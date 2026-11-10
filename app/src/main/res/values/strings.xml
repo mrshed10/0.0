@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">مواعيد الرواتب</string>
+    <string name="widget_name">مواعيدي</string>
+    <string name="widget_description">الرواتب والخدمات والعدادات الشخصية بألوانك</string>
+</resources>
