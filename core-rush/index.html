@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#090d16">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Core Rush</title>
+<style>
+:root{
+  --hud-h: clamp(120px, 21vh, 190px);
+  --btn: clamp(34px, min(6.3vh, 10.5vw), 62px);
+  --card-w: clamp(40px, min(8vh, 12.5vw), 78px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none}
+html,body{height:100%;background:#090d16;color:#fff;font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif;overflow:hidden;overscroll-behavior:none}
+body{display:flex;flex-direction:column;height:100vh;height:100dvh}
+button{font-family:inherit;color:inherit;cursor:pointer}
+
+/* ===== لوحات اللاعبين ===== */
+.hud{height:var(--hud-h);flex:none;display:flex;align-items:center;justify-content:space-between;gap:6px;
+  padding:6px max(8px,env(safe-area-inset-left));background:linear-gradient(#111827,#0d1422);direction:ltr;transition:transform .45s ease}
+#hud0{border-bottom:3px solid #1d4ed8}
+#hud1{border-top:3px solid #b91c1c;background:linear-gradient(#0d1422,#111827)}
+#hud0.rotated{transform:rotate(180deg)}
+.cards{display:flex;gap:4px;flex:none}
+.card{width:var(--card-w);height:calc(var(--card-w)*1.25);border-radius:10px;border:2px solid #475569;background:#1e293b;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:700;
+  transition:transform .1s,opacity .3s;position:relative;overflow:hidden}
+.card .ic{font-size:calc(var(--card-w)*.42);line-height:1}
+.card:active{transform:scale(.92)}
+.card.boost{border-color:#f59e0b;background:linear-gradient(160deg,#3b2a07,#1e293b)}
+.card.block{border-color:#ea580c;background:linear-gradient(160deg,#3b1607,#1e293b)}
+.card.shield{border-color:#22d3ee;background:linear-gradient(160deg,#073640,#1e293b)}
+.card.used{opacity:.18;pointer-events:none;filter:grayscale(1)}
+.info{flex:1;text-align:center;min-width:0;direction:rtl}
+.info .name{font-weight:800;font-size:clamp(12px,2.2vh,20px);white-space:nowrap}
+.info .score{font-size:clamp(20px,3.6vh,34px);font-weight:900;line-height:1.1}
+.info .status{font-size:clamp(11px,1.6vh,14px);min-height:1.3em;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hud0 .name{color:#60a5fa}
+#hud1 .name{color:#f87171}
+.dpad{flex:none;display:grid;grid-template-columns:repeat(3,var(--btn));grid-template-rows:repeat(3,var(--btn));gap:3px}
+.dpad button{background:#334155;border:none;border-radius:10px;font-size:calc(var(--btn)*.38);font-weight:900;box-shadow:inset 0 -3px 0 rgba(0,0,0,.35)}
+.dpad button.pressed{background:#64748b}
+#hud0 .dpad button.pressed{background:#2563eb}
+#hud1 .dpad button.pressed{background:#dc2626}
+.dpad .mid{border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-size:12px;color:#64748b}
+
+/* ===== الساحة ===== */
+#arena{flex:1;min-height:0;display:flex;flex-direction:column;align-items:stretch}
+.topbar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 8px;font-size:13px}
+.btn-ui{background:rgba(30,41,59,.95);border:1px solid #475569;padding:5px 10px;border-radius:8px;font-size:13px;white-space:nowrap}
+#biome-label{font-weight:800;color:#34d399;text-align:center;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:2px}
+canvas{display:block;border-radius:10px;box-shadow:0 0 24px rgba(0,0,0,.8)}
+
+/* ===== الطبقة العلوية (القوائم) ===== */
+#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(3,6,14,.78);
+  z-index:10;padding:16px;backdrop-filter:blur(3px)}
+#overlay.hidden{display:none}
+.panel{width:min(440px,100%);max-height:100%;overflow:auto;background:#0f172a;border:1px solid #334155;border-radius:18px;padding:18px;
+  text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6);touch-action:pan-y}
+.panel h1{font-size:34px;letter-spacing:1px;background:linear-gradient(90deg,#60a5fa,#34d399,#f87171);-webkit-background-clip:text;background-clip:text;color:transparent}
+.panel h2{font-size:24px;margin-bottom:6px}
+.panel p{color:#94a3b8;font-size:14px;line-height:1.6;margin:6px 0}
+.row{display:flex;gap:8px;margin:10px 0}
+.opt{flex:1;padding:10px 6px;border-radius:10px;border:2px solid #334155;background:#1e293b;font-size:14px;font-weight:700}
+.opt.on{border-color:#34d399;background:#064e3b}
+.big{width:100%;padding:14px;border:none;border-radius:12px;font-size:19px;font-weight:900;margin-top:8px;
+  background:linear-gradient(90deg,#2563eb,#059669);box-shadow:0 4px 0 #064e3b}
+.big.sec{background:#334155;box-shadow:0 4px 0 #1e293b;font-size:16px;padding:11px}
+.mirror{transform:rotate(180deg);border-bottom:1px dashed #334155;padding-bottom:10px;margin-bottom:10px}
+.biomes{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;font-size:12px;color:#94a3b8;margin-top:8px}
+.biomes span{background:#1e293b;border-radius:6px;padding:3px 6px}
+.lbl{font-size:12px;color:#64748b;margin-top:10px;text-align:right}
+</style>
+</head>
+<body>
+
+<!-- لوحة اللاعب الأزرق (العلوي) -->
+<div class="hud" id="hud0">
+  <div class="cards" id="cards0"></div>
+  <div class="info">
+    <div class="name">الأزرق <span id="ai-tag"></span></div>
+    <div class="score" id="score0">0</div>
+    <div class="status" id="status0"></div>
+  </div>
+  <div class="dpad" data-player="0">
+    <div></div><button data-dir="0">▲</button><div></div>
+    <button data-dir="3">◀</button><div class="mid">●</div><button data-dir="1">▶</button>
+    <div></div><button data-dir="2">▼</button><div></div>
+  </div>
+</div>
+
+<!-- ساحة المتاهة -->
+<div id="arena">
+  <div class="topbar">
+    <button class="btn-ui" id="btn-pause">⏸</button>
+    <span id="biome-label">Core Rush</span>
+    <button class="btn-ui" id="btn-table">🔄 طاولة</button>
+  </div>
+  <div id="wrap"><canvas id="game"></canvas></div>
+</div>
+
+<!-- لوحة اللاعب الأحمر (السفلي) -->
+<div class="hud" id="hud1">
+  <div class="cards" id="cards1"></div>
+  <div class="info">
+    <div class="name">الأحمر</div>
+    <div class="score" id="score1">0</div>
+    <div class="status" id="status1"></div>
+  </div>
+  <div class="dpad" data-player="1">
+    <div></div><button data-dir="0">▲</button><div></div>
+    <button data-dir="3">◀</button><div class="mid">●</div><button data-dir="1">▶</button>
+    <div></div><button data-dir="2">▼</button><div></div>
+  </div>
+</div>
+
+<div id="overlay"><div class="panel" id="panel"></div></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Core Rush — لعبة متاهة تنافسية (HTML5 Canvas, ملف واحد)
+   الأقسام:
+   1) ثوابت وأدوات مساعدة        2) البيئات السبع (Biome Strategy)
+   3) مولّد المتاهة المتماثل      4) العقبات الديناميكية
+   5) اللاعبون والحركة الذكية     6) الكروت التكتيكية
+   7) الذكاء الاصطناعي            8) الإدخال (لمس متعدد + سحب + لوحة مفاتيح)
+   9) الرسم والمؤثرات             10) حلقة اللعبة وإدارة الجولات والواجهة
+   ===================================================================== */
+
+/* ---------- 1) ثوابت وأدوات ---------- */
+const DX = [0, 1, 0, -1];          // 0=أعلى 1=يمين 2=أسفل 3=يسار
+const DY = [-1, 0, 1, 0];
+const OPP = d => (d + 2) % 4;
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function mulberry32(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('corerush.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('corerush.' + k, JSON.stringify(v)); } catch (e) { } }
+};
+const settings = {
+  mode: store.get('mode', 'ai'),          // 'ai' | 'pvp'
+  difficulty: store.get('difficulty', 1), // 0 سهل، 1 عادي، 2 صعب
+  tabletop: store.get('tabletop', false),
+  sound: store.get('sound', true),
+  vibrate: store.get('vibrate', true),
+};
+function vibrate(p) { if (settings.vibrate && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { } } }
+
+/* مؤثرات صوتية مولّدة (بدون ملفات) */
+let AC = null;
+const SFX = {
+  card: [660, 990, .12, 'triangle'], hit: [200, 70, .28, 'sawtooth'], win: [523, 1046, .55, 'square'],
+  count: [440, 440, .12, 'sine'], go: [880, 1320, .3, 'sine'], block: [240, 120, .2, 'square'],
+  shield: [500, 900, .22, 'sine'], freeze: [1400, 300, .35, 'sine'], tap: [320, 380, .05, 'sine'],
+  boost: [300, 1200, .3, 'sawtooth'], bump: [120, 90, .06, 'sine']
+};
+function sfx(name) {
+  if (!settings.sound) return;
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const p = SFX[name]; if (!p) return;
+    const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
+    o.type = p[3];
+    o.frequency.setValueAtTime(p[0], t);
+    o.frequency.exponentialRampToValueAtTime(p[1], t + p[2]);
+    g.gain.setValueAtTime(.09, t);
+    g.gain.exponentialRampToValueAtTime(.0008, t + p[2]);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t + p[2] + .03);
+  } catch (e) { }
+}
+
+/* ---------- 2) البيئات السبع (Biome Strategy Pattern) ----------
+   كل بيئة = كائن إعدادات: ألوان، معامل سرعة، نوع جزيئات، أسلوب الأثر، ونوع العقبة.
+   إضافة بيئة جديدة = إضافة كائن هنا + حالة في createHazards(). */
+const BIOMES = [
+  { key: 'ice', name: 'الجليدية', icon: '❄️', bg: '#06142a', floorA: '#a7d5f4', floorB: '#bde2f8', wall: '#1d4f86', glow: '#bfe8ff',
+    goal: '#22ff88', trail: 'skate', trailColor: 'rgba(255,255,255,', particle: 'snow', speedMul: 1.12,
+    hazardName: 'كتل جليدية منزلقة تدفعك للخلف' },
+  { key: 'lava', name: 'النارية', icon: '🌋', bg: '#1a0402', floorA: '#3a0d06', floorB: '#45120a', wall: '#ff6a00', glow: '#ff2a00',
+    goal: '#22ff88', trail: 'ember', trailColor: 'rgba(255,140,30,', particle: 'ember', speedMul: 1.0,
+    hazardName: 'كرات نار متطايرة تبطئك' },
+  { key: 'cyber', name: 'التقنية', icon: '💠', bg: '#02030a', floorA: '#050a18', floorB: '#081127', wall: '#00ffd5', glow: '#00e5ff',
+    goal: '#39ff14', trail: 'neon', trailColor: 'rgba(0,255,213,', particle: 'digit', speedMul: 1.05,
+    hazardName: 'ليزر ماسح يجمّد النظام' },
+  { key: 'desert', name: 'الصحراوية', icon: '🏜️', bg: '#3a2510', floorA: '#e2b66e', floorB: '#d8a95d', wall: '#6e4219', glow: '#ffcf6e',
+    goal: '#16a34a', trail: 'dig', trailColor: 'rgba(120,80,35,', particle: 'sand', speedMul: 0.95,
+    hazardName: 'صخور متدحرجة وعواصف رملية' },
+  { key: 'forest', name: 'الغابة', icon: '🌲', bg: '#0b1d0c', floorA: '#2f6b2c', floorB: '#367834', wall: '#132e0f', glow: '#7ccf4f',
+    goal: '#bbf7d0', trail: 'leaf', trailColor: 'rgba(190,240,90,', particle: 'leaf', speedMul: 1.0,
+    hazardName: 'جذور أشجار تلتقط الكرة (انقر مرتين)' },
+  { key: 'water', name: 'المائية', icon: '🌊', bg: '#021a2e', floorA: '#063a60', floorB: '#08466f', wall: '#38bdf8', glow: '#0ea5e9',
+    goal: '#4ade80', trail: 'bubble', trailColor: 'rgba(186,230,253,', particle: 'bubble', speedMul: 0.9,
+    hazardName: 'دوامات تدير الكرة وتغيّر اتجاهها' },
+  { key: 'sky', name: 'الهوائية', icon: '☁️', bg: '#4f9bd9', floorA: '#f5faff', floorB: '#e3effb', wall: '#4a7fc0', glow: '#ffffff',
+    goal: '#16a34a', trail: 'wisp', trailColor: 'rgba(255,255,255,', particle: 'cloud', speedMul: 1.15,
+    hazardName: 'سحب رعدية وأعاصير مصغّرة' },
+];
+
+/* ---------- الحالة العامة ---------- */
+const G = {
+  state: 'menu',        // menu | countdown | play | paused | roundEnd
+  level: 1, N: 11, c: 5, walls: null, biome: BIOMES[0],
+  players: [], hazards: [], tempWalls: new Map(),
+  particles: [], fx: [], popups: [],
+  time: 0, roundTime: 0, countdown: 0,
+  scores: [0, 0], winner: -1,
+  storm: { next: 0, until: 0, amount: 0 },
+  cs: 30, size: 330, dpr: 1, mazeCanvas: null, shake: 0,
+};
+
+/* ---------- 3) مولّد المتاهة المتماثل ----------
+   Recursive Backtracker مع تماثل دوراني 180° حول المركز:
+   كل ممر يُحفر يُحفر نظيره المقلوب ⇒ مسافة ومنعطفات متساوية للاعبَين.
+   ثم تُفتح جدران إضافية (~12%) بشكل متماثل أيضاً لصنع حلقات وطرق التفاف. */
+function generateMaze(N, rng) {
+  const walls = new Uint8Array(N * N).fill(15);
+  const visited = new Uint8Array(N * N);
+  const c = (N - 1) / 2;
+  const idx = (x, y) => y * N + x;
+  const inb = (x, y) => x >= 0 && y >= 0 && x < N && y < N;
+  const carve = (x, y, d) => {
+    const nx = x + DX[d], ny = y + DY[d];
+    walls[idx(x, y)] &= ~(1 << d);
+    walls[idx(nx, ny)] &= ~(1 << OPP(d));
+  };
+  const carveSym = (x, y, d) => { carve(x, y, d); carve(N - 1 - x, N - 1 - y, OPP(d)); };
+
+  const stack = [[c, c]];
+  visited[idx(c, c)] = 1;
+  while (stack.length) {
+    const [x, y] = stack[stack.length - 1];
+    const opts = [];
+    for (let d = 0; d < 4; d++) {
+      const nx = x + DX[d], ny = y + DY[d];
+      if (inb(nx, ny) && !visited[idx(nx, ny)]) opts.push(d);
+    }
+    if (!opts.length) { stack.pop(); continue; }
+    const d = opts[Math.floor(rng() * opts.length)];
+    const nx = x + DX[d], ny = y + DY[d];
+    carveSym(x, y, d);
+    visited[idx(nx, ny)] = 1;
+    visited[idx(N - 1 - nx, N - 1 - ny)] = 1;
+    stack.push([nx, ny]);
+  }
+  // فتح ممرات إضافية متماثلة
+  const half = Math.floor(N * N / 2);
+  for (let i = 0; i < half; i++) {
+    const x = i % N, y = Math.floor(i / N);
+    for (const d of [1, 2]) {
+      const nx = x + DX[d], ny = y + DY[d];
+      if (inb(nx, ny) && (walls[idx(x, y)] & (1 << d)) && rng() < 0.12) carveSym(x, y, d);
+    }
+  }
+  return walls;
+}
+
+function wallAt(x, y, d) { return (G.walls[y * G.N + x] & (1 << d)) !== 0; }
+function edgeKey(x, y, d) {
+  const a = y * G.N + x, b = (y + DY[d]) * G.N + (x + DX[d]);
+  return a < b ? a + '-' + b : b + '-' + a;
+}
+function canPass(x, y, d) {
+  const nx = x + DX[d], ny = y + DY[d];
+  if (nx < 0 || ny < 0 || nx >= G.N || ny >= G.N) return false;
+  if (wallAt(x, y, d)) return false;
+  return !G.tempWalls.has(edgeKey(x, y, d));
+}
+function exits(x, y, ignoreTemp) {
+  const r = [];
+  for (let d = 0; d < 4; d++) {
+    if (ignoreTemp) { const nx = x + DX[d], ny = y + DY[d]; if (nx >= 0 && ny >= 0 && nx < G.N && ny < G.N && !wallAt(x, y, d)) r.push(d); }
+    else if (canPass(x, y, d)) r.push(d);
+  }
+  return r;
+}
+/* أقصر مسار (BFS) — يُستخدم للذكاء الاصطناعي ولوضع الجدار المؤقت */
+function bfs(sx, sy, tx, ty) {
+  const N = G.N, prev = new Int32Array(N * N).fill(-1), start = sy * N + sx, goal = ty * N + tx;
+  const q = [start]; prev[start] = start;
+  for (let h = 0; h < q.length; h++) {
+    const cur = q[h]; if (cur === goal) break;
+    const x = cur % N, y = (cur / N) | 0;
+    for (let d = 0; d < 4; d++) {
+      if (!canPass(x, y, d)) continue;
+      const n = (y + DY[d]) * N + x + DX[d];
+      if (prev[n] === -1) { prev[n] = cur; q.push(n); }
+    }
+  }
+  if (prev[goal] === -1) return null;
+  const path = []; let c = goal;
+  while (c !== start) { path.push({ x: c % N, y: (c / N) | 0 }); c = prev[c]; }
+  path.push({ x: sx, y: sy });
+  return path.reverse();
+}
+function dirBetween(a, b) { for (let d = 0; d < 4; d++) if (a.x + DX[d] === b.x && a.y + DY[d] === b.y) return d; return -1; }
+
+/* ---------- 4) العقبات الديناميكية ----------
+   كل عقبة تملك: update(dt) و test(player) و apply(player) و draw(ctx, cs).
+   تُوضع بأزواج متماثلة (مدوّرة 180°) لضمان العدالة. */
+const rotCell = c => ({ x: G.N - 1 - c.x, y: G.N - 1 - c.y });
+
+class Patrol { // كيان يتحرك ذهاباً وإياباً في ممر مستقيم: كتلة جليد / كرة نار / صخرة / إعصار
+  constructor(cells, kind, speed, pos, dir) {
+    this.cells = cells; this.kind = kind; this.speed = speed;
+    this.pos = pos; this.dir = dir; this.hop = pos * 1.7; this.rot = 0;
+  }
+  update(dt) {
+    const m = this.cells.length - 1;
+    this.pos += this.dir * this.speed * dt;
+    if (this.pos > m) { this.pos = 2 * m - this.pos; this.dir = -1; }
+    if (this.pos < 0) { this.pos = -this.pos; this.dir = 1; }
+    this.hop += dt * 3.4; this.rot += dt * this.dir * 5;
+  }
+  xy() {
+    const m = this.cells.length - 1, i = Math.min(Math.floor(this.pos), m - 1), f = this.pos - i;
+    const a = this.cells[i], b = this.cells[i + 1];
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+  }
+  height() { return this.kind === 'fireball' ? Math.abs(Math.sin(this.hop)) : 0; }
+  test(p) { if (this.kind === 'fireball' && this.height() > 0.45) return false; return dist(this.xy(), playerPos(p)) < 0.58; }
+  apply(p) {
+    if (this.kind === 'iceblock') { pushBack(p, 2); popup(p, '❄️ دفعة للخلف!'); sfx('hit'); }
+    else if (this.kind === 'fireball') { p.slowUntil = G.time + 2; popup(p, '🔥 إبطاء 50%'); sfx('hit'); burst(playerPos(p), '#ff7a00', 18); }
+    else if (this.kind === 'rock') { pushBack(p, 1); p.stunUntil = G.time + 0.6; popup(p, '🪨 اصطدام!'); sfx('hit'); }
+    else if (this.kind === 'tornado') { spin(p, 0.6); popup(p, '🌪️ إعصار!'); }
+  }
+  draw(ctx, cs) {
+    const q = this.xy(), x = (q.x + .5) * cs, y = (q.y + .5) * cs, r = cs * .34;
+    ctx.save(); ctx.translate(x, y);
+    if (this.kind === 'iceblock') {
+      ctx.rotate(Math.sin(this.rot * .2) * .1);
+      ctx.shadowColor = '#e0f7ff'; ctx.shadowBlur = cs * .3;
+      const g = ctx.createLinearGradient(-r, -r, r, r); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#7cc8f0');
+      ctx.fillStyle = g; roundRect(ctx, -r, -r, r * 2, r * 2, r * .3); ctx.fill();
+      ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-r * .5, -r * .6); ctx.lineTo(r * .2, -r * .6); ctx.stroke();
+    } else if (this.kind === 'fireball') {
+      const h = this.height(), lift = h * cs * .5;
+      ctx.fillStyle = 'rgba(0,0,0,' + (.35 - h * .25) + ')';
+      ctx.beginPath(); ctx.ellipse(0, r * .6, r * (1 - h * .4), r * .35 * (1 - h * .4), 0, 0, 7); ctx.fill();
+      if (h < .45) { ctx.strokeStyle = 'rgba(255,80,0,.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, r * 1.1, 0, 7); ctx.stroke(); }
+      ctx.translate(0, -lift);
+      ctx.shadowColor = '#ff4500'; ctx.shadowBlur = cs * .5;
+      const g = ctx.createRadialGradient(-r * .2, -r * .2, 1, 0, 0, r);
+      g.addColorStop(0, '#fff3b0'); g.addColorStop(.4, '#ffa500'); g.addColorStop(1, '#d11a00');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r * .85, 0, 7); ctx.fill();
+    } else if (this.kind === 'rock') {
+      ctx.rotate(this.rot);
+      ctx.fillStyle = '#7a5530'; ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, rr = r * (i % 2 ? .85 : 1); ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#5a3b1c'; ctx.beginPath(); ctx.arc(r * .3, -r * .2, r * .2, 0, 7); ctx.arc(-r * .3, r * .3, r * .15, 0, 7); ctx.fill();
+    } else if (this.kind === 'tornado') {
+      ctx.strokeStyle = 'rgba(90,110,140,.85)'; ctx.lineWidth = Math.max(1.5, cs * .05);
+      for (let i = 0; i < 5; i++) {
+        const yy = -r + i * r * .45, w = r * (.35 + i * .17), o = Math.sin(this.hop * 2 + i) * r * .15;
+        ctx.beginPath(); ctx.ellipse(o, -yy * .9 + r * .3, w, w * .3, 0, 0, 7); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+}
+
+class Laser { // التقنية: شعاع ماسح يومض ثم يجمّد الحركة 1.5 ثانية
+  constructor(o, lo, hi, line, dir, s, e, timer) {
+    Object.assign(this, { o, lo, hi, line, dir, s, e, timer, phase: 'off', speed: .9 });
+  }
+  update(dt) {
+    this.line += this.dir * this.speed * dt;
+    if (this.line > this.hi) { this.line = this.hi; this.dir = -1; }
+    if (this.line < this.lo) { this.line = this.lo; this.dir = 1; }
+    this.timer -= dt;
+    if (this.timer <= 0) {
+      if (this.phase === 'off') { this.phase = 'warn'; this.timer = .75; }
+      else if (this.phase === 'warn') { this.phase = 'on'; this.timer = 1.1; }
+      else { this.phase = 'off'; this.timer = 2.4; }
+    }
+  }
+  test(p) {
+    if (this.phase !== 'on') return false;
+    const q = playerPos(p);
+    const a = this.o === 'h' ? q.y : q.x, b = this.o === 'h' ? q.x : q.y;
+    return Math.abs(a - this.line) < .4 && b >= this.s - .45 && b <= this.e + .45;
+  }
+  apply(p) { p.frozenUntil = G.time + 1.5; popup(p, '⛔ تجميد النظام'); sfx('freeze'); vibrate([20, 30, 20]); }
+  draw(ctx, cs) {
+    const L = (this.line + .5) * cs, A = this.s * cs + cs * .1, B = (this.e + 1) * cs - cs * .1;
+    const seg = (w, col, blur) => {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.shadowColor = col; ctx.shadowBlur = blur;
+      ctx.beginPath();
+      if (this.o === 'h') { ctx.moveTo(A, L); ctx.lineTo(B, L); } else { ctx.moveTo(L, A); ctx.lineTo(L, B); }
+      ctx.stroke();
+    };
+    ctx.save();
+    // الباعثات
+    ctx.fillStyle = '#ff00e6';
+    const em = (u) => { const px = this.o === 'h' ? u : L, py = this.o === 'h' ? L : u; ctx.fillRect(px - cs * .1, py - cs * .1, cs * .2, cs * .2); };
+    em(A); em(B);
+    if (this.phase === 'warn') {
+      if (Math.floor(G.time * 12) % 2) { ctx.setLineDash([cs * .15, cs * .12]); seg(1.5, 'rgba(255,0,230,.8)', 0); }
+    } else if (this.phase === 'on') {
+      seg(cs * .22, 'rgba(255,0,200,.35)', cs * .6); seg(cs * .07, '#ffd6fb', cs * .2);
+    }
+    ctx.restore();
+  }
+}
+
+class Roots { // الغابة: جذور تنبثق في التقاطعات وتمسك الكرة
+  constructor(x, y, timer) { Object.assign(this, { x, y, timer, phase: 'idle', grow: 0 }); }
+  update(dt) {
+    this.timer -= dt;
+    if (this.timer <= 0) {
+      if (this.phase === 'idle') { this.phase = 'warn'; this.timer = .7; }
+      else if (this.phase === 'warn') { this.phase = 'active'; this.timer = 1.7; }
+      else { this.phase = 'idle'; this.timer = 3.2; }
+    }
+    const target = this.phase === 'active' ? 1 : 0;
+    this.grow += (target - this.grow) * Math.min(1, dt * 10);
+  }
+  test(p) { return this.phase === 'active' && dist(this, playerPos(p)) < .45; }
+  apply(p) { rootPlayer(p); }
+  draw(ctx, cs) {
+    const x = (this.x + .5) * cs, y = (this.y + .5) * cs;
+    ctx.save(); ctx.translate(x, y);
+    if (this.phase === 'warn') ctx.translate(Math.sin(G.time * 60) * 1.5, 0);
+    ctx.fillStyle = 'rgba(60,35,15,.55)'; ctx.beginPath(); ctx.ellipse(0, 0, cs * .3, cs * .2, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#6b3f1d'; ctx.lineCap = 'round';
+    const n = 6, g = .15 + this.grow * .85;
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2 + .3;
+      ctx.lineWidth = cs * .07;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * cs * .08, Math.sin(a) * cs * .08);
+      ctx.quadraticCurveTo(Math.cos(a + .6) * cs * .3 * g, Math.sin(a + .6) * cs * .3 * g, Math.cos(a + 1) * cs * .42 * g, Math.sin(a + 1) * cs * .42 * g);
+      ctx.stroke();
+    }
+    if (this.phase === 'warn') { ctx.strokeStyle = 'rgba(255,220,120,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, cs * .4, 0, 7); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+class Whirlpool { // المائية: دوامة تدير الكرة ثم توجهها لممر عشوائي
+  constructor(x, y, sign) { Object.assign(this, { x, y, sign, ang: 0 }); }
+  update(dt) { this.ang += dt * 4 * this.sign; }
+  test(p) { return dist(this, playerPos(p)) < .32; }
+  apply(p) { spin(p, .8); popup(p, '🌀 دوامة!'); }
+  draw(ctx, cs) {
+    ctx.save(); ctx.translate((this.x + .5) * cs, (this.y + .5) * cs); ctx.rotate(this.ang);
+    for (let i = 0; i < 3; i++) {
+      ctx.strokeStyle = 'rgba(190,240,255,' + (.75 - i * .2) + ')'; ctx.lineWidth = Math.max(1.5, cs * .05);
+      ctx.beginPath(); ctx.arc(0, 0, cs * (.12 + i * .11), i, i + 4.2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+class Thundercloud { // الهوائية: سحابة تنجرف ثم تصعق وتعيد الكرة لآخر تقاطع
+  constructor(x, y, vx, vy, timer) { Object.assign(this, { x, y, vx, vy, timer, phase: 'drift' }); }
+  update(dt) {
+    if (this.phase === 'drift') {
+      this.x += this.vx * dt; this.y += this.vy * dt;
+      const m = G.N - 1;
+      if (this.x < .5 || this.x > m - .5) { this.vx *= -1; this.x = clamp(this.x, .5, m - .5); }
+      if (this.y < 1 || this.y > m - 1) { this.vy *= -1; this.y = clamp(this.y, 1, m - 1); }
+    }
+    this.timer -= dt;
+    if (this.timer <= 0) {
+      if (this.phase === 'drift') { this.phase = 'charge'; this.timer = .8; }
+      else if (this.phase === 'charge') { this.phase = 'strike'; this.timer = .3; G.shake = Math.max(G.shake, .15); }
+      else { this.phase = 'drift'; this.timer = 3.3; }
+    }
+  }
+  test(p) { return this.phase === 'strike' && dist(this, playerPos(p)) < .85; }
+  apply(p) { shockBack(p); p.stunUntil = G.time + .45; popup(p, '⚡ صاعقة!'); sfx('hit'); vibrate(60); }
+  draw(ctx, cs) {
+    const x = (this.x + .5) * cs, y = (this.y + .5) * cs;
+    ctx.save();
+    if (this.phase === 'strike') {
+      ctx.strokeStyle = '#fff59d'; ctx.shadowColor = '#fff'; ctx.shadowBlur = cs * .6; ctx.lineWidth = cs * .08;
+      ctx.beginPath(); ctx.moveTo(x, y - cs * .55);
+      for (let i = 1; i <= 4; i++) ctx.lineTo(x + (i % 2 ? 1 : -1) * cs * .15 * Math.random(), y - cs * .55 + i * cs * .15);
+      ctx.stroke(); ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,180,.35)'; ctx.beginPath(); ctx.arc(x, y, cs * .85, 0, 7); ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(x, y + cs * .1, cs * .55, cs * .2, 0, 0, 7); ctx.fill();
+    }
+    const dark = this.phase === 'drift' ? '#9aa6b8' : (Math.floor(G.time * 14) % 2 ? '#4b5563' : '#6b7280');
+    ctx.fillStyle = dark;
+    const cy = y - cs * .55;
+    [[-.32, .05, .26], [0, -.08, .33], [.32, .05, .26], [0, .1, .28]].forEach(([ox, oy, r]) => {
+      ctx.beginPath(); ctx.arc(x + ox * cs, cy + oy * cs, r * cs, 0, 7); ctx.fill();
+    });
+    ctx.restore();
+  }
+}
+
+/* إيجاد ممرات مستقيمة لوضع الكيانات المتحركة */
+function findSegments() {
+  const N = G.N, segs = [];
+  for (let y = 0; y < N; y++) {
+    let x = 0;
+    while (x < N) { const run = [{ x, y }]; while (x < N - 1 && !wallAt(x, y, 1)) { x++; run.push({ x, y }); } if (run.length >= 3) segs.push(run); x++; }
+  }
+  for (let x = 0; x < N; x++) {
+    let y = 0;
+    while (y < N) { const run = [{ x, y }]; while (y < N - 1 && !wallAt(x, y, 2)) { y++; run.push({ x, y }); } if (run.length >= 3) segs.push(run); y++; }
+  }
+  return segs.map(s => { if (s.length <= 6) return s; const len = randi(3, 6), st = randi(0, s.length - len); return s.slice(st, st + len); });
+}
+function forbidden(c) {
+  const N = G.N, m = G.c;
+  const near = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) <= 1;
+  return near(c, { x: m, y: m }) || near(c, { x: m, y: 0 }) || near(c, { x: m, y: N - 1 }) || c.y === 0 || c.y === N - 1;
+}
+
+function createHazards() {
+  const b = G.biome.key, N = G.N, H = [];
+  const pairs = clamp(1 + Math.floor((G.level - 1) / 7) + (N >= 13 ? 1 : 0), 1, 4);
+  const segs = shuffle(findSegments().filter(s => !s.some(forbidden)));
+  const usedSeg = new Set();
+  const takeSeg = () => {
+    for (const s of segs) {
+      const k = s.map(c => c.x + ',' + c.y).join('|');
+      const rk = s.map(rotCell).map(c => c.x + ',' + c.y).join('|');
+      if (usedSeg.has(k) || usedSeg.has(rk)) continue;
+      usedSeg.add(k); usedSeg.add(rk); return s;
+    }
+    return null;
+  };
+  const addPatrolPair = (kind, speed) => {
+    const s = takeSeg(); if (!s) return;
+    const pos = Math.random() * (s.length - 1), dir = Math.random() < .5 ? 1 : -1;
+    H.push(new Patrol(s, kind, speed, pos, dir));
+    H.push(new Patrol(s.map(rotCell), kind, speed, pos, dir));
+  };
+  const cellsWhere = fn => {
+    const r = [];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const c = { x, y }; if (forbidden(c) || y * N + x >= Math.floor(N * N / 2)) continue;
+      if (fn(x, y)) r.push(c);
+    }
+    return shuffle(r);
+  };
+
+  if (b === 'ice') for (let i = 0; i < pairs + 1; i++) addPatrolPair('iceblock', 1.4);
+  if (b === 'lava') for (let i = 0; i < pairs + 1; i++) addPatrolPair('fireball', 1.2);
+  if (b === 'desert') for (let i = 0; i < pairs; i++) addPatrolPair('rock', 1.7);
+  if (b === 'cyber') {
+    for (let i = 0; i < pairs; i++) {
+      const o = Math.random() < .5 ? 'h' : 'v';
+      const lo = randi(1, Math.max(1, Math.floor(N / 2) - 3)), hi = Math.min(lo + 3, Math.floor(N / 2) - 1);
+      const s = randi(0, N - 6), e = s + 5, line = rand(lo, hi), dir = 1, t = rand(1.5, 3.5);
+      H.push(new Laser(o, lo, hi, line, dir, s, e, t));
+      H.push(new Laser(o, N - 1 - hi, N - 1 - lo, N - 1 - line, -dir, N - 1 - e, N - 1 - s, t));
+    }
+  }
+  if (b === 'forest') {
+    const js = cellsWhere((x, y) => exits(x, y, true).length >= 3);
+    const extra = cellsWhere((x, y) => exits(x, y, true).length === 2);
+    const list = js.concat(extra).slice(0, pairs + 2);
+    list.forEach(c => { const t = rand(1.5, 4); H.push(new Roots(c.x, c.y, t)); const r = rotCell(c); H.push(new Roots(r.x, r.y, t)); });
+  }
+  if (b === 'water') {
+    const list = cellsWhere((x, y) => exits(x, y, true).length === 2), chosen = [];
+    for (const c of list) { if (chosen.length >= pairs + 1) break; if (chosen.every(o => Math.abs(o.x - c.x) + Math.abs(o.y - c.y) > 2)) chosen.push(c); }
+    chosen.forEach(c => { H.push(new Whirlpool(c.x, c.y, 1)); const r = rotCell(c); H.push(new Whirlpool(r.x, r.y, -1)); });
+  }
+  if (b === 'sky') {
+    for (let i = 0; i < pairs; i++) {
+      const x = rand(1, N - 2), y = rand(2, G.c - 1), vx = rand(.4, .8) * (Math.random() < .5 ? 1 : -1), vy = rand(-.3, .3), t = rand(2, 4);
+      H.push(new Thundercloud(x, y, vx, vy, t));
+      H.push(new Thundercloud(N - 1 - x, N - 1 - y, -vx, -vy, t));
+    }
+    addPatrolPair('tornado', 1.3);
+  }
+  return H;
+}
+
+/* ---------- 5) اللاعبون والحركة الذكية ---------- */
+function makePlayer(i) {
+  const N = G.N, x = G.c, y = i === 0 ? 0 : N - 1;
+  return {
+    i, x, y, tx: x, ty: y, t: 0, moving: false, dir: null,
+    want: null, wantTime: 0,
+    color: i === 0 ? '#3b82f6' : '#ef4444', light: i === 0 ? '#bfdbfe' : '#fecaca',
+    history: [{ x, y }], lastJunction: { x, y },
+    forced: [], forcedMoving: false,
+    frozenUntil: 0, slowUntil: 0, stunUntil: 0, spinUntil: 0, shieldUntil: 0, boostUntil: 0,
+    rooted: false, rootTaps: 0, rootLastTap: 0, rootUntil: 0,
+    immune: 0, cards: [], trail: [], trailTimer: 0,
+    ai: false, aiTimer: 0, aiCardTimer: 1.5, aiHold: null, aiHoldDir: -1, aiMistakes: new Set(),
+  };
+}
+function playerPos(p) { return { x: p.x + (p.tx - p.x) * p.t, y: p.y + (p.ty - p.y) * p.t }; }
+const boosting = p => G.time < p.boostUntil;
+const shielded = p => G.time < p.shieldUntil;
+function speedOf(p) {
+  if (p.forcedMoving) return 7;
+  let s = (3.5 + Math.min(G.level, 21) * .045) * G.biome.speedMul;
+  if (boosting(p)) s *= 2;
+  if (G.time < p.slowUntil) s *= .5;
+  return s;
+}
+function startMove(p, d, forced) {
+  p.tx = p.x + DX[d]; p.ty = p.y + DY[d]; p.t = 0; p.moving = true;
+  if (forced) { p.forcedMoving = true; } else { p.dir = d; }
+}
+function snap(p) {
+  if (!p.moving) return;
+  if (p.t >= .5) { p.x = p.tx; p.y = p.ty; if (!p.forcedMoving) pushHistory(p); }
+  p.tx = p.x; p.ty = p.y; p.t = 0; p.moving = false;
+}
+function pushHistory(p) {
+  const h = p.history, l = h[h.length - 1];
+  if (!l || l.x !== p.x || l.y !== p.y) { h.push({ x: p.x, y: p.y }); if (h.length > 40) h.shift(); }
+}
+function arrive(p) {
+  p.x = p.tx; p.y = p.ty; p.t = 0; p.moving = false;
+  if (p.forcedMoving) {
+    if (!p.forced.length) { p.forcedMoving = false; p.dir = null; }
+  } else {
+    pushHistory(p);
+    if (exits(p.x, p.y, true).length >= 3) p.lastJunction = { x: p.x, y: p.y };
+  }
+  if (p.x === G.c && p.y === G.c) winRound(p);
+}
+/* قرار الحركة عند الوقوف في مركز خلية: إدخال مخزّن ← طيار آلي يتبع الممر ← توقف عند التقاطع */
+function decide(p) {
+  if (p.forced.length) {
+    const n = p.forced.shift(), d = dirBetween(p, n);
+    if (d >= 0) { startMove(p, d, true); return true; }
+    p.forced.length = 0; p.forcedMoving = false; return false;
+  }
+  if (p.want !== null) {
+    if (canPass(p.x, p.y, p.want)) { const d = p.want; p.want = null; startMove(p, d); return true; }
+    if (G.time - p.wantTime > .8) p.want = null;
+  }
+  if (p.dir !== null) {
+    if (boosting(p) && canPass(p.x, p.y, p.dir)) { startMove(p, p.dir); return true; }
+    const ex = exits(p.x, p.y).filter(d => d !== OPP(p.dir));
+    if (ex.length === 1) { startMove(p, ex[0]); return true; }
+    if (ex.length === 0 && !p.ai) { sfx('bump'); }
+    p.dir = null; // تقاطع أو طريق مسدود: توقف
+  }
+  return false;
+}
+function updatePlayer(p, dt) {
+  if (p.immune > 0) p.immune -= dt;
+  if (p.rooted) { if (G.time >= p.rootUntil) releaseRoot(p); else return; }
+  if (p.spinUntil) { if (G.time >= p.spinUntil) { p.spinUntil = 0; redirect(p); } else return; }
+  if (G.time < p.frozenUntil || G.time < p.stunUntil) return;
+  let move = speedOf(p) * dt, guard = 0;
+  while (move > 0 && guard++ < 5) {
+    if (p.moving) {
+      // جدار مؤقت ظهر في الممر الحالي قبل منتصفه: ارتد للخلف
+      if (!p.forcedMoving && p.t < .5 && G.tempWalls.has(edgeKey(p.x, p.y, p.dir))) {
+        p.tx = p.x; p.ty = p.y; p.t = 0; p.moving = false; p.dir = null; break;
+      }
+      const need = 1 - p.t;
+      if (move < need) { p.t += move; move = 0; }
+      else { move -= need; arrive(p); if (G.state !== 'play') return; }
+    } else if (!decide(p)) break;
+  }
+  // الأثر خلف الكرة
+  p.trailTimer -= dt;
+  if (p.moving && p.trailTimer <= 0) {
+    p.trailTimer = boosting(p) ? .02 : .045;
+    const q = playerPos(p);
+    p.trail.push({ x: q.x, y: q.y, life: G.biome.trail === 'dig' ? 3 : (boosting(p) ? .7 : .55), max: G.biome.trail === 'dig' ? 3 : (boosting(p) ? .7 : .55), boost: boosting(p) });
+    if (p.trail.length > 90) p.trail.shift();
+  }
+  for (const t of p.trail) t.life -= dt;
+  while (p.trail.length && p.trail[0].life <= 0) p.trail.shift();
+}
+/* أوامر الاتجاه من أي مصدر (أزرار، سحب، لوحة مفاتيح، ذكاء اصطناعي) */
+function applyDir(p, d) {
+  if (p.rooted) { registerTap(p); return; }
+  if (p.forcedMoving) return;
+  if (p.moving && p.dir !== null && d === OPP(p.dir)) { // عكس فوري في منتصف الممر
+    [p.x, p.tx] = [p.tx, p.x]; [p.y, p.ty] = [p.ty, p.y]; p.t = 1 - p.t; p.dir = d; p.want = null; return;
+  }
+  if (p.moving && d === p.dir) return;
+  p.want = d; p.wantTime = G.time;
+}
+function humanDir(i, d) {
+  if (G.state !== 'play') return;
+  const p = G.players[i]; if (!p || p.ai) return;
+  applyDir(p, d); vibrate(8);
+}
+
+/* تأثيرات العقبات */
+function pushBack(p, n) {
+  snap(p); p.want = null; p.dir = null;
+  const h = p.history, path = [];
+  for (let k = 1; k <= n; k++) { const j = h.length - 1 - k; if (j < 0) break; path.push(h[j]); }
+  h.length = Math.max(1, h.length - path.length);
+  p.forced = path; G.shake = Math.max(G.shake, .12); vibrate(40);
+}
+function shockBack(p) {
+  snap(p); p.want = null; p.dir = null;
+  const h = p.history, path = [];
+  for (let k = 1; k <= 8; k++) {
+    const j = h.length - 1 - k; if (j < 0) break;
+    path.push(h[j]);
+    if (h[j].x === p.lastJunction.x && h[j].y === p.lastJunction.y) break;
+  }
+  h.length = Math.max(1, h.length - path.length);
+  p.forced = path;
+}
+function spin(p, dur) { snap(p); p.spinUntil = G.time + dur; p.want = null; p.dir = null; sfx('tap'); vibrate(25); }
+function redirect(p) {
+  snap(p);
+  const ex = exits(p.x, p.y); if (!ex.length) return;
+  startMove(p, pick(ex));
+}
+function rootPlayer(p) {
+  p.rooted = true; p.rootTaps = 0; p.rootLastTap = 0; p.rootUntil = G.time + 3.5; p.want = null;
+  popup(p, p.ai ? '🌿 عالق!' : '🌿 انقر مرتين!'); sfx('hit'); vibrate([30, 30, 30]);
+}
+function registerTap(p) {
+  if (!p.rooted) return;
+  p.rootTaps = (G.time - p.rootLastTap < .6) ? p.rootTaps + 1 : 1;
+  p.rootLastTap = G.time; sfx('tap');
+  if (p.rootTaps >= 2) releaseRoot(p);
+}
+function releaseRoot(p) { p.rooted = false; p.immune = 1.3; burst(playerPos(p), '#8b5a2b', 12); }
+
+/* ---------- 6) الكروت التكتيكية ---------- */
+const CARD_TYPES = {
+  boost: { icon: '⚡', name: 'دفعة' },
+  block: { icon: '🧱', name: 'جدار' },
+  shield: { icon: '🛡️', name: 'درع' },
+};
+function dealCards() { const k = Object.keys(CARD_TYPES); return [pick(k), pick(k), pick(k)].map(type => ({ type, used: false })); }
+function useCard(i, slot) {
+  if (G.state !== 'play') return;
+  const p = G.players[i], card = p.cards[slot];
+  if (!card || card.used) return;
+  const o = G.players[1 - i];
+  if (card.type === 'boost') {
+    p.boostUntil = G.time + 2.5; popup(p, '⚡ دفعة ×2'); sfx('boost'); vibrate(30);
+  } else if (card.type === 'shield') {
+    p.shieldUntil = G.time + 5; popup(p, '🛡️ درع 5ث'); sfx('shield'); vibrate(20);
+  } else if (card.type === 'block') {
+    if (shielded(o)) { popup(o, '🛡️ صدّ الجدار!'); sfx('shield'); }
+    else if (!placeBlock(o, i)) return; // لا يوجد مكان مناسب: لا يُستهلك الكرت
+    else { sfx('block'); vibrate(30); }
+  }
+  card.used = true; refreshCards();
+}
+function placeBlock(target, owner) {
+  const from = target.moving ? { x: target.tx, y: target.ty } : { x: target.x, y: target.y };
+  const path = bfs(from.x, from.y, G.c, G.c);
+  if (!path || path.length < 2) return false;
+  for (let k = 0; k < Math.min(3, path.length - 1); k++) {
+    const a = path[k], b = path[k + 1], d = dirBetween(a, b), key = edgeKey(a.x, a.y, d);
+    if (G.tempWalls.has(key)) continue;
+    G.tempWalls.set(key, { a, b, d, until: G.time + 4, owner, born: G.time });
+    popup(target, '🧱 جدار مؤقت!');
+    burst({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, '#fb923c', 16);
+    return true;
+  }
+  return false;
+}
+
+/* ---------- 7) الذكاء الاصطناعي ---------- */
+const AI_LEVELS = [
+  { react: .3, mistake: .22, cardChance: .25 },
+  { react: .16, mistake: .1, cardChance: .45 },
+  { react: .07, mistake: .03, cardChance: .7 },
+];
+function updateAI(p, dt) {
+  const L = AI_LEVELS[settings.difficulty];
+  p.aiTimer -= dt;
+  if (p.aiTimer > 0) return;
+  p.aiTimer = L.react * rand(.7, 1.3);
+  if (p.rooted) { registerTap(p); return; }
+  if (p.forcedMoving || p.spinUntil) return;
+  const from = p.moving ? { x: p.tx, y: p.ty } : { x: p.x, y: p.y };
+  const path = bfs(from.x, from.y, G.c, G.c);
+  if (path && path.length > 1) {
+    let d = dirBetween(path[0], path[1]);
+    const key = from.x + ',' + from.y;
+    if (p.aiHold === key) d = p.aiHoldDir;      // التزم بالخطأ حتى يغادر هذه الخلية
+    else {
+      p.aiHold = null;
+      const ex = exits(from.x, from.y), back = p.moving ? OPP(p.dir) : -1;
+      // أخطاء بشرية الطابع عند التقاطعات (مرة واحدة لكل تقاطع في الجولة)
+      if (ex.length >= 3 && d !== back && !p.aiMistakes.has(key) && Math.random() < L.mistake) {
+        p.aiMistakes.add(key);
+        const opts = ex.filter(e => e !== back && e !== d);
+        if (opts.length) { d = pick(opts); p.aiHold = key; p.aiHoldDir = d; }
+      }
+    }
+    if (d >= 0 && !(p.moving && d === p.dir)) applyDir(p, d);
+  }
+  // استخدام الكروت
+  p.aiCardTimer -= L.react;
+  if (p.aiCardTimer <= 0) {
+    p.aiCardTimer = rand(.8, 1.6);
+    const o = G.players[1 - p.i];
+    const myLen = path ? path.length : 99;
+    const op = bfs(o.moving ? o.tx : o.x, o.moving ? o.ty : o.y, G.c, G.c);
+    const oLen = op ? op.length : 99;
+    const has = t => p.cards.findIndex(c => !c.used && c.type === t);
+    const near = G.hazards.some(h => { const q = h.xy ? h.xy() : h; return dist(q, playerPos(p)) < 1.8; });
+    let slot = -1;
+    if (has('block') >= 0 && oLen <= myLen + 1 && !shielded(o) && Math.random() < L.cardChance) slot = has('block');
+    else if (has('shield') >= 0 && !shielded(p) && (near || G.storm.amount > .5) && Math.random() < L.cardChance) slot = has('shield');
+    else if (has('boost') >= 0 && !boosting(p) && myLen > 4 && Math.random() < L.cardChance * .7) slot = has('boost');
+    else if (oLen < 4 && Math.random() < L.cardChance) slot = p.cards.findIndex(c => !c.used);
+    if (slot >= 0) useCard(p.i, slot);
+  }
+}
+
+/* ---------- 8) الإدخال: لمس متعدد (Pointer Events) ---------- */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const swipes = new Map(); // pointerId → {x,y,player,moved}
+function touchOwner(clientY) {
+  if (settings.mode === 'ai') return 1;
+  const r = canvas.getBoundingClientRect();
+  return clientY < r.top + r.height / 2 ? 0 : 1;
+}
+canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { }
+  swipes.set(e.pointerId, { x: e.clientX, y: e.clientY, player: touchOwner(e.clientY), moved: false });
+  unlockAudio();
+});
+canvas.addEventListener('pointermove', e => {
+  const s = swipes.get(e.pointerId); if (!s) return;
+  const dx = e.clientX - s.x, dy = e.clientY - s.y, th = Math.max(18, G.cs * .45);
+  if (Math.hypot(dx, dy) < th) return;
+  // السحب يتبع إصبع اللاعب على الشاشة مباشرة، لذلك لا يحتاج تدويراً في وضع الطاولة
+  const d = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+  humanDir(s.player, d);
+  s.x = e.clientX; s.y = e.clientY; s.moved = true;
+});
+const endSwipe = e => {
+  const s = swipes.get(e.pointerId); if (!s) return;
+  swipes.delete(e.pointerId);
+  if (!s.moved && G.state === 'play') { const p = G.players[s.player]; if (p && !p.ai) registerTap(p); }
+};
+canvas.addEventListener('pointerup', endSwipe);
+canvas.addEventListener('pointercancel', e => swipes.delete(e.pointerId));
+
+// أزرار الاتجاه — كل زر يستقبل إصبعه الخاص فيعمل اللاعبان معاً بلا تعارض
+document.querySelectorAll('.dpad').forEach(pad => {
+  const pl = +pad.dataset.player;
+  pad.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault(); unlockAudio();
+      let d = +btn.dataset.dir;
+      if (pl === 0 && settings.tabletop) d = OPP(d); // لوحة اللاعب العلوي مقلوبة 180°
+      btn.classList.add('pressed');
+      humanDir(pl, d);
+    });
+    const up = () => btn.classList.remove('pressed');
+    btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('pointerleave', up);
+  });
+});
+// لوحة المفاتيح للتجربة على الحاسب: الأزرق WASD + 1/2/3، الأحمر الأسهم + ,/.//
+const KEYS = { w: [0, 0], d: [0, 1], s: [0, 2], a: [0, 3], ArrowUp: [1, 0], ArrowRight: [1, 1], ArrowDown: [1, 2], ArrowLeft: [1, 3] };
+const CARD_KEYS = { '1': [0, 0], '2': [0, 1], '3': [0, 2], ',': [1, 0], '.': [1, 1], '/': [1, 2] };
+window.addEventListener('keydown', e => {
+  const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  if (KEYS[k]) { e.preventDefault(); humanDir(KEYS[k][0], KEYS[k][1]); }
+  else if (CARD_KEYS[k]) { const [p, s] = CARD_KEYS[k]; if (!G.players[p] || !G.players[p].ai) useCard(p, s); }
+  else if (k === ' ' ) { G.players.forEach(p => { if (!p.ai) registerTap(p); }); }
+  else if (k === 'Escape' || k === 'p') togglePause();
+});
+function unlockAudio() { if (settings.sound && !AC) sfx('tap'); }
+
+/* ---------- 9) الرسم والمؤثرات ---------- */
+function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+
+function resize() {
+  const wrap = document.getElementById('wrap');
+  const r = wrap.getBoundingClientRect();
+  G.size = Math.max(120, Math.floor(Math.min(r.width, r.height) - 6));
+  G.dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  canvas.style.width = canvas.style.height = G.size + 'px';
+  canvas.width = canvas.height = Math.round(G.size * G.dpr);
+  ctx.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+  G.cs = G.size / G.N;
+  G.particles.length = 0;
+  if (G.walls) renderMaze();
+}
+
+/* رسم المتاهة الثابتة مرة واحدة لكل جولة في Canvas خفي (أداء أفضل على أندرويد) */
+function renderMaze() {
+  const b = G.biome, N = G.N, cs = G.cs, S = G.size;
+  const off = G.mazeCanvas || document.createElement('canvas');
+  off.width = off.height = Math.round(S * G.dpr);
+  const c = off.getContext('2d');
+  c.setTransform(G.dpr, 0, 0, G.dpr, 0, 0);
+  const rng = mulberry32(G.level * 977);
+  if (b.key === 'sky') { const g = c.createLinearGradient(0, 0, 0, S); g.addColorStop(0, '#6cb6f0'); g.addColorStop(1, '#3d86c9'); c.fillStyle = g; }
+  else c.fillStyle = b.bg;
+  c.fillRect(0, 0, S, S);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const px = x * cs, py = y * cs;
+    c.fillStyle = (x + y) % 2 ? b.floorA : b.floorB;
+    if (b.key === 'sky') { c.beginPath(); c.arc(px + cs / 2, py + cs / 2, cs * .62, 0, 7); c.fill(); }
+    else c.fillRect(px, py, cs + .5, cs + .5);
+    // زخارف أرضية خاصة بكل بيئة
+    c.save();
+    switch (b.key) {
+      case 'ice': c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + cs * rng(), py + cs * .2); c.lineTo(px + cs * rng(), py + cs * .8); c.stroke(); break;
+      case 'lava': c.strokeStyle = 'rgba(255,90,0,.25)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px + cs * rng(), py + cs * rng()); c.lineTo(px + cs * rng(), py + cs * rng()); c.lineTo(px + cs * rng(), py + cs * rng()); c.stroke(); break;
+      case 'cyber': c.strokeStyle = 'rgba(0,229,255,.12)'; c.lineWidth = 1; c.strokeRect(px + 2, py + 2, cs - 4, cs - 4); c.fillStyle = 'rgba(255,0,230,.35)'; c.fillRect(px + cs / 2 - 1, py + cs / 2 - 1, 2, 2); break;
+      case 'desert': c.fillStyle = 'rgba(120,80,30,.25)'; for (let k = 0; k < 4; k++) c.fillRect(px + cs * rng(), py + cs * rng(), 1.5, 1.5); break;
+      case 'forest': c.strokeStyle = 'rgba(140,220,90,.35)'; c.lineWidth = 1; for (let k = 0; k < 3; k++) { const gx = px + cs * rng(), gy = py + cs * (.3 + rng() * .6); c.beginPath(); c.moveTo(gx, gy); c.lineTo(gx - 2, gy - cs * .15); c.moveTo(gx, gy); c.lineTo(gx + 2, gy - cs * .14); c.stroke(); } break;
+      case 'water': c.strokeStyle = 'rgba(160,220,255,.18)'; c.lineWidth = 1; c.beginPath(); c.moveTo(px, py + cs * .5); c.quadraticCurveTo(px + cs * .25, py + cs * .35, px + cs * .5, py + cs * .5); c.quadraticCurveTo(px + cs * .75, py + cs * .65, px + cs, py + cs * .5); c.stroke(); break;
+    }
+    c.restore();
+  }
+  // الجدران
+  c.lineCap = 'round';
+  c.strokeStyle = b.wall; c.lineWidth = Math.max(2, cs * .14);
+  c.shadowColor = b.glow; c.shadowBlur = (b.key === 'cyber' || b.key === 'lava' || b.key === 'water') ? cs * .35 : cs * .12;
+  c.beginPath();
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const px = x * cs, py = y * cs;
+    if (wallAt(x, y, 0)) { c.moveTo(px, py); c.lineTo(px + cs, py); }
+    if (wallAt(x, y, 3)) { c.moveTo(px, py); c.lineTo(px, py + cs); }
+    if (x === N - 1 && wallAt(x, y, 1)) { c.moveTo(px + cs, py); c.lineTo(px + cs, py + cs); }
+    if (y === N - 1 && wallAt(x, y, 2)) { c.moveTo(px, py + cs); c.lineTo(px + cs, py + cs); }
+  }
+  c.stroke();
+  c.strokeRect(1, 1, S - 2, S - 2); // إطار خارجي واضح
+  if (b.key === 'lava') { c.shadowBlur = 0; c.strokeStyle = 'rgba(255,230,120,.7)'; c.lineWidth = Math.max(1, cs * .04); c.stroke(); }
+  if (b.key === 'forest') { c.shadowBlur = 0; c.strokeStyle = 'rgba(124,207,79,.45)'; c.lineWidth = Math.max(1, cs * .04); c.stroke(); }
+  // مواقع الانطلاق
+  c.shadowBlur = 0;
+  [[G.c, 0, 'rgba(59,130,246,.35)'], [G.c, N - 1, 'rgba(239,68,68,.35)']].forEach(([x, y, col]) => {
+    c.fillStyle = col; c.beginPath(); c.arc((x + .5) * cs, (y + .5) * cs, cs * .42, 0, 7); c.fill();
+  });
+  G.mazeCanvas = off;
+}
+
+/* جزيئات البيئة المحيطة */
+function spawnAmbient(dt) {
+  const t = G.biome.particle, S = G.size, max = 55;
+  const rate = { snow: 18, ember: 16, digit: 14, sand: G.storm.amount > .1 ? 70 : 12, leaf: 6, bubble: 10, cloud: 1.6 }[t];
+  let n = rate * dt; while (n > 0) {
+    if (Math.random() > n) break; n -= 1;
+    if (G.particles.length >= (t === 'sand' && G.storm.amount > .1 ? 160 : max)) break;
+    const p = { type: t, life: 1, rot: rand(0, 6), vr: rand(-2, 2), size: 1 };
+    switch (t) {
+      case 'snow': Object.assign(p, { x: rand(0, S), y: -5, vx: rand(-10, 10), vy: rand(20, 45), size: rand(1, 2.8), life: 12 }); break;
+      case 'ember': Object.assign(p, { x: rand(0, S), y: S + 5, vx: rand(-8, 8), vy: rand(-45, -20), size: rand(1, 2.5), life: rand(2, 5) }); break;
+      case 'digit': Object.assign(p, { x: Math.floor(rand(0, S / 10)) * 10, y: -10, vx: 0, vy: rand(40, 90), size: 9, life: 10, ch: Math.random() < .5 ? '0' : '1' }); break;
+      case 'sand': Object.assign(p, { x: -5, y: rand(0, S), vx: rand(60, 140) * (G.storm.amount > .1 ? 2.2 : 1), vy: rand(-8, 8), size: rand(1, 2), life: 8 }); break;
+      case 'leaf': Object.assign(p, { x: rand(0, S), y: -8, vx: rand(-15, 15), vy: rand(18, 35), size: rand(3, 5), life: 14, col: pick(['#84cc16', '#eab308', '#ea580c', '#65a30d']) }); break;
+      case 'bubble': Object.assign(p, { x: rand(0, S), y: S + 6, vx: 0, vy: rand(-40, -18), size: rand(2, 5), life: 12 }); break;
+      case 'cloud': Object.assign(p, { x: -60, y: rand(0, S), vx: rand(12, 28), vy: 0, size: rand(20, 40), life: 30 }); break;
+    }
+    G.particles.push(p);
+  }
+}
+function updateParticles(dt) {
+  const S = G.size;
+  for (const p of G.particles) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= dt;
+    if (p.type === 'leaf' || p.type === 'bubble') p.x += Math.sin(G.time * 2 + p.rot) * 12 * dt;
+  }
+  G.particles = G.particles.filter(p => p.life > 0 && p.x > -80 && p.x < S + 80 && p.y > -20 && p.y < S + 20);
+  for (const f of G.fx) { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .93; f.vy *= .93; f.life -= dt; }
+  G.fx = G.fx.filter(f => f.life > 0);
+  for (const q of G.popups) q.life -= dt;
+  G.popups = G.popups.filter(q => q.life > 0);
+}
+function drawParticles() {
+  for (const p of G.particles) {
+    switch (p.type) {
+      case 'snow': ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill(); break;
+      case 'ember': ctx.fillStyle = 'rgba(255,' + (120 + Math.floor(p.life * 20)) + ',0,' + Math.min(1, p.life / 2) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.fill(); break;
+      case 'digit': ctx.fillStyle = 'rgba(57,255,20,.35)'; ctx.font = '9px monospace'; ctx.fillText(p.ch, p.x, p.y); break;
+      case 'sand': ctx.fillStyle = 'rgba(240,200,130,.7)'; ctx.fillRect(p.x, p.y, p.size * 2, p.size); break;
+      case 'leaf': ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.col; ctx.beginPath(); ctx.ellipse(0, 0, p.size, p.size * .45, 0, 0, 7); ctx.fill(); ctx.restore(); break;
+      case 'bubble': ctx.strokeStyle = 'rgba(200,240,255,.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.stroke(); break;
+      case 'cloud': ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 7); ctx.arc(p.x + p.size * .8, p.y + 4, p.size * .7, 0, 7); ctx.arc(p.x - p.size * .8, p.y + 5, p.size * .6, 0, 7); ctx.fill(); break;
+    }
+  }
+}
+function burst(pos, color, n) {
+  const cs = G.cs;
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, 6.28), s = rand(30, 140);
+    G.fx.push({ x: (pos.x + .5) * cs, y: (pos.y + .5) * cs, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(.3, .8), color, size: rand(1.5, 3.5) });
+  }
+}
+function popup(p, text) { const q = playerPos(p); G.popups.push({ x: q.x, y: q.y, text, life: 1.3, owner: p.i }); }
+
+function drawGoal(cs) {
+  const x = (G.c + .5) * cs, y = (G.c + .5) * cs, pulse = .5 + .5 * Math.sin(G.time * 4);
+  ctx.save();
+  const g = ctx.createRadialGradient(x, y, 1, x, y, cs * (.9 + pulse * .3));
+  g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.25, G.biome.goal); g.addColorStop(1, 'rgba(34,255,136,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, cs * (.9 + pulse * .3), 0, 7); ctx.fill();
+  ctx.strokeStyle = G.biome.goal; ctx.lineWidth = 2; ctx.setLineDash([cs * .12, cs * .1]); ctx.lineDashOffset = -G.time * 20;
+  ctx.beginPath(); ctx.arc(x, y, cs * .42, 0, 7); ctx.stroke();
+  ctx.restore();
+}
+function drawTempWalls(cs) {
+  for (const w of G.tempWalls.values()) {
+    const left = w.until - G.time, a = Math.min(1, left * 2, (G.time - w.born) * 6);
+    let x1, y1, x2, y2;
+    const ax = w.a.x * cs, ay = w.a.y * cs;
+    if (w.d === 1) { x1 = x2 = ax + cs; y1 = ay; y2 = ay + cs; }
+    else if (w.d === 3) { x1 = x2 = ax; y1 = ay; y2 = ay + cs; }
+    else if (w.d === 2) { y1 = y2 = ay + cs; x1 = ax; x2 = ax + cs; }
+    else { y1 = y2 = ay; x1 = ax; x2 = ax + cs; }
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.strokeStyle = w.owner === 0 ? '#60a5fa' : '#f87171'; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = cs * .5;
+    ctx.lineWidth = cs * .26; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = cs * .05; ctx.setLineDash([cs * .12, cs * .08]);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.restore();
+  }
+}
+function drawTrail(p, cs) {
+  const style = G.biome.trail, col = G.biome.trailColor;
+  ctx.save();
+  for (let k = 0; k < p.trail.length; k++) {
+    const t = p.trail[k], a = Math.max(0, t.life / t.max), x = (t.x + .5) * cs, y = (t.y + .5) * cs;
+    if (t.boost) {
+      ctx.fillStyle = p.i === 0 ? 'rgba(147,197,253,' + a * .8 + ')' : 'rgba(252,165,165,' + a * .8 + ')';
+      ctx.beginPath(); ctx.arc(x, y, cs * .3 * a, 0, 7); ctx.fill(); continue;
+    }
+    switch (style) {
+      case 'skate': ctx.fillStyle = col + a * .8 + ')'; ctx.fillRect(x - cs * .2, y - 1, cs * .08, 2); ctx.fillRect(x + cs * .12, y - 1, cs * .08, 2); break;
+      case 'dig': ctx.fillStyle = col + a * .45 + ')'; ctx.beginPath(); ctx.arc(x, y, cs * .12, 0, 7); ctx.fill(); break;
+      case 'bubble': ctx.strokeStyle = col + a + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x + Math.sin(k) * cs * .15, y - (1 - a) * cs * .4, cs * .07 + (1 - a) * cs * .05, 0, 7); ctx.stroke(); break;
+      default: ctx.fillStyle = col + a * .6 + ')'; ctx.beginPath(); ctx.arc(x, y, cs * .17 * a, 0, 7); ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+function drawPlayer(p, cs) {
+  const q = playerPos(p), x = (q.x + .5) * cs, y = (q.y + .5) * cs;
+  let r = cs * .3;
+  ctx.save(); ctx.translate(x, y);
+  if (p.spinUntil) ctx.rotate(G.time * 25);
+  if (G.biome.key === 'sky') { ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(0, r * .9, r * .9, r * .3, 0, 0, 7); ctx.fill(); ctx.translate(0, Math.sin(G.time * 5 + p.i) * 2 - 3); }
+  if (boosting(p)) { ctx.shadowColor = p.light; ctx.shadowBlur = cs * .7; }
+  let alpha = 1;
+  if (G.biome.key === 'cyber') alpha = .75 + .25 * Math.sin(G.time * 18 + p.i * 3);
+  ctx.globalAlpha = alpha;
+  const g = ctx.createRadialGradient(-r * .35, -r * .35, r * .1, 0, 0, r);
+  g.addColorStop(0, '#fff'); g.addColorStop(.35, p.light); g.addColorStop(1, p.color);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+  if (shielded(p)) {
+    const left = p.shieldUntil - G.time, blink = left < 1.2 ? (Math.floor(G.time * 10) % 2 ? .3 : 1) : 1;
+    ctx.strokeStyle = 'rgba(34,211,238,' + .9 * blink + ')'; ctx.lineWidth = cs * .06; ctx.shadowColor = '#22d3ee'; ctx.shadowBlur = cs * .4;
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.45, 0, 7); ctx.stroke(); ctx.shadowBlur = 0;
+  }
+  if (G.time < p.frozenUntil) { ctx.fillStyle = 'rgba(160,240,255,.5)'; ctx.strokeStyle = '#e0ffff'; ctx.lineWidth = 1.5; roundRect(ctx, -r * 1.25, -r * 1.25, r * 2.5, r * 2.5, 4); ctx.fill(); ctx.stroke(); }
+  if (G.time < p.slowUntil) { ctx.fillStyle = 'rgba(80,80,80,.5)'; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(Math.sin(G.time * 6 + k * 2) * r * .6, -r - k * r * .35 - (G.time * 20 % 6), r * .25, 0, 7); ctx.fill(); } }
+  if (G.time < p.stunUntil) { ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2; for (let k = 0; k < 3; k++) { const a = G.time * 8 + k * 2.1; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 1.2, Math.sin(a) * r * .5 - r, 2, 0, 7); ctx.stroke(); } }
+  if (p.rooted) {
+    ctx.strokeStyle = '#7c4a1e'; ctx.lineWidth = cs * .07; ctx.lineCap = 'round';
+    for (let k = 0; k < 4; k++) { const a = k * 1.57 + .7; ctx.beginPath(); ctx.moveTo(Math.cos(a) * r * 1.4, Math.sin(a) * r * 1.4); ctx.quadraticCurveTo(Math.cos(a + .8) * r, Math.sin(a + .8) * r, Math.cos(a + 1.4) * r * .5, Math.sin(a + 1.4) * r * .5); ctx.stroke(); }
+    if (!p.ai) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(cs * .32) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('👆👆', 0, -r * 1.6); }
+  }
+  ctx.restore();
+}
+function drawFog(cs) {
+  const amt = G.storm.amount; if (amt <= .01) return;
+  const S = G.size;
+  if (!G.fogCanvas) G.fogCanvas = document.createElement('canvas');
+  const f = G.fogCanvas;
+  if (f.width !== S) { f.width = f.height = S; }
+  const c = f.getContext('2d');
+  c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, S, S);
+  c.fillStyle = 'rgba(120,80,35,' + .93 * amt + ')'; c.fillRect(0, 0, S, S);
+  c.globalCompositeOperation = 'destination-out';
+  for (const p of G.players) {
+    const q = playerPos(p), x = (q.x + .5) * cs, y = (q.y + .5) * cs, R = cs * 2.4;
+    const g = c.createRadialGradient(x, y, cs * .5, x, y, R); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, R, 0, 7); c.fill();
+  }
+  const gx = (G.c + .5) * cs, gg = c.createRadialGradient(gx, gx, 0, gx, gx, cs);
+  gg.addColorStop(0, 'rgba(0,0,0,.8)'); gg.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = gg; c.beginPath(); c.arc(gx, gx, cs, 0, 7); c.fill();
+  ctx.drawImage(f, 0, 0, S, S);
+}
+function drawBiomeOverlay(cs) {
+  const S = G.size, k = G.biome.key;
+  if (k === 'lava') {
+    const a = .18 + .08 * Math.sin(G.time * 2);
+    const g = ctx.createRadialGradient(S / 2, S / 2, S * .35, S / 2, S / 2, S * .75);
+    g.addColorStop(0, 'rgba(255,40,0,0)'); g.addColorStop(1, 'rgba(255,40,0,' + a + ')');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+  } else if (k === 'cyber') {
+    const y = (G.time * 70) % (S + 40) - 20;
+    ctx.fillStyle = 'rgba(0,255,213,.06)'; ctx.fillRect(0, y, S, 14);
+  } else if (k === 'water') {
+    ctx.fillStyle = 'rgba(56,189,248,' + (.04 + .03 * Math.sin(G.time * 1.5)) + ')'; ctx.fillRect(0, 0, S, S);
+  }
+}
+function drawTextBlock(lines, cx, cy, rotate) {
+  ctx.save(); ctx.translate(cx, cy); if (rotate) ctx.rotate(Math.PI);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const total = lines.reduce((a, l) => a + l[1] * 1.15, 0);
+  let y = -total / 2;
+  for (const [txt, size, col] of lines) {
+    y += size * .575;
+    ctx.font = '900 ' + size + 'px system-ui, sans-serif';
+    ctx.lineWidth = Math.max(3, size * .12); ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(txt, 0, y);
+    ctx.fillStyle = col; ctx.fillText(txt, 0, y);
+    y += size * .575;
+  }
+  ctx.restore();
+}
+function draw() {
+  const cs = G.cs, S = G.size;
+  ctx.save();
+  if (G.shake > 0) ctx.translate(rand(-1, 1) * G.shake * 30, rand(-1, 1) * G.shake * 30);
+  ctx.clearRect(-20, -20, S + 40, S + 40);
+  if (G.mazeCanvas) ctx.drawImage(G.mazeCanvas, 0, 0, S, S);
+  drawBiomeOverlay(cs);
+  drawGoal(cs);
+  for (const p of G.players) drawTrail(p, cs);
+  drawTempWalls(cs);
+  for (const h of G.hazards) h.draw(ctx, cs);
+  for (const p of G.players) drawPlayer(p, cs);
+  drawParticles();
+  for (const f of G.fx) { ctx.globalAlpha = Math.max(0, Math.min(1, f.life * 2)); ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, f.size, 0, 7); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  drawFog(cs);
+  // نصوص منبثقة (تُقلب للاعب العلوي في وضع الطاولة)
+  for (const q of G.popups) {
+    const a = Math.min(1, q.life * 2), rise = (1.3 - q.life) * cs * .8;
+    const flip = settings.tabletop && q.owner === 0;
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.translate((q.x + .5) * cs, (q.y + .5) * cs + (flip ? rise : -rise) + (flip ? cs * .6 : -cs * .6));
+    if (flip) ctx.rotate(Math.PI);
+    ctx.font = 'bold ' + Math.round(clamp(cs * .42, 11, 20)) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.8)';
+    ctx.strokeText(q.text, 0, 0); ctx.fillStyle = '#fff'; ctx.fillText(q.text, 0, 0);
+    ctx.restore();
+  }
+  // العد التنازلي ومقدمة البيئة
+  if (G.state === 'countdown') {
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, S, S);
+    const n = Math.ceil(G.countdown), big = Math.round(S * .16);
+    const lines = [[G.biome.icon + ' ' + G.biome.name, Math.round(S * .075), '#fff'], ['⚠ ' + G.biome.hazardName, Math.round(S * .038), '#fde68a'], [n > 0 ? String(n) : 'انطلق!', big, '#34d399']];
+    if (settings.tabletop && settings.mode === 'pvp') { drawTextBlock(lines, S / 2, S * .73, false); drawTextBlock(lines, S / 2, S * .27, true); }
+    else drawTextBlock(lines, S / 2, S * .5, false);
+  }
+  ctx.restore();
+}
+
+/* ---------- 10) حلقة اللعبة والجولات والواجهة ---------- */
+function newRound() {
+  G.N = G.level <= 7 ? 11 : (G.level <= 14 ? 13 : 15);
+  G.c = (G.N - 1) / 2;
+  G.biome = BIOMES[(G.level - 1) % BIOMES.length];
+  G.walls = generateMaze(G.N, mulberry32((Math.random() * 1e9) | 0));
+  G.players = [makePlayer(0), makePlayer(1)];
+  G.players[0].ai = settings.mode === 'ai';
+  G.players.forEach(p => p.cards = dealCards());
+  G.tempWalls.clear(); G.fx.length = 0; G.popups.length = 0; G.particles.length = 0;
+  G.hazards = createHazards();
+  G.storm = { next: G.biome.key === 'desert' ? rand(6, 9) : 1e9, until: 0, amount: 0 };
+  G.roundTime = 0; G.countdown = 3; G.state = 'countdown'; G.winner = -1;
+  resize(); refreshCards(); updateHUD(true);
+  document.getElementById('biome-label').textContent = G.biome.icon + ' ' + G.biome.name + ' · المرحلة ' + G.level;
+  document.getElementById('ai-tag').textContent = settings.mode === 'ai' ? '🤖' : '';
+  hideOverlay(); sfx('count');
+}
+function winRound(p) {
+  if (G.state !== 'play') return;
+  G.state = 'roundEnd'; G.winner = p.i; G.scores[p.i]++;
+  burst({ x: G.c, y: G.c }, p.color, 50); burst({ x: G.c, y: G.c }, '#34d399', 30);
+  sfx('win'); vibrate([60, 40, 120]);
+  const best = store.get('bestLevel', 1); if (G.level > best) store.set('bestLevel', G.level);
+  if (settings.mode === 'ai' && p.i === 1) store.set('aiWins', store.get('aiWins', 0) + 1);
+  updateHUD(true);
+  setTimeout(showRoundEnd, 1100);
+}
+function update(dt) {
+  G.time += dt;
+  if (G.shake > 0) G.shake = Math.max(0, G.shake - dt);
+  spawnAmbient(dt); updateParticles(dt);
+  if (G.state === 'countdown') {
+    const before = Math.ceil(G.countdown);
+    G.countdown -= dt;
+    const after = Math.ceil(G.countdown);
+    if (after !== before) { if (after > 0) sfx('count'); else { sfx('go'); vibrate(40); } }
+    if (G.countdown <= -0.35) G.state = 'play';
+    return;
+  }
+  if (G.state !== 'play') return;
+  G.roundTime += dt;
+  // انتهاء الجدران المؤقتة
+  for (const [k, w] of G.tempWalls) if (G.time >= w.until) G.tempWalls.delete(k);
+  // العاصفة الرملية
+  const st = G.storm;
+  if (G.time >= 0 && G.roundTime >= st.next) { st.until = G.roundTime + 4.5; st.next = G.roundTime + rand(11, 15); popup(G.players[1], '🌪️ عاصفة رملية!'); if (settings.tabletop) popup(G.players[0], '🌪️ عاصفة رملية!'); }
+  const target = G.roundTime < st.until ? 1 : 0;
+  st.amount += (target - st.amount) * Math.min(1, dt * 2.5);
+  for (const h of G.hazards) h.update(dt);
+  for (const p of G.players) if (p.ai) updateAI(p, dt);
+  for (const p of G.players) { updatePlayer(p, dt); if (G.state !== 'play') return; }
+  // اصطدام العقبات
+  for (const p of G.players) {
+    if (p.immune > 0 || p.forcedMoving || p.rooted || p.spinUntil) continue;
+    for (const h of G.hazards) {
+      if (!h.test(p)) continue;
+      p.immune = 1.0;
+      if (shielded(p)) { popup(p, '🛡️ محمي'); sfx('shield'); burst(playerPos(p), '#22d3ee', 14); }
+      else h.apply(p);
+      break;
+    }
+  }
+}
+let hudTimer = 0;
+function updateHUD(force) {
+  hudTimer -= 1;
+  if (!force && hudTimer > 0) return; hudTimer = 6;
+  G.players.forEach((p, i) => {
+    document.getElementById('score' + i).textContent = G.scores[i];
+    const s = [];
+    if (boosting(p)) s.push('⚡' + (p.boostUntil - G.time).toFixed(1));
+    if (shielded(p)) s.push('🛡️' + (p.shieldUntil - G.time).toFixed(1));
+    if (G.time < p.slowUntil) s.push('🔥بطء');
+    if (G.time < p.frozenUntil) s.push('⛔تجميد');
+    if (p.rooted) s.push(p.ai ? '🌿عالق' : '🌿انقر مرتين');
+    if (p.spinUntil) s.push('🌀');
+    document.getElementById('status' + i).textContent = s.join(' ') || (G.state === 'play' ? '⏱ ' + G.roundTime.toFixed(1) : '');
+  });
+}
+function refreshCards() {
+  [0, 1].forEach(i => {
+    const box = document.getElementById('cards' + i), p = G.players[i];
+    box.innerHTML = '';
+    if (!p) return;
+    p.cards.forEach((c, slot) => {
+      const t = CARD_TYPES[c.type], b = document.createElement('button');
+      b.className = 'card ' + c.type + (c.used ? ' used' : '');
+      b.innerHTML = '<span class="ic">' + t.icon + '</span><span>' + t.name + '</span>';
+      if (p.ai) b.style.pointerEvents = 'none';
+      b.addEventListener('pointerdown', e => { e.preventDefault(); useCard(i, slot); });
+      box.appendChild(b);
+    });
+  });
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (G.state !== 'paused' && G.state !== 'menu') update(dt);
+  else if (G.state === 'menu') { G.time += dt; spawnAmbient(dt); updateParticles(dt); }
+  draw(); updateHUD(false);
+  requestAnimationFrame(loop);
+}
+
+/* ---------- القوائم ---------- */
+const overlay = document.getElementById('overlay'), panel = document.getElementById('panel');
+function hideOverlay() { overlay.classList.add('hidden'); }
+function showOverlay(html) { panel.innerHTML = html; overlay.classList.remove('hidden'); panel.scrollTop = 0; }
+function opt(group, val, label, cur) { return '<button class="opt' + (cur === val ? ' on' : '') + '" data-g="' + group + '" data-v="' + val + '">' + label + '</button>'; }
+function showMenu() {
+  G.state = 'menu';
+  const s = settings;
+  showOverlay(
+    '<h1>CORE RUSH</h1><p>سباق المتاهات نحو النواة الخضراء — 7 بيئات، كروت تكتيكية، وعقبات متحركة.</p>' +
+    '<div class="lbl">نمط اللعب</div><div class="row">' + opt('mode', 'ai', '🤖 ضد الذكاء', s.mode) + opt('mode', 'pvp', '👥 لاعبان', s.mode) + '</div>' +
+    '<div class="lbl">مستوى الذكاء الاصطناعي</div><div class="row">' + opt('difficulty', 0, 'سهل', s.difficulty) + opt('difficulty', 1, 'عادي', s.difficulty) + opt('difficulty', 2, 'صعب', s.difficulty) + '</div>' +
+    '<div class="lbl">الإعدادات</div><div class="row">' + opt('tabletop', true, '🔄 وضع الطاولة', s.tabletop) + opt('sound', true, '🔊 صوت', s.sound) + opt('vibrate', true, '📳 اهتزاز', s.vibrate) + '</div>' +
+    '<button class="big" id="go">▶ ابدأ السباق</button>' +
+    '<button class="big sec" id="fs">⛶ ملء الشاشة</button>' +
+    '<p>التحكم: اسحب على المتاهة (النصف العلوي للأزرق والسفلي للأحمر) أو استخدم الأزرار. الكرة تتبع الممر وتتوقف عند التقاطع. اضغط الاتجاه مبكراً لتنعطف تلقائياً.</p>' +
+    '<div class="biomes">' + BIOMES.map(b => '<span>' + b.icon + ' ' + b.name + '</span>').join('') + '</div>' +
+    '<p style="font-size:12px">أفضل مرحلة: ' + store.get('bestLevel', 1) + ' · انتصاراتك على الذكاء: ' + store.get('aiWins', 0) + '</p>'
+  );
+  panel.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {
+    const g = b.dataset.g;
+    let v = b.dataset.v;
+    if (g === 'difficulty') v = +v;
+    else if (g === 'tabletop' || g === 'sound' || g === 'vibrate') v = !settings[g];
+    settings[g] = v; store.set(g, v);
+    if (g === 'tabletop') applyTabletop();
+    showMenu();
+  }));
+  document.getElementById('go').addEventListener('click', () => { unlockAudio(); G.scores = [0, 0]; G.level = 1; newRound(); });
+  document.getElementById('fs').addEventListener('click', () => {
+    const el = document.documentElement;
+    try { (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { }); } catch (e) { }
+  });
+}
+function showRoundEnd() {
+  if (G.state !== 'roundEnd') return;
+  const w = G.winner, name = w === 0 ? (settings.mode === 'ai' ? '🤖 الذكاء الاصطناعي' : '🔵 الأزرق') : (settings.mode === 'ai' ? '🎉 أنت' : '🔴 الأحمر');
+  const next = BIOMES[G.level % BIOMES.length];
+  const msg = name + ' فاز!';
+  const mirror = (settings.tabletop && settings.mode === 'pvp') ? '<div class="mirror"><h2>' + msg + '</h2><p>' + G.scores[0] + ' - ' + G.scores[1] + '</p></div>' : '';
+  showOverlay(mirror +
+    '<h2 style="color:' + (w === 0 ? '#60a5fa' : '#f87171') + '">' + msg + '</h2>' +
+    '<p>الزمن: ' + G.roundTime.toFixed(1) + ' ثانية</p>' +
+    '<p style="font-size:28px;font-weight:900;color:#fff"><span style="color:#60a5fa">' + G.scores[0] + '</span> - <span style="color:#f87171">' + G.scores[1] + '</span></p>' +
+    '<p>المرحلة التالية: ' + next.icon + ' ' + next.name + ' — ' + next.hazardName + '</p>' +
+    '<button class="big" id="next">الجولة التالية ◀</button><button class="big sec" id="menu">القائمة الرئيسية</button>');
+  document.getElementById('next').addEventListener('click', () => { G.level++; newRound(); });
+  document.getElementById('menu').addEventListener('click', showMenu);
+}
+function togglePause() {
+  if (G.state === 'play' || G.state === 'countdown') {
+    G.prevState = G.state; G.state = 'paused';
+    showOverlay('<h2>⏸ إيقاف مؤقت</h2><button class="big" id="resume">متابعة</button><button class="big sec" id="restart">إعادة الجولة</button><button class="big sec" id="menu">القائمة الرئيسية</button>');
+    document.getElementById('resume').addEventListener('click', () => { G.state = G.prevState; hideOverlay(); last = performance.now(); });
+    document.getElementById('restart').addEventListener('click', newRound);
+    document.getElementById('menu').addEventListener('click', showMenu);
+  } else if (G.state === 'paused') { G.state = G.prevState; hideOverlay(); }
+}
+function applyTabletop() {
+  document.getElementById('hud0').classList.toggle('rotated', !!settings.tabletop);
+  document.getElementById('btn-table').classList.toggle('on', !!settings.tabletop);
+  document.getElementById('btn-table').style.background = settings.tabletop ? '#065f46' : '';
+}
+document.getElementById('btn-pause').addEventListener('click', togglePause);
+document.getElementById('btn-table').addEventListener('click', () => { settings.tabletop = !settings.tabletop; store.set('tabletop', settings.tabletop); applyTabletop(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && (G.state === 'play' || G.state === 'countdown')) togglePause(); });
+window.addEventListener('resize', () => { resize(); });
+if (window.ResizeObserver) new ResizeObserver(() => resize()).observe(document.getElementById('wrap'));
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// خلفية القائمة: متاهة عرض
+G.walls = generateMaze(G.N, mulberry32(7));
+G.players = [makePlayer(0), makePlayer(1)];
+G.players.forEach(p => p.cards = dealCards());
+applyTabletop(); resize(); refreshCards();
+showMenu();
+requestAnimationFrame(loop);
+window.__G = G; // للاختبار والتصحيح
+</script>
+</body>
+</html>
