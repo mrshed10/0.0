@@ -111,8 +111,6 @@ data class RenderedBlock(
     val text: String,
     val rtl: Boolean,
     val backgroundColor: Int? = null,
-    /** رقم ترتيب القراءة (فقاعات المانغا)، أو null. */
-    val order: Int? = null,
     val centered: Boolean = false,
 )
 

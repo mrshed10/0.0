@@ -24,8 +24,9 @@ data class LiveConfig(
     val ocrScript: OcrScript? = null,
     val wifiOnlyDownloads: Boolean = false,
     val overlayOpacity: Float = 0.94f,
-    val showOrderBadges: Boolean = true,
     val excludeSystemUi: Boolean = true,
+    /** الشريط العائم مطويّ إلى دائرة صغيرة. */
+    val barCollapsed: Boolean = false,
     /** في وضع النص: استخدم OCR تلقائياً عندما لا تحتوي الشاشة على نص قابل للقراءة (صور). */
     val ocrFallbackInTextMode: Boolean = false,
     /** موضع المربع العائم بإحداثيات الشاشة (فارغ = الافتراضي). */
@@ -67,8 +68,8 @@ class LiveSettings private constructor(context: Context) {
             ocrScript = prefs.getString("ocr_script_v2", null)?.let { n -> OcrScript.entries.firstOrNull { it.name == n } },
             wifiOnlyDownloads = prefs.getBoolean("wifi_only_v2", d.wifiOnlyDownloads),
             overlayOpacity = prefs.getFloat("opacity", d.overlayOpacity),
-            showOrderBadges = prefs.getBoolean("badges", d.showOrderBadges),
             excludeSystemUi = prefs.getBoolean("exclude_sysui", d.excludeSystemUi),
+            barCollapsed = prefs.getBoolean("bar_collapsed", d.barCollapsed),
             ocrFallbackInTextMode = prefs.getBoolean("ocr_fallback", d.ocrFallbackInTextMode),
             bubble = Box(
                 prefs.getInt("b_l", 0), prefs.getInt("b_t", 0),
@@ -89,8 +90,8 @@ class LiveSettings private constructor(context: Context) {
             .putString("ocr_script_v2", c.ocrScript?.name ?: "AUTO")
             .putBoolean("wifi_only_v2", c.wifiOnlyDownloads)
             .putFloat("opacity", c.overlayOpacity)
-            .putBoolean("badges", c.showOrderBadges)
             .putBoolean("exclude_sysui", c.excludeSystemUi)
+            .putBoolean("bar_collapsed", c.barCollapsed)
             .putBoolean("ocr_fallback", c.ocrFallbackInTextMode)
             .putInt("b_l", c.bubble.left).putInt("b_t", c.bubble.top)
             .putInt("b_r", c.bubble.right).putInt("b_b", c.bubble.bottom)

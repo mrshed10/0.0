@@ -143,3 +143,18 @@ class ScriptDetectorTest {
         assertEquals(Box(0, 0, 300, 100), Box(0, 0, 300, 100).widenToAspect(0.75f, screen))
     }
 }
+
+class NormalizeCaseTest {
+    @Test fun allCapsComicTextBecomesSentenceCase() {
+        assertEquals("Yo te conozco! Eres la tipa que intento fundar",
+            TextTools.normalizeCase("YO TE CONOZCO! ERES LA TIPA QUE INTENTO FUNDAR"))
+        assertEquals("¡Sensei es consejero del club de natación!",
+            TextTools.normalizeCase("¡SENSEI ES CONSEJERO DEL CLUB DE NATACIÓN!"))
+    }
+
+    @Test fun mixedCaseAndCjkUntouched() {
+        assertEquals("Hello World", TextTools.normalizeCase("Hello World"))
+        assertEquals("こんにちは", TextTools.normalizeCase("こんにちは"))
+        assertEquals("OK", TextTools.normalizeCase("OK"))
+    }
+}

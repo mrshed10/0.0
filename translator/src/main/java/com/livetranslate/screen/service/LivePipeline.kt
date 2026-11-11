@@ -192,7 +192,7 @@ class LivePipeline(
         val sampleBg = mode == ContentMode.MANGA
         val fixed = c.effectiveOcrScript
         val (script, raw) = try {
-            if (fixed != null) {
+            val (s, r) = if (fixed != null) {
                 fixed to ocr.recognize(bitmap, fixed, zone, sampleBg)
             } else {
                 // اكتشاف تلقائي: نعيد الاكتشاف عند تغيّر التطبيق، أو إذا لم يُقرأ شيء، أو كل 20 دورة
@@ -212,6 +212,11 @@ class LivePipeline(
                     (found?.first ?: known ?: OcrScript.LATIN) to found?.second.orEmpty()
                 }
             }
+            // قراءة ثانية مكبّرة لكل فقاعة/سطر ترجمة لرفع دقة الحروف
+            if (mode != ContentMode.TEXT) {
+                val grouped = if (mode == ContentMode.MANGA) BlockGrouper.group(r.filter { TextTools.isTranslatable(it.text) }, c.mangaRtl, s.isCjk) else r
+                s to ocr.refine(bitmap, grouped, s, zone)
+            } else s to r
         } finally {
             bitmap.recycle()
         }
@@ -219,10 +224,7 @@ class LivePipeline(
         graceTicks = 2
         val blocks = raw.filter { TextTools.isTranslatable(it.text) }
         when (mode) {
-            ContentMode.MANGA -> {
-                val bubbles = BlockGrouper.group(blocks, c.mangaRtl, script.isCjk)
-                renderTranslations(c, ReadingOrder.sort(bubbles, c.mangaRtl) { it.box }, mode, hint)
-            }
+            ContentMode.MANGA -> renderTranslations(c, ReadingOrder.sort(blocks, c.mangaRtl) { it.box }, mode, hint)
             ContentMode.VIDEO -> renderCaption(c, blocks, zone, script.isCjk, hint)
             ContentMode.TEXT -> renderTranslations(c, BlockGrouper.group(blocks, false, script.isCjk, 0.5f), mode, hint)
         }
@@ -235,7 +237,7 @@ class LivePipeline(
         if (sig == lastSignature) return
         lastSignature = sig
         if (text.isBlank()) { overlay.clear(); return }
-        val result = engine.translate(text, c, hint)
+        val result = engine.translate(text, c, hint ?: engine.detect(TextTools.normalizeCase(text)), preferHint = true)
         if (result == null) return
         reportDetected(result.route.source)
         val anchor = ordered.map { it.box }.reduceOrNull { a, b -> a.union(b) } ?: zone
@@ -256,7 +258,8 @@ class LivePipeline(
 
         // لغة الصفحة الغالبة كتلميح للكتل القصيرة
         val sample = sources.sortedByDescending { it.text.length }.take(6).joinToString(" ") { it.text }.take(600)
-        val pageHint = if (c.sourceLang == "auto") scriptHint ?: engine.detect(sample) else null
+        val pageHint = if (c.sourceLang == "auto") scriptHint ?: engine.detect(TextTools.normalizeCase(sample)) else null
+        val preferHint = mode != ContentMode.TEXT
 
         val results = arrayOfNulls<RenderedBlock>(sources.size)
         val screen = screenProvider()
@@ -267,22 +270,21 @@ class LivePipeline(
             text = translated,
             rtl = TextTools.isRtlLanguage(target),
             backgroundColor = sources[i].backgroundColor,
-            order = if (mode == ContentMode.MANGA && c.showOrderBadges) i + 1 else null,
             centered = mode == ContentMode.MANGA,
         )
         // عرض فوري لما هو موجود في الذاكرة المؤقتة ثم إكمال الباقي على دفعات
         val pending = ArrayList<Int>()
         for (i in sources.indices) {
-            val route = engine.resolveRoute(sources[i].text.trim(), c, pageHint)
+            val route = engine.resolveRoute(TextTools.normalizeCase(sources[i].text.trim()), c, pageHint, preferHint)
             if (route == null) continue
-            val hit = engine.peek(sources[i].text.trim(), route)
+            val hit = engine.peek(sources[i].text, route)
             sourceLangs += route.source
             if (hit != null) results[i] = build(i, hit, route.target) else pending += i
         }
         if (results.any { it != null }) overlay.render(results.filterNotNull(), null, c.overlayOpacity)
         for (chunk in pending.chunked(8)) {
             coroutineScope {
-                chunk.map { i -> async { i to engine.translate(sources[i].text, c, pageHint) } }.awaitAll()
+                chunk.map { i -> async { i to engine.translate(sources[i].text, c, pageHint, preferHint) } }.awaitAll()
             }.forEach { (i, r) -> if (r != null) results[i] = build(i, r.text, r.route.target) }
             overlay.render(results.filterNotNull(), null, c.overlayOpacity)
         }

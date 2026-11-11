@@ -43,6 +43,7 @@ class OverlayController(private val callbacks: Callbacks) : OverlayHider {
         fun onToggleDisplay()
         fun onSwapDirection()
         fun onClose()
+        fun onBarCollapsedChanged(collapsed: Boolean)
     }
 
     private var ctx: Context? = null
@@ -64,6 +65,10 @@ class OverlayController(private val callbacks: Callbacks) : OverlayHider {
     private var pauseIcon: ImageView? = null
     private var displayIcon: ImageView? = null
     private var pairLabel: TextView? = null
+    private val expandedViews = mutableListOf<View>()
+    private var miniButton: View? = null
+    var isCollapsed = false
+        private set
 
     val isAttached: Boolean get() = canvas != null
 
@@ -192,6 +197,7 @@ class OverlayController(private val callbacks: Callbacks) : OverlayHider {
         listOfNotNull(canvas, bar, handle).forEach { v -> runCatching { w?.removeViewImmediate(v) } }
         canvas = null; bar = null; handle = null; barParams = null; handleParams = null
         chips.clear(); pauseIcon = null; displayIcon = null; pairLabel = null
+        expandedViews.clear(); miniButton = null
         wm = null; ctx = null
     }
 
@@ -279,8 +285,47 @@ class OverlayController(private val callbacks: Callbacks) : OverlayHider {
         root.addView(pauseIcon)
         displayIcon = icon(c, R.drawable.ic_bubble).apply { setOnClickListener { callbacks.onToggleDisplay() }; contentDescription = "تبديل الوضع" }
         root.addView(displayIcon)
+        root.addView(icon(c, R.drawable.ic_minimize).apply {
+            setOnClickListener { setCollapsed(true, notify = true) }
+            contentDescription = "إخفاء الشريط"
+        })
         root.addView(icon(c, R.drawable.ic_close).apply { setOnClickListener { callbacks.onClose() }; contentDescription = "إيقاف الترجمة" })
+        expandedViews.clear()
+        for (i in 0 until root.childCount) expandedViews += root.getChildAt(i)
+
+        // الزر المصغّر: دائرة صغيرة قابلة للسحب، والنقر عليها يعيد إظهار الشريط
+        val mini = icon(c, R.drawable.ic_translate).apply {
+            layoutParams = LinearLayout.LayoutParams((36 * dp).toInt(), (36 * dp).toInt())
+            contentDescription = "إظهار شريط الترجمة"
+            visibility = View.GONE
+            setOnTouchListener(DragListener(onTap = { setCollapsed(false, notify = true) }))
+        }
+        root.addView(mini)
+        miniButton = mini
+        applyBarStyle(root)
         return root
+    }
+
+    /** طيّ الشريط إلى دائرة صغيرة أو إظهاره بالكامل. */
+    fun setCollapsed(value: Boolean, notify: Boolean = false) {
+        if (isCollapsed == value && !notify) { bar?.let { applyBarStyle(it) }; return }
+        isCollapsed = value
+        bar?.let { applyBarStyle(it) }
+        relayoutControls()
+        if (notify) callbacks.onBarCollapsedChanged(value)
+    }
+
+    private fun applyBarStyle(root: LinearLayout) {
+        expandedViews.forEach { it.visibility = if (isCollapsed) View.GONE else View.VISIBLE }
+        miniButton?.visibility = if (isCollapsed) View.VISIBLE else View.GONE
+        val pad = (if (isCollapsed) 3 else 5) * dp
+        root.setPadding(pad.toInt(), pad.toInt(), pad.toInt(), pad.toInt())
+        root.background = GradientDrawable().apply {
+            if (isCollapsed) shape = GradientDrawable.OVAL else cornerRadius = 22 * dp
+            // مصغّر: شبه شفاف حتى لا يغطي المحتوى
+            setColor(if (isCollapsed) 0x991B1F26.toInt() else 0xE61B1F26.toInt())
+            setStroke((1 * dp).toInt(), 0x40FFFFFF)
+        }
     }
 
     private fun icon(c: Context, res: Int) = ImageView(c).apply {
@@ -310,7 +355,7 @@ class OverlayController(private val callbacks: Callbacks) : OverlayHider {
     }
 
     /** سحب الشريط: يحرّك المربع العائم (وضع المربع) أو الشريط وحده (وضع الشاشة الكاملة). */
-    private inner class DragListener : View.OnTouchListener {
+    private inner class DragListener(private val onTap: (() -> Unit)? = null) : View.OnTouchListener {
         private var startX = 0f; private var startY = 0f
         private var startBubble = bubble
         private var startBar = floatingBarPos
@@ -334,7 +379,11 @@ class OverlayController(private val callbacks: Callbacks) : OverlayHider {
                         relayoutControls()
                     }
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP -> {
+                    if (moved && displayMode == DisplayMode.BUBBLE) callbacks.onBubbleChanged(bubble, true)
+                    if (!moved) onTap?.invoke()
+                }
+                MotionEvent.ACTION_CANCEL -> {
                     if (moved && displayMode == DisplayMode.BUBBLE) callbacks.onBubbleChanged(bubble, true)
                 }
             }

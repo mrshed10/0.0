@@ -10,6 +10,7 @@ import com.google.mlkit.nl.translate.TranslatorOptions
 import com.livetranslate.screen.core.LanguageRouter
 import com.livetranslate.screen.core.LruCache
 import com.livetranslate.screen.core.Route
+import com.livetranslate.screen.core.TextTools
 import com.livetranslate.screen.core.TranslationCache
 import com.livetranslate.screen.settings.LiveConfig
 import kotlinx.coroutines.CoroutineScope
@@ -60,12 +61,16 @@ class TranslationEngine(
     }
 
     /** نتيجة من الذاكرة المؤقتة فقط (للعرض الفوري قبل اكتمال الدفعة). */
-    fun peek(text: String, route: Route): String? = cache.get(route.source, route.target, text)
+    fun peek(text: String, route: Route): String? = cache.get(route.source, route.target, TextTools.normalizeCase(text.trim()))
 
-    suspend fun resolveRoute(text: String, cfg: LiveConfig, pageHint: String?): Route? {
+    /**
+     * @param preferHint في المانغا/الفيديو الصفحة كلها بلغة واحدة: نعتمد لغة الصفحة لكل الفقاعات
+     *        بدل اكتشاف كل فقاعة قصيرة وحدها (مصدر أخطاء شائع مع أخطاء OCR الصغيرة).
+     */
+    suspend fun resolveRoute(text: String, cfg: LiveConfig, pageHint: String?, preferHint: Boolean = false): Route? {
         val detected = if (cfg.sourceLang == LanguageRouter.AUTO) {
             // النصوص القصيرة جداً غير موثوقة في التعرف ← نستخدم لغة الصفحة الغالبة
-            if (text.length < 12 && pageHint != null) pageHint else detect(text) ?: pageHint
+            if ((preferHint || text.length < 12) && pageHint != null) pageHint else detect(text) ?: pageHint
         } else null
         val route = LanguageRouter.route(detected, cfg.sourceLang, cfg.targetLang, cfg.secondaryLang, cfg.bidirectional)
             ?: return null
@@ -75,9 +80,9 @@ class TranslationEngine(
         return route
     }
 
-    suspend fun translate(text: String, cfg: LiveConfig, pageHint: String?): TranslationResult? {
-        val clean = text.trim()
-        val route = resolveRoute(clean, cfg, pageHint) ?: return null
+    suspend fun translate(text: String, cfg: LiveConfig, pageHint: String?, preferHint: Boolean = false): TranslationResult? {
+        val clean = TextTools.normalizeCase(text.trim())
+        val route = resolveRoute(clean, cfg, pageHint, preferHint) ?: return null
         cache.get(route.source, route.target, clean)?.let { return TranslationResult(it, route) }
         val translator = translatorFor(route)
         if (!ensureModel(route, translator, cfg.wifiOnlyDownloads)) return null

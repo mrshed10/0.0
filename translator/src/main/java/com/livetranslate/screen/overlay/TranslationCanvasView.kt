@@ -34,7 +34,6 @@ class TranslationCanvasView(context: Context) : View(context) {
         val layout: StaticLayout,
         val padX: Float,
         val padY: Float,
-        val badge: String?,
     )
 
     private var items: List<Item> = emptyList()
@@ -53,10 +52,6 @@ class TranslationCanvasView(context: Context) : View(context) {
     private val glassFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x1A9EC5FF }
     private val glassHighlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE; strokeWidth = 1f * dp; color = 0x66BBD6FF
-    }
-    private val badgeBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2F6BFF.toInt() }
-    private val badgeText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; textSize = 10f * sp; textAlign = Paint.Align.CENTER; isFakeBoldText = true
     }
 
     /** موضع هذه النافذة على الشاشة (لتحويل إحداثيات الشاشة إلى إحداثيات النافذة). */
@@ -97,7 +92,7 @@ class TranslationCanvasView(context: Context) : View(context) {
         val layout = fit(b.text, width, maxH, maxPx, 8f * sp, fg, b.rtl, b.centered)
         val h = max(b.box.height.toFloat(), layout.height + 2 * padY)
         val rect = RectF(b.box.left.toFloat(), b.box.top.toFloat(), b.box.right.toFloat(), b.box.top + h)
-        return Item(rect, bg, layout, padX, padY, b.order?.toString())
+        return Item(rect, bg, layout, padX, padY)
     }
 
     private fun buildCaption(c: Caption): Item {
@@ -111,7 +106,7 @@ class TranslationCanvasView(context: Context) : View(context) {
         val gap = 8f * dp
         // فوق منطقة الالتقاط إن توفرت مساحة، وإلا تحتها — حتى لا تُغطّى الترجمة المرئية الأصلية
         val top = if (c.anchor.top - h - gap > 24 * dp) c.anchor.top - h - gap else c.anchor.bottom + gap
-        return Item(RectF(left, top, left + width, top + h), 0xE6101418.toInt(), layout, padX, padY, null)
+        return Item(RectF(left, top, left + width, top + h), 0xE6101418.toInt(), layout, padX, padY)
     }
 
     private fun fit(
@@ -169,12 +164,6 @@ class TranslationCanvasView(context: Context) : View(context) {
         canvas.translate(it.rect.left + it.padX, textTop)
         it.layout.draw(canvas)
         canvas.restore()
-        it.badge?.let { label ->
-            val cx = it.rect.right - 2 * dp
-            val cy = it.rect.top + 2 * dp
-            canvas.drawCircle(cx, cy, 8f * dp, badgeBg)
-            canvas.drawText(label, cx, cy + 3.5f * dp, badgeText)
-        }
     }
 
     private fun luminance(c: Int): Float =

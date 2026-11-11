@@ -146,6 +146,7 @@ class LiveTranslationService : Service(), OverlayController.Callbacks {
         val cfg = settings.config.value
         overlay.attach(a11y ?: this, a11y != null, currentScreen().bounds, cfg.displayMode, bubble)
         overlay.updateControls(cfg, pipeline.paused)
+        overlay.setCollapsed(cfg.barCollapsed)
     }
 
     private fun currentScreen(): ScreenSize = screen ?: ScreenMetrics.real(this).also { screen = it }
@@ -233,6 +234,10 @@ class LiveTranslationService : Service(), OverlayController.Callbacks {
     }
 
     override fun onClose() = shutdown()
+
+    override fun onBarCollapsedChanged(collapsed: Boolean) {
+        settings.update { it.copy(barCollapsed = collapsed) }
+    }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)

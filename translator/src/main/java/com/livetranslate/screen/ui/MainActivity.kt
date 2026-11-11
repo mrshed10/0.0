@@ -289,7 +289,6 @@ private fun HomeScreen(activity: Activity, resumeTick: Int, onOpenPacks: () -> U
             )
             if (cfg.contentMode == ContentMode.MANGA) {
                 SwitchRow("اتجاه القراءة من اليمين لليسار (مانغا يابانية)", cfg.mangaRtl) { v -> settings.update { it.copy(mangaRtl = v) } }
-                SwitchRow("إظهار أرقام ترتيب الفقاعات", cfg.showOrderBadges) { v -> settings.update { it.copy(showOrderBadges = v) } }
             }
             if (cfg.contentMode.usesOcr && cfg.sourceLang == "auto") {
                 Text("نظام كتابة النص في الصورة:", style = MaterialTheme.typography.labelLarge)
