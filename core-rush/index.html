@@ -154,7 +154,14 @@ const settings = {
   sound: store.get('sound', true),
   vibrate: store.get('vibrate', true),
 };
-function vibrate(p) { if (settings.vibrate && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) { } } }
+function vibrate(p) {
+  if (!settings.vibrate) return;
+  try {
+    if (window.AndroidBridge) window.AndroidBridge.vibrate(String(p)); // داخل تطبيق أندرويد
+    else if (navigator.vibrate) navigator.vibrate(p);
+  } catch (e) { }
+}
+const IN_APP = !!window.AndroidBridge;
 
 /* مؤثرات صوتية مولّدة (بدون ملفات) */
 let AC = null;
@@ -1286,7 +1293,7 @@ function showMenu() {
     '<div class="lbl">مستوى الذكاء الاصطناعي</div><div class="row">' + opt('difficulty', 0, 'سهل', s.difficulty) + opt('difficulty', 1, 'عادي', s.difficulty) + opt('difficulty', 2, 'صعب', s.difficulty) + '</div>' +
     '<div class="lbl">الإعدادات</div><div class="row">' + opt('tabletop', true, '🔄 وضع الطاولة', s.tabletop) + opt('sound', true, '🔊 صوت', s.sound) + opt('vibrate', true, '📳 اهتزاز', s.vibrate) + '</div>' +
     '<button class="big" id="go">▶ ابدأ السباق</button>' +
-    '<button class="big sec" id="fs">⛶ ملء الشاشة</button>' +
+    (IN_APP ? '' : '<button class="big sec" id="fs">⛶ ملء الشاشة</button>') +
     '<p>التحكم: اسحب على المتاهة (النصف العلوي للأزرق والسفلي للأحمر) أو استخدم الأزرار. الكرة تتبع الممر وتتوقف عند التقاطع. اضغط الاتجاه مبكراً لتنعطف تلقائياً.</p>' +
     '<div class="biomes">' + BIOMES.map(b => '<span>' + b.icon + ' ' + b.name + '</span>').join('') + '</div>' +
     '<p style="font-size:12px">أفضل مرحلة: ' + store.get('bestLevel', 1) + ' · انتصاراتك على الذكاء: ' + store.get('aiWins', 0) + '</p>'
@@ -1301,9 +1308,9 @@ function showMenu() {
     showMenu();
   }));
   document.getElementById('go').addEventListener('click', () => { unlockAudio(); G.scores = [0, 0]; G.level = 1; newRound(); });
-  document.getElementById('fs').addEventListener('click', () => {
+  if (!IN_APP) document.getElementById('fs').addEventListener('click', () => {
     const el = document.documentElement;
-    try { (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { }); } catch (e) { }
+    try { const r = (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if (r && r.catch) r.catch(() => { }); if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => { }); } catch (e) { }
   });
 }
 function showRoundEnd() {
@@ -1350,6 +1357,12 @@ applyTabletop(); resize(); refreshCards();
 showMenu();
 requestAnimationFrame(loop);
 window.__G = G; // للاختبار والتصحيح
+/* زر الرجوع في تطبيق أندرويد: يوقف اللعبة مؤقتاً أو يعود للقائمة، ويعيد 'exit' للخروج */
+window.onAndroidBack = function () {
+  if (G.state === 'play' || G.state === 'countdown') { togglePause(); return 'handled'; }
+  if (G.state === 'paused' || G.state === 'roundEnd') { showMenu(); return 'handled'; }
+  return 'exit';
+};
 </script>
 </body>
 </html>

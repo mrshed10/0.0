@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- أيقونة: متاهة نيون مع النواة الخضراء والكرتين الأزرق والأحمر -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#00FFD5"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M30,30 H48 M60,30 H78 V48 M78,60 V78 H60 M48,78 H30 V60 M30,48 V30 M40,40 H68 V52 M40,40 V68 H56 M68,68 H62 M52,52 H56" />
+    <path
+        android:fillColor="#3322FF88"
+        android:pathData="M54,54m-11,0a11,11 0,1 1,22 0a11,11 0,1 1,-22 0" />
+    <path
+        android:fillColor="#22FF88"
+        android:pathData="M54,54m-5.5,0a5.5,5.5 0,1 1,11 0a5.5,5.5 0,1 1,-11 0" />
+    <path
+        android:fillColor="#3B82F6"
+        android:pathData="M54,24m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
+    <path
+        android:fillColor="#EF4444"
+        android:pathData="M54,84m-4.5,0a4.5,4.5 0,1 1,9 0a4.5,4.5 0,1 1,-9 0" />
+</vector>
