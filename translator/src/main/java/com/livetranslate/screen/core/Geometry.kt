@@ -42,6 +42,18 @@ data class Box(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     /** طول التداخل الرأسي (قد يكون سالباً = فجوة). */
     fun verticalOverlap(o: Box): Int = min(bottom, o.bottom) - max(top, o.top)
 
+    /**
+     * توسيع الصندوق أفقياً حول مركزه حتى نسبة عرض/ارتفاع دنيا (فقاعات المانغا الرأسية الضيقة)
+     * كي تبقى الترجمة العربية مقروءة بدل أن تُضغط في عمود رفيع.
+     */
+    fun widenToAspect(minAspect: Float, bounds: Box): Box {
+        val wanted = (height * minAspect).toInt()
+        if (width >= wanted) return this
+        val w = minOf(wanted, bounds.width)
+        val l = (centerX - w / 2).coerceIn(bounds.left, bounds.right - w)
+        return Box(l, top, l + w, bottom)
+    }
+
     /** حصر المستطيل داخل حدود معينة مع الحفاظ على الحجم قدر الإمكان. */
     fun clampInto(bounds: Box, minW: Int, minH: Int): Box {
         val w = width.coerceIn(min(minW, bounds.width), bounds.width)

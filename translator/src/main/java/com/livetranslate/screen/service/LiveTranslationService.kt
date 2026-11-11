@@ -126,9 +126,14 @@ class LiveTranslationService : Service(), OverlayController.Callbacks {
             }
         }
         scope.launch {
+            LiveState.status.collect { st ->
+                if (started) overlay.updateControls(settings.config.value, pipeline.paused, st.detectedLang)
+            }
+        }
+        scope.launch {
             settings.config.collect { c ->
                 if (!started) return@collect
-                overlay.updateControls(c, pipeline.paused)
+                overlay.updateControls(c, pipeline.paused, LiveState.status.value.detectedLang)
                 if (c.contentMode.usesOcr && capture == null) requestProjection()
             }
         }

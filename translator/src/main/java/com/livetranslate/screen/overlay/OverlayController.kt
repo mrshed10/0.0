@@ -139,10 +139,14 @@ class OverlayController(private val callbacks: Callbacks) : OverlayHider {
         applyDisplayMode(displayMode, bubble)
     }
 
-    fun updateControls(cfg: LiveConfig, paused: Boolean) {
+    fun updateControls(cfg: LiveConfig, paused: Boolean, detected: String? = null) {
         chips.forEach { (mode, view) -> styleChip(view, mode == cfg.contentMode) }
         pauseIcon?.setImageResource(if (paused) R.drawable.ic_play else R.drawable.ic_pause)
-        val src = if (cfg.sourceLang == "auto") "تلقائي" else short(cfg.sourceLang)
+        val src = when {
+            cfg.sourceLang != "auto" -> short(cfg.sourceLang)
+            detected != null -> "تلقائي: ${short(detected)}"
+            else -> "تلقائي"
+        }
         pairLabel?.text = "$src ← ${short(cfg.targetLang)}"
     }
 

@@ -20,8 +20,8 @@ data class LiveConfig(
     val contentMode: ContentMode = ContentMode.TEXT,
     /** اتجاه قراءة المانغا: من اليمين لليسار (يابانية) أو العكس. */
     val mangaRtl: Boolean = true,
-    /** محرك OCR عند اختيار "تلقائي" كلغة مصدر. */
-    val ocrScript: OcrScript = OcrScript.LATIN,
+    /** محرك OCR عند اختيار "تلقائي" كلغة مصدر؛ null = اكتشاف نظام الكتابة تلقائياً. */
+    val ocrScript: OcrScript? = null,
     val wifiOnlyDownloads: Boolean = false,
     val overlayOpacity: Float = 0.94f,
     val showOrderBadges: Boolean = true,
@@ -31,7 +31,8 @@ data class LiveConfig(
     /** موضع المربع العائم بإحداثيات الشاشة (فارغ = الافتراضي). */
     val bubble: Box = Box(0, 0, 0, 0),
 ) {
-    val effectiveOcrScript: OcrScript
+    /** null = يُكتشف تلقائياً من الصورة. */
+    val effectiveOcrScript: OcrScript?
         get() = OcrScript.forLanguage(sourceLang) ?: ocrScript
 
     val needsProjection: Boolean
@@ -63,7 +64,7 @@ class LiveSettings private constructor(context: Context) {
             displayMode = enumOr(prefs.getString("display", null), d.displayMode),
             contentMode = enumOr(prefs.getString("content", null), d.contentMode),
             mangaRtl = prefs.getBoolean("manga_rtl", d.mangaRtl),
-            ocrScript = enumOr(prefs.getString("ocr_script", null), d.ocrScript),
+            ocrScript = prefs.getString("ocr_script_v2", null)?.let { n -> OcrScript.entries.firstOrNull { it.name == n } },
             wifiOnlyDownloads = prefs.getBoolean("wifi_only_v2", d.wifiOnlyDownloads),
             overlayOpacity = prefs.getFloat("opacity", d.overlayOpacity),
             showOrderBadges = prefs.getBoolean("badges", d.showOrderBadges),
@@ -85,7 +86,7 @@ class LiveSettings private constructor(context: Context) {
             .putString("display", c.displayMode.name)
             .putString("content", c.contentMode.name)
             .putBoolean("manga_rtl", c.mangaRtl)
-            .putString("ocr_script", c.ocrScript.name)
+            .putString("ocr_script_v2", c.ocrScript?.name ?: "AUTO")
             .putBoolean("wifi_only_v2", c.wifiOnlyDownloads)
             .putFloat("opacity", c.overlayOpacity)
             .putBoolean("badges", c.showOrderBadges)
@@ -119,6 +120,8 @@ data class ServiceStatus(
     val lastFound: Int = -1,
     val lastTranslated: Int = -1,
     val lastError: String? = null,
+    /** اللغة المكتشفة تلقائياً في آخر دورة (تُعرض في الشريط العائم). */
+    val detectedLang: String? = null,
 )
 
 object LiveState {

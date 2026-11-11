@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
@@ -13,6 +14,7 @@ import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.livetranslate.screen.core.Box
 import com.livetranslate.screen.core.OcrScript
+import com.livetranslate.screen.core.ScriptDetector
 import com.livetranslate.screen.core.SourceBlock
 import com.livetranslate.screen.core.TextTools
 import kotlinx.coroutines.tasks.await
@@ -38,8 +40,42 @@ class OcrEngine {
      * @param origin موضع الصورة على الشاشة؛ تُعاد الكتل بإحداثيات الشاشة.
      * @param sampleBackground أخذ لون الخلفية حول كل كتلة (وضع المانغا).
      */
-    suspend fun recognize(bitmap: Bitmap, script: OcrScript, origin: Box, sampleBackground: Boolean): List<SourceBlock> {
-        val result = client(script).process(InputImage.fromBitmap(bitmap, 0)).await()
+    suspend fun recognize(bitmap: Bitmap, script: OcrScript, origin: Box, sampleBackground: Boolean): List<SourceBlock> =
+        toBlocks(process(bitmap, script), bitmap, script, origin, sampleBackground)
+
+    private suspend fun process(bitmap: Bitmap, script: OcrScript): Text =
+        client(script).process(InputImage.fromBitmap(bitmap, 0)).await()
+
+    /**
+     * اكتشاف نظام الكتابة تلقائياً ثم إرجاع الكتل بالمحرك الصحيح.
+     * @param detectLanguage أداة اكتشاف اللغة (للتحقق من أن القراءة اللاتينية نص حقيقي).
+     * @return المحرك المكتشف والكتل، أو null إذا لم يُعثر على نص.
+     */
+    suspend fun recognizeAuto(
+        bitmap: Bitmap,
+        origin: Box,
+        sampleBackground: Boolean,
+        detectLanguage: suspend (String) -> String?,
+    ): Pair<OcrScript, List<SourceBlock>>? {
+        fun done(s: OcrScript, t: Text) = s to toBlocks(t, bitmap, s, origin, sampleBackground)
+
+        val jp = process(bitmap, OcrScript.JAPANESE)
+        when (ScriptDetector.fromJapanesePass(jp.text)) {
+            OcrScript.JAPANESE -> return done(OcrScript.JAPANESE, jp)
+            OcrScript.CHINESE -> return done(OcrScript.CHINESE, process(bitmap, OcrScript.CHINESE))
+            else -> Unit
+        }
+        val latin = process(bitmap, OcrScript.LATIN)
+        val lang = if (latin.text.isBlank()) null else detectLanguage(latin.text.take(400))
+        if (ScriptDetector.isLatinConfident(latin.text, lang)) return done(OcrScript.LATIN, latin)
+        val ko = process(bitmap, OcrScript.KOREAN)
+        if (ScriptDetector.hasHangul(ko.text)) return done(OcrScript.KOREAN, ko)
+        val dev = process(bitmap, OcrScript.DEVANAGARI)
+        if (ScriptDetector.hasDevanagari(dev.text)) return done(OcrScript.DEVANAGARI, dev)
+        return if (latin.text.isNotBlank()) done(OcrScript.LATIN, latin) else null
+    }
+
+    private fun toBlocks(result: Text, bitmap: Bitmap, script: OcrScript, origin: Box, sampleBackground: Boolean): List<SourceBlock> {
         return result.textBlocks.mapNotNull { block ->
             val r = block.boundingBox ?: return@mapNotNull null
             val text = TextTools.joinLines(block.lines.map { it.text }, script.isCjk)

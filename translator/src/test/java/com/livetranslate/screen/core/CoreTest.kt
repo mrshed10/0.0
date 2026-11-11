@@ -110,3 +110,36 @@ class CacheAndSignatureTest {
         assertEquals(Box(800, 1900, 1000, 2000), Box(950, 1950, 1150, 2050).clampInto(screen, 100, 100))
     }
 }
+
+class ScriptDetectorTest {
+    @Test fun kanaMeansJapanese() {
+        assertEquals(OcrScript.JAPANESE, ScriptDetector.fromJapanesePass("こんにちは、元気ですか"))
+    }
+
+    @Test fun hanWithoutKanaMeansChinese() {
+        assertEquals(OcrScript.CHINESE, ScriptDetector.fromJapanesePass("你今天好吗我很好"))
+    }
+
+    @Test fun latinIsInconclusiveOnJapanesePass() {
+        assertNull(ScriptDetector.fromJapanesePass("Hello there"))
+    }
+
+    @Test fun latinConfidenceNeedsKnownLanguage() {
+        assertTrue(ScriptDetector.isLatinConfident("Where are you going", "en"))
+        assertFalse(ScriptDetector.isLatinConfident("xq zt", null))
+    }
+
+    @Test fun hangulAndDevanagari() {
+        assertTrue(ScriptDetector.hasHangul("안녕하세요"))
+        assertTrue(ScriptDetector.hasDevanagari("नमस्ते दुनिया"))
+        assertFalse(ScriptDetector.hasHangul("hello"))
+    }
+
+    @Test fun narrowVerticalBubbleIsWidened() {
+        val screen = Box(0, 0, 1000, 2000)
+        val b = Box(500, 100, 540, 400).widenToAspect(0.75f, screen)
+        assertEquals(225, b.width)
+        assertEquals(520, b.centerX)
+        assertEquals(Box(0, 0, 300, 100), Box(0, 0, 300, 100).widenToAspect(0.75f, screen))
+    }
+}

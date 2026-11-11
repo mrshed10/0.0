@@ -209,6 +209,12 @@ private fun HomeScreen(activity: Activity, resumeTick: Int, onOpenPacks: () -> U
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                if (status.running && cfg.sourceLang == "auto" && status.detectedLang != null) {
+                    Text(
+                        "اللغة المكتشفة: ${LanguagePacks.displayName(status.detectedLang!!)} ← ${LanguagePacks.displayName(cfg.targetLang)}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
                 if (status.downloadingPacks.isNotEmpty()) {
                     Text("جارٍ تنزيل حزم اللغات: " + status.downloadingPacks.joinToString("، "), style = MaterialTheme.typography.bodySmall)
                 }
@@ -276,8 +282,8 @@ private fun HomeScreen(activity: Activity, resumeTick: Int, onOpenPacks: () -> U
             Text(
                 when (cfg.contentMode) {
                     ContentMode.TEXT -> "قراءة مباشرة لنصوص الواجهة — أسرع استجابة وأقل استهلاك."
-                    ContentMode.VIDEO -> "التعرف على الترجمات المرئية في الإطارات وعرض ترجمتها في شريط لا يغطي الفيديو."
-                    ContentMode.MANGA -> "تجميع الفقاعات وترتيب القراءة، وتلوين الترجمة بلون خلفية الفقاعة."
+                    ContentMode.VIDEO -> "يكتشف لغة الترجمات المرئية تلقائياً ويترجمها للعربية في شريط لا يغطي الفيديو."
+                    ContentMode.MANGA -> "يكتشف اللغة تلقائياً (ياباني/صيني/كوري/إنجليزي…)، يجمع الفقاعات ويرتب القراءة ويلوّن الترجمة بلون الفقاعة."
                 },
                 style = MaterialTheme.typography.bodySmall,
             )
@@ -286,8 +292,9 @@ private fun HomeScreen(activity: Activity, resumeTick: Int, onOpenPacks: () -> U
                 SwitchRow("إظهار أرقام ترتيب الفقاعات", cfg.showOrderBadges) { v -> settings.update { it.copy(showOrderBadges = v) } }
             }
             if (cfg.contentMode.usesOcr && cfg.sourceLang == "auto") {
-                Text("خط النص المصدر للتعرف الضوئي:", style = MaterialTheme.typography.labelLarge)
+                Text("نظام كتابة النص في الصورة:", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ChoiceChip("تلقائي (موصى به)", cfg.ocrScript == null) { settings.update { it.copy(ocrScript = null) } }
                     OcrScript.entries.forEach { s ->
                         ChoiceChip(scriptName(s), cfg.ocrScript == s) { settings.update { it.copy(ocrScript = s) } }
                     }

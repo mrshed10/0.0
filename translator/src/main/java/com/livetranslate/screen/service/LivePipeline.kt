@@ -9,8 +9,10 @@ import com.livetranslate.screen.core.Caption
 import com.livetranslate.screen.core.ContentMode
 import com.livetranslate.screen.core.DisplayMode
 import com.livetranslate.screen.core.FrameSignature
+import com.livetranslate.screen.core.OcrScript
 import com.livetranslate.screen.core.ReadingOrder
 import com.livetranslate.screen.core.RenderedBlock
+import com.livetranslate.screen.core.ScriptDetector
 import com.livetranslate.screen.core.SourceBlock
 import com.livetranslate.screen.core.TextTools
 import com.livetranslate.screen.overlay.OverlayController
@@ -62,6 +64,11 @@ class LivePipeline(
     private var previous: IntArray? = null
     private var graceTicks = 0
 
+    // نظام الكتابة المكتشف تلقائياً (ثابت حتى يتغير المشهد أو التطبيق لتوفير الأداء)
+    private var autoScript: OcrScript? = null
+    private var autoPasses = 0
+    private var autoEmpty = 0
+
     @Volatile var paused = false
         private set
 
@@ -74,7 +81,7 @@ class LivePipeline(
                 if (paused) return@collect
                 when (change.kind) {
                     // تنقل أو تمرير: نخفي الترجمة القديمة فوراً كي لا تطفو فوق محتوى متحرك
-                    UiChangeKind.NAVIGATION -> schedule(260, clear = true)
+                    UiChangeKind.NAVIGATION -> { autoScript = null; schedule(260, clear = true) }
                     UiChangeKind.SCROLL -> schedule(220, clear = cfg.displayMode == DisplayMode.FULL_SCREEN || cfg.contentMode == ContentMode.TEXT)
                     UiChangeKind.CONTENT -> if (cfg.contentMode == ContentMode.TEXT) schedule(320)
                 }
@@ -182,40 +189,62 @@ class LivePipeline(
         // وضع الفيديو يرسم الشريط خارج المنطقة ← لا حاجة لإخفاء الطبقات (بلا وميض)
         val hider = if (mode != ContentMode.VIDEO && (overlay.hasContent || c.displayMode == DisplayMode.FULL_SCREEN)) overlay else null
         val bitmap = capture.capture(zone, hider) ?: return
-        val script = c.effectiveOcrScript
-        val raw = try {
-            ocr.recognize(bitmap, script, zone, sampleBackground = mode == ContentMode.MANGA)
+        val sampleBg = mode == ContentMode.MANGA
+        val fixed = c.effectiveOcrScript
+        val (script, raw) = try {
+            if (fixed != null) {
+                fixed to ocr.recognize(bitmap, fixed, zone, sampleBg)
+            } else {
+                // اكتشاف تلقائي: نعيد الاكتشاف عند تغيّر التطبيق، أو إذا لم يُقرأ شيء، أو كل 20 دورة
+                val known = autoScript
+                val reuse = known?.let { ocr.recognize(bitmap, it, zone, sampleBg) }
+                // إطار بلا نص (مثلاً فيديو بلا ترجمة مرئية حالياً) لا يستدعي إعادة الاكتشاف فوراً
+                val keep = reuse != null && autoPasses < 20 &&
+                    (reuse.isNotEmpty() || ++autoEmpty < 3)
+                if (known != null && reuse != null && keep) {
+                    if (reuse.isNotEmpty()) autoEmpty = 0
+                    autoPasses++
+                    known to reuse
+                } else {
+                    autoEmpty = 0
+                    val found = ocr.recognizeAuto(bitmap, zone, sampleBg) { engine.detect(it) }
+                    if (found != null) { autoScript = found.first; autoPasses = 0 }
+                    (found?.first ?: known ?: OcrScript.LATIN) to found?.second.orEmpty()
+                }
+            }
         } finally {
             bitmap.recycle()
         }
+        val hint = if (c.sourceLang == "auto") ScriptDetector.languageHint(script) else null
         graceTicks = 2
         val blocks = raw.filter { TextTools.isTranslatable(it.text) }
         when (mode) {
             ContentMode.MANGA -> {
                 val bubbles = BlockGrouper.group(blocks, c.mangaRtl, script.isCjk)
-                renderTranslations(c, ReadingOrder.sort(bubbles, c.mangaRtl) { it.box }, mode)
+                renderTranslations(c, ReadingOrder.sort(bubbles, c.mangaRtl) { it.box }, mode, hint)
             }
-            ContentMode.VIDEO -> renderCaption(c, blocks, zone, script.isCjk)
-            ContentMode.TEXT -> renderTranslations(c, BlockGrouper.group(blocks, false, script.isCjk, 0.5f), mode)
+            ContentMode.VIDEO -> renderCaption(c, blocks, zone, script.isCjk, hint)
+            ContentMode.TEXT -> renderTranslations(c, BlockGrouper.group(blocks, false, script.isCjk, 0.5f), mode, hint)
         }
     }
 
-    private suspend fun renderCaption(c: LiveConfig, blocks: List<SourceBlock>, zone: Box, cjk: Boolean) {
+    private suspend fun renderCaption(c: LiveConfig, blocks: List<SourceBlock>, zone: Box, cjk: Boolean, hint: String?) {
         val ordered = ReadingOrder.sort(blocks, false) { it.box }
         val text = TextTools.joinLines(ordered.map { it.text }, cjk)
         val sig = text.hashCode()
         if (sig == lastSignature) return
         lastSignature = sig
         if (text.isBlank()) { overlay.clear(); return }
-        val result = engine.translate(text, c, null)
+        val result = engine.translate(text, c, hint)
         if (result == null) return
+        reportDetected(result.route.source)
         val anchor = ordered.map { it.box }.reduceOrNull { a, b -> a.union(b) } ?: zone
         val captionAnchor = if (c.displayMode == DisplayMode.BUBBLE) region(c) else anchor
         overlay.render(emptyList(), Caption(result.text, TextTools.isRtlLanguage(result.route.target), captionAnchor), c.overlayOpacity)
         status(null)
     }
 
-    private suspend fun renderTranslations(c: LiveConfig, sources: List<SourceBlock>, mode: ContentMode) {
+    private suspend fun renderTranslations(c: LiveConfig, sources: List<SourceBlock>, mode: ContentMode, scriptHint: String? = null) {
         val sig = TextTools.signature(sources)
         if (sig == lastSignature) return
         lastSignature = sig
@@ -227,11 +256,14 @@ class LivePipeline(
 
         // لغة الصفحة الغالبة كتلميح للكتل القصيرة
         val sample = sources.sortedByDescending { it.text.length }.take(6).joinToString(" ") { it.text }.take(600)
-        val pageHint = if (c.sourceLang == "auto") engine.detect(sample) else null
+        val pageHint = if (c.sourceLang == "auto") scriptHint ?: engine.detect(sample) else null
 
         val results = arrayOfNulls<RenderedBlock>(sources.size)
+        val screen = screenProvider()
+        val sourceLangs = ArrayList<String>()
         fun build(i: Int, translated: String, target: String) = RenderedBlock(
-            box = sources[i].box,
+            // فقاعات المانغا الرأسية الضيقة تُوسَّع أفقياً لتبقى الترجمة مقروءة
+            box = if (mode == ContentMode.MANGA) sources[i].box.widenToAspect(0.75f, screen) else sources[i].box,
             text = translated,
             rtl = TextTools.isRtlLanguage(target),
             backgroundColor = sources[i].backgroundColor,
@@ -244,6 +276,7 @@ class LivePipeline(
             val route = engine.resolveRoute(sources[i].text.trim(), c, pageHint)
             if (route == null) continue
             val hit = engine.peek(sources[i].text.trim(), route)
+            sourceLangs += route.source
             if (hit != null) results[i] = build(i, hit, route.target) else pending += i
         }
         if (results.any { it != null }) overlay.render(results.filterNotNull(), null, c.overlayOpacity)
@@ -255,6 +288,7 @@ class LivePipeline(
         }
         if (results.all { it == null }) overlay.clear()
         val translated = results.count { it != null }
+        sourceLangs.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key?.let { reportDetected(it) }
         LiveState.update {
             it.copy(
                 lastFound = sources.size, lastTranslated = translated,
@@ -291,6 +325,10 @@ class LivePipeline(
                 changed > 0.06f -> { overlay.clear(); lastSignature = null } // ما زال يتحرك (تمرير) ← إخفاء الترجمات القديمة
             }
         }
+    }
+
+    private fun reportDetected(lang: String) {
+        if (LiveState.status.value.detectedLang != lang) LiveState.update { it.copy(detectedLang = lang) }
     }
 
     private fun status(message: String?) {
