@@ -22,7 +22,7 @@ data class LiveConfig(
     val mangaRtl: Boolean = true,
     /** محرك OCR عند اختيار "تلقائي" كلغة مصدر. */
     val ocrScript: OcrScript = OcrScript.LATIN,
-    val wifiOnlyDownloads: Boolean = true,
+    val wifiOnlyDownloads: Boolean = false,
     val overlayOpacity: Float = 0.94f,
     val showOrderBadges: Boolean = true,
     val excludeSystemUi: Boolean = true,
@@ -64,7 +64,7 @@ class LiveSettings private constructor(context: Context) {
             contentMode = enumOr(prefs.getString("content", null), d.contentMode),
             mangaRtl = prefs.getBoolean("manga_rtl", d.mangaRtl),
             ocrScript = enumOr(prefs.getString("ocr_script", null), d.ocrScript),
-            wifiOnlyDownloads = prefs.getBoolean("wifi_only", d.wifiOnlyDownloads),
+            wifiOnlyDownloads = prefs.getBoolean("wifi_only_v2", d.wifiOnlyDownloads),
             overlayOpacity = prefs.getFloat("opacity", d.overlayOpacity),
             showOrderBadges = prefs.getBoolean("badges", d.showOrderBadges),
             excludeSystemUi = prefs.getBoolean("exclude_sysui", d.excludeSystemUi),
@@ -86,7 +86,7 @@ class LiveSettings private constructor(context: Context) {
             .putString("content", c.contentMode.name)
             .putBoolean("manga_rtl", c.mangaRtl)
             .putString("ocr_script", c.ocrScript.name)
-            .putBoolean("wifi_only", c.wifiOnlyDownloads)
+            .putBoolean("wifi_only_v2", c.wifiOnlyDownloads)
             .putFloat("opacity", c.overlayOpacity)
             .putBoolean("badges", c.showOrderBadges)
             .putBoolean("exclude_sysui", c.excludeSystemUi)
@@ -115,6 +115,10 @@ data class ServiceStatus(
     val projectionActive: Boolean = false,
     val message: String? = null,
     val downloadingPacks: Set<String> = emptySet(),
+    /** تشخيص آخر دورة: عدد النصوص المكتشفة والمترجمة، وآخر خطأ. */
+    val lastFound: Int = -1,
+    val lastTranslated: Int = -1,
+    val lastError: String? = null,
 )
 
 object LiveState {

@@ -31,6 +31,7 @@ class TranslationEngine(
     private val scope: CoroutineScope,
     private val onModelReady: () -> Unit,
     private val onDownloadingChanged: (Set<String>) -> Unit,
+    private val onError: (String) -> Unit = {},
 ) {
     private val languageId = LanguageIdentification.getClient(
         LanguageIdentificationOptions.Builder().setConfidenceThreshold(0.45f).build()
@@ -83,7 +84,9 @@ class TranslationEngine(
         val task = translator.translate(clean)
         // تُحفظ النتيجة في الذاكرة المؤقتة حتى لو أُلغيت الدورة الحالية
         task.addOnSuccessListener { cache.put(route.source, route.target, clean, it) }
-        val out = runCatching { task.await() }.getOrNull() ?: return null
+        val out = runCatching { task.await() }
+            .onFailure { onError("فشلت الترجمة: ${it.message ?: it.javaClass.simpleName}") }
+            .getOrNull() ?: return null
         return TranslationResult(out, route)
     }
 
@@ -107,7 +110,11 @@ class TranslationEngine(
         val deferred = models.getOrPut(key) {
             scope.async {
                 val conditions = DownloadConditions.Builder().apply { if (wifiOnly) requireWifi() }.build()
-                val ok = runCatching { translator.downloadModelIfNeeded(conditions).await(); true }.getOrDefault(false)
+                val outcome = runCatching { translator.downloadModelIfNeeded(conditions).await() }
+                val ok = outcome.isSuccess
+                outcome.exceptionOrNull()?.let {
+                    onError("تعذّر تنزيل حزمة اللغة (${route.source} → ${route.target}): ${it.message ?: it.javaClass.simpleName}")
+                }
                 if (downloading.remove(key)) onDownloadingChanged(downloading.toSet())
                 if (ok) {
                     failedAt.remove(key)

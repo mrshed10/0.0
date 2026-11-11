@@ -68,6 +68,7 @@ class LiveTranslationService : Service(), OverlayController.Callbacks {
             scope,
             onModelReady = { scope.launch { pipeline.refresh(clear = false) } },
             onDownloadingChanged = { packs -> scope.launch { LiveState.update { it.copy(downloadingPacks = packs) }; updateNotification() } },
+            onError = { msg -> scope.launch { LiveState.update { it.copy(lastError = msg) } } },
         )
         ocr = OcrEngine()
         overlay = OverlayController(this)

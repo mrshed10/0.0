@@ -78,6 +78,12 @@ class ScreenTextAccessibilityService : AccessibilityService() {
             if (w.type == AccessibilityWindowInfo.TYPE_APPLICATION && !winBox.isEmpty) occluders += winBox
             if (out.size >= limit) break
         }
+        if (out.isEmpty()) {
+            // بعض واجهات الشركات (مثل MagicOS) قد لا تُرجع قائمة النوافذ ← نقرأ النافذة النشطة مباشرة
+            val root = runCatching { rootInActiveWindow }.getOrNull()
+            val pkg = root?.packageName?.toString()
+            if (root != null && pkg != packageName) collect(root, region, emptyList(), out, limit, rect)
+        }
         return out
     }
 

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -89,6 +90,7 @@ import com.livetranslate.screen.settings.LiveConfig
 import com.livetranslate.screen.settings.LiveSettings
 import com.livetranslate.screen.settings.LiveState
 import com.livetranslate.screen.translate.LanguagePacks
+import com.livetranslate.screen.translate.TranslationSelfTest
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -116,14 +118,23 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class Permissions(val overlay: Boolean, val accessibility: Boolean, val notifications: Boolean)
+private data class Permissions(val overlay: Boolean, val accessibility: Boolean, val notifications: Boolean, val battery: Boolean)
 
 private fun readPermissions(a: Activity) = Permissions(
     overlay = Settings.canDrawOverlays(a),
     accessibility = ScreenTextAccessibilityService.isEnabled(a),
     notifications = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(a, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED,
+    battery = a.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(a.packageName),
 )
+
+@android.annotation.SuppressLint("BatteryLife")
+private fun requestBatteryExemption(a: Activity) {
+    val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${a.packageName}"))
+    runCatching { a.startActivity(direct) }.onFailure {
+        runCatching { a.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+    }
+}
 
 @Composable
 private fun AppRoot(activity: Activity, resumeTick: Int) {
@@ -223,6 +234,15 @@ private fun HomeScreen(activity: Activity, resumeTick: Int, onOpenPacks: () -> U
             PermissionRow("الإشعارات (التحكم من الإشعار الدائم)", perms.notifications) {
                 if (Build.VERSION.SDK_INT >= 33) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+            PermissionRow("استثناء من تحسين البطارية (حتى لا يوقف النظام الخدمة)", perms.battery) { requestBatteryExemption(activity) }
+            if (Build.MANUFACTURER.equals("HONOR", true) || Build.MANUFACTURER.equals("HUAWEI", true)) {
+                Text(
+                    "أجهزة هونر (MagicOS): افتح الإعدادات ← البطارية ← تشغيل التطبيقات ← \"الترجمة الحية للشاشة\" " +
+                        "وأوقف \"الإدارة التلقائية\" ثم فعّل الخيارات الثلاثة. وإذا تعطلت خدمة إمكانية الوصول بعد تحديث أعد تفعيلها.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Text(
                 "يُطلب إذن التقاط الشاشة عند استخدام وضع الفيديو أو المانغا فقط.",
                 style = MaterialTheme.typography.bodySmall,
@@ -295,6 +315,9 @@ private fun HomeScreen(activity: Activity, resumeTick: Int, onOpenPacks: () -> U
                 Icon(Icons.Filled.CloudDownload, null); Spacer(Modifier.width(8.dp)); Text("إدارة حزم اللغات (دون إنترنت)")
             }
         }
+
+        // ——— التشخيص ———
+        DiagnosticsSection(cfg.targetLang, status, perms.accessibility)
 
         // ——— متقدم ———
         Section("إعدادات متقدمة") {
@@ -482,5 +505,52 @@ private fun PacksScreen(activity: Activity, onBack: () -> Unit) {
                 HorizontalDivider()
             }
         }
+    }
+}
+
+@Composable
+private fun DiagnosticsSection(target: String, status: com.livetranslate.screen.settings.ServiceStatus, a11yEnabled: Boolean) {
+    val scope = rememberCoroutineScope()
+    val a11yConnected by ScreenTextAccessibilityService.connected.collectAsState()
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
+    Section("التشخيص (إذا لم تظهر الترجمة)") {
+        Text("الجهاز: ${Build.MANUFACTURER} ${Build.MODEL} • Android ${Build.VERSION.RELEASE}", style = MaterialTheme.typography.bodySmall)
+        Text(
+            "خدمة إمكانية الوصول: " + when {
+                a11yConnected -> "✅ متصلة وتعمل"
+                a11yEnabled -> "⚠️ مفعّلة في الإعدادات لكنها لا تعمل — أوقفها وأعد تفعيلها"
+                else -> "❌ غير مفعّلة"
+            },
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (status.running && status.lastFound >= 0) {
+            Text(
+                "آخر دورة: ${status.lastFound} نص مكتشف • ${status.lastTranslated} مترجم",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (status.lastFound == 0) Text(
+                "لم يُعثر على نصوص: تأكد أن خدمة إمكانية الوصول متصلة، أو استخدم وضع المانغا/الصور للتطبيقات التي تعرض النص كصورة.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (status.lastFound > 0 && status.lastTranslated == 0) Text(
+                "النصوص مكتشفة لكن لم تُترجم: غالباً حزمة اللغة لم تُنزّل بعد، أو النص بلغة الهدف نفسها. جرّب زر الاختبار.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        status.lastError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+        OutlinedButton(
+            enabled = !testing,
+            onClick = {
+                testing = true
+                testResult = "جارٍ الاختبار (قد يستغرق دقيقة عند أول تنزيل للحزمة)…"
+                scope.launch {
+                    testResult = TranslationSelfTest.run(target)
+                    testing = false
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("اختبار محرك الترجمة") }
+        testResult?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
     }
 }

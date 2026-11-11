@@ -219,7 +219,11 @@ class LivePipeline(
         val sig = TextTools.signature(sources)
         if (sig == lastSignature) return
         lastSignature = sig
-        if (sources.isEmpty()) { overlay.clear(); return }
+        if (sources.isEmpty()) {
+            overlay.clear()
+            LiveState.update { it.copy(lastFound = 0, lastTranslated = 0) }
+            return
+        }
 
         // لغة الصفحة الغالبة كتلميح للكتل القصيرة
         val sample = sources.sortedByDescending { it.text.length }.take(6).joinToString(" ") { it.text }.take(600)
@@ -250,6 +254,13 @@ class LivePipeline(
             overlay.render(results.filterNotNull(), null, c.overlayOpacity)
         }
         if (results.all { it == null }) overlay.clear()
+        val translated = results.count { it != null }
+        LiveState.update {
+            it.copy(
+                lastFound = sources.size, lastTranslated = translated,
+                lastError = if (translated > 0) null else it.lastError,
+            )
+        }
         status(null)
     }
 
