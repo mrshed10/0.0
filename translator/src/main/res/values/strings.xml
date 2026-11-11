@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">الترجمة الحية للشاشة</string>
+    <string name="a11y_label">الترجمة الحية للشاشة</string>
+    <string name="a11y_description">تقرأ هذه الخدمة النصوص الظاهرة على الشاشة لترجمتها فورياً على الجهاز وعرض الترجمة فوقها. لا تُرسل أي بيانات خارج الجهاز، ولا تجمع ما تكتبه في حقول الإدخال أو كلمات المرور.</string>
+    <string name="channel_name">الترجمة الحية</string>
+    <string name="notif_title">الترجمة الحية تعمل</string>
+    <string name="notif_paused">الترجمة الحية متوقفة مؤقتاً</string>
+    <string name="action_stop">إيقاف</string>
+    <string name="action_pause">إيقاف مؤقت</string>
+    <string name="action_resume">استئناف</string>
+    <string name="action_switch_display">تبديل الشاشة/المربع</string>
+    <string name="mode_text">نص</string>
+    <string name="mode_video">فيديو</string>
+    <string name="mode_manga">مانغا</string>
+    <string name="mode_full">الشاشة كاملة</string>
+    <string name="mode_bubble">المربع العائم</string>
+</resources>
