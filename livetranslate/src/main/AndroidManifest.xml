@@ -45,10 +45,24 @@
             android:foregroundServiceType="specialUse|mediaProjection">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Floating live-translation overlay shown above other apps" />
+                android:value="Live on-screen translation drawn in place above other apps" />
         </service>
 
-        <!-- زر في الإعدادات السريعة يفتح النافذة العائمة مباشرة (بديل الضغط المطوّل على زر الرئيسية) -->
+        <!-- مضيف اختياري لطبقة الترجمة بعتامة كاملة (TYPE_ACCESSIBILITY_OVERLAY) -->
+        <service
+            android:name=".a11y.TranslateAccessibilityService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_config" />
+        </service>
+
+        <!-- زر في الإعدادات السريعة يبدأ/يوقف الترجمة (بديل الضغط المطوّل على زر الرئيسية) -->
         <service
             android:name=".tile.TranslateTileService"
             android:exported="true"

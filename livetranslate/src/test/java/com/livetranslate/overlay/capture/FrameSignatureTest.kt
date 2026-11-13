@@ -34,8 +34,8 @@ class FrameSignatureTest {
     }
 
     @Test
-    fun edgeGlowChangesAreIgnored() {
-        // تغيّر في الهامش الخارجي فقط (حيث يُرسم الإطار المضيء)
+    fun systemBarChangesAreIgnored() {
+        // تغيّر في شريط الحالة/التنقل والحواف فقط
         val a = sig(frame(200, 400) { _, _ -> 120 }, 200, 400)
         val b = sig(frame(200, 400) { x, y -> if (x < 4 || x > 195 || y < 10 || y > 390) 0 else 120 }, 200, 400)
         assertFalse(a.differsFrom(b))
@@ -47,6 +47,19 @@ class FrameSignatureTest {
         val a = sig(frame(200, 400) { _, _ -> 120 }, 200, 400, pill)
         val b = sig(frame(200, 400) { x, y -> if (pill.contains(x, y)) (x * 7) % 256 else 120 }, 200, 400, pill)
         assertFalse(a.differsFrom(b))
+    }
+
+    @Test
+    fun maskIgnoresOurOwnTranslation() {
+        val patch = Box(40, 100, 160, 200)
+        val clean = sig(frame(200, 400) { _, y -> (y * 3) % 256 }, 200, 400)
+        val withPatch = sig(frame(200, 400) { x, y -> if (patch.contains(x, y)) 255 else (y * 3) % 256 }, 200, 400)
+        assertTrue(withPatch.differsFrom(clean))
+        val mask = FrameSignature.maskFor(200, 400, listOf(patch))
+        assertFalse(withPatch.differsFrom(clean, mask))
+        // تمرير حقيقي ما زال يُكتشف مع القناع
+        val scrolled = sig(frame(200, 400) { x, y -> if (patch.contains(x, y)) 255 else ((y + 30) * 3) % 256 }, 200, 400)
+        assertTrue(scrolled.differsFrom(clean, mask))
     }
 
     @Test

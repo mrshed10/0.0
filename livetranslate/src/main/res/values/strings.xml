@@ -3,47 +3,42 @@
     <string name="app_name">الترجمة العائمة</string>
     <string name="tile_label">ترجمة الشاشة</string>
 
-    <!-- الإشعار -->
-    <string name="channel_name">النافذة العائمة</string>
-    <string name="notif_title_idle">النافذة العائمة جاهزة</string>
+    <!-- الإشعار: المكان الوحيد للحالة والتحكم أثناء الترجمة -->
+    <string name="channel_name">الترجمة الفورية</string>
     <string name="notif_title_active">الترجمة الفورية تعمل</string>
-    <string name="notif_text_idle">اضغط الفقاعة لترجمة أي شاشة</string>
-    <string name="notif_text_active">مرّر في أي تطبيق وستُترجم الشاشة تلقائياً</string>
+    <string name="notif_text_preparing">جارٍ تجهيز الترجمة…</string>
+    <string name="notif_text_active">%1$s ← %2$s · مرّر في أي تطبيق</string>
+    <string name="notif_text_model_error">حزمة اللغة غير منزّلة. افتح التطبيق لتنزيلها.</string>
+    <string name="notif_text_error">تعذّرت الترجمة: %1$s</string>
     <string name="notif_action_stop">إيقاف</string>
-    <string name="notif_action_translate">ترجمة</string>
 
-    <!-- الفقاعة العائمة -->
-    <string name="pill_launcher">ترجمة الشاشة</string>
-    <string name="pill_scroll_translate">مرّر وترجم</string>
-    <string name="pill_translating">جارٍ الترجمة</string>
-    <string name="pill_to_language">إلى %1$s</string>
-    <string name="pill_working">يقرأ النص…</string>
-    <string name="pill_downloading">تنزيل حزمة %1$s…</string>
-    <string name="pill_capture_denied">لم يُمنح إذن التقاط الشاشة</string>
-    <string name="pill_error">تعذّرت الترجمة: %1$s</string>
-    <string name="pill_close">إغلاق</string>
-    <string name="pill_swap">تبديل اللغتين</string>
-    <string name="pill_from">من</string>
-    <string name="pill_to">إلى</string>
+    <!-- خدمة إمكانية الوصول -->
+    <string name="a11y_description">تُستخدم فقط لعرض الترجمة فوق النص الأصلي بعتامة كاملة مع بقاء اللمس والتمرير يعملان. لا تقرأ هذه الخدمة أي محتوى ولا تجمع أي بيانات.</string>
 
     <!-- الشاشة الرئيسية -->
-    <string name="main_subtitle">نافذة شفافة تطفو فوق كل التطبيقات وتترجم ما على الشاشة في مكانه أثناء التمرير.</string>
+    <string name="main_subtitle">ترجمة فورية تحل محل النص الأصلي مباشرة فوق أي تطبيق، وتتجدد أثناء التمرير. بلا فقاعات ولا حواف ولا إطارات.</string>
     <string name="perm_overlay_title">الظهور فوق التطبيقات الأخرى</string>
-    <string name="perm_overlay_body">ضروري لرسم الفقاعة والإطار المضيء والنص المترجم فوق أي تطبيق.</string>
+    <string name="perm_overlay_body">لرسم النص المترجم فوق أي تطبيق.</string>
+    <string name="perm_a11y_title">الاستبدال الكامل (مُستحسن)</string>
+    <string name="perm_a11y_body">فعّل «الترجمة العائمة» في إمكانية الوصول لتغطي الترجمة النص الأصلي بالكامل بدل الشفافية الجزئية. على Android 13+ للتطبيقات المثبتة يدوياً: معلومات التطبيق ← ⋮ ← السماح بالإعدادات المقيّدة أولاً.</string>
     <string name="perm_notif_title">الإشعارات</string>
-    <string name="perm_notif_body">لإظهار إشعار الخدمة الأمامية الذي يُبقي النافذة تعمل عند مغادرة التطبيق.</string>
+    <string name="perm_notif_body">لإظهار إشعار الخدمة وزر «إيقاف».</string>
     <string name="perm_capture_title">التقاط الشاشة</string>
-    <string name="perm_capture_body">يطلبه النظام عند الضغط على «مرّر وترجم» في كل جلسة. الصور تُعالَج على الجهاز ولا تُرسل لأي خادم.</string>
+    <string name="perm_capture_body">يطلبه النظام عند بدء كل جلسة ترجمة. الصور تُعالَج على الجهاز ولا تُرسل لأي خادم.</string>
     <string name="perm_grant">منح</string>
     <string name="perm_granted">ممنوح</string>
-    <string name="perm_on_demand">عند الطلب</string>
+    <string name="perm_on_demand">عند البدء</string>
     <string name="lang_section">اللغات</string>
     <string name="lang_source">لغة الشاشة</string>
     <string name="lang_target">الترجمة إلى</string>
-    <string name="glow_animated">تحريك الإطار المضيء</string>
-    <string name="start_overlay">تشغيل النافذة العائمة</string>
-    <string name="stop_overlay">إيقاف النافذة العائمة</string>
+    <string name="lang_auto_hint">في الوضع التلقائي يُعامل أي نص لاتيني كإنجليزي، إلا إذا كانت حزمة لغته منزّلة مسبقاً (اختر اللغة مرة واحدة لتنزيل حزمتها). لن يُنزَّل شيء أثناء الترجمة.</string>
+    <string name="models_ready">حزم اللغات جاهزة — الترجمة تعمل دون إنترنت</string>
+    <string name="models_downloading">جارٍ تنزيل حزمة %1$s مسبقاً…</string>
+    <string name="models_error">لم تُنزَّل حزم اللغات بعد (تحقق من الإنترنت)</string>
+    <string name="models_retry">إعادة المحاولة</string>
+    <string name="start_translation">بدء الترجمة الفورية</string>
+    <string name="stop_translation">إيقاف الترجمة</string>
     <string name="add_tile">إضافة زر «ترجمة الشاشة» للإعدادات السريعة</string>
     <string name="how_title">طريقة الاستخدام</string>
-    <string name="how_body">١. شغّل النافذة العائمة ثم افتح أي تطبيق.\n٢. اضغط الفقاعة، اختر اللغتين، ثم «مرّر وترجم».\n٣. مرّر بحرية: تختفي الترجمة أثناء الحركة وتظهر من جديد فور توقف الشاشة.\n٤. اسحب الفقاعة إلى أي مكان، واضغط × لإيقاف الترجمة.</string>
+    <string name="how_body">١. اختر اللغتين وانتظر علامة «حزم اللغات جاهزة».\n٢. اضغط «بدء الترجمة الفورية» (أو زر الإعدادات السريعة) ووافق على التقاط الشاشة.\n٣. افتح أي تطبيق ومرّر بحرية: تحل الترجمة محل النص فور توقف الشاشة.\n٤. للإيقاف: زر الإعدادات السريعة أو «إيقاف» في الإشعار.</string>
 </resources>

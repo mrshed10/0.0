@@ -17,8 +17,8 @@ import com.livetranslate.overlay.overlay.ScreenMetrics
 /**
  * يلتقط الشاشة عبر MediaProjection → VirtualDisplay → ImageReader.
  *
- * - كل إطار جديد يُحوَّل إلى [FrameSignature] رخيصة (بحد أقصى كل [SIGNATURE_INTERVAL_MS])
- *   لاكتشاف التمرير والاستقرار.
+ * - كل إطار جديد يُحوَّل إلى [FrameSignature] رخيصة (2048 نقطة فقط) لاكتشاف التمرير والاستقرار.
+ *   لا نتخطى أي إطار: آخر إطار في الحركة هو الأهم لمعرفة الشكل النهائي للشاشة.
  * - عند الحاجة فقط يُحوَّل الإطار التالي إلى Bitmap كامل عبر [requestGrab] ليُقرأ نصه.
  *
  * كل العمل الثقيل يتم على خيط خلفي؛ النتائج تُعاد على الخيط الرئيسي.
@@ -35,10 +35,6 @@ class ScreenCapturer(
 
     private var reader: ImageReader? = null
     private var display: VirtualDisplay? = null
-    private var lastSignatureAt = 0L
-
-    /** منطقة الفقاعة العائمة (بإحداثيات الشاشة) لاستبعادها من البصمة. */
-    @Volatile var excludeBox: Box? = null
 
     /** وقت آخر إطار وصل (uptime) لمعرفة هل الشاشة ساكنة تماماً. */
     @Volatile var lastFrameAt = 0L
@@ -122,8 +118,6 @@ class ScreenCapturer(
                 return
             }
 
-            if (now - lastSignatureAt < SIGNATURE_INTERVAL_MS) return
-            lastSignatureAt = now
             val signature = signatureOf(image)
             main.post { onSignature(signature) }
         } finally {
@@ -134,7 +128,7 @@ class ScreenCapturer(
     private fun signatureOf(image: Image): FrameSignature {
         val plane = image.planes[0]
         return FrameSignature.compute(
-            plane.buffer, image.width, image.height, plane.rowStride, plane.pixelStride, excludeBox,
+            plane.buffer, image.width, image.height, plane.rowStride, plane.pixelStride,
         )
     }
 
@@ -149,9 +143,5 @@ class ScreenCapturer(
         padded.copyPixelsFromBuffer(plane.buffer)
         if (rowPadding == 0) return padded
         return Bitmap.createBitmap(padded, 0, 0, image.width, image.height).also { padded.recycle() }
-    }
-
-    private companion object {
-        const val SIGNATURE_INTERVAL_MS = 110L
     }
 }

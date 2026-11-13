@@ -10,8 +10,8 @@ import com.livetranslate.overlay.OverlayTrampolineActivity
 import com.livetranslate.overlay.service.OverlayService
 
 /**
- * زر "ترجمة الشاشة" في الإعدادات السريعة: أقرب بديل متاح للتطبيقات العادية
- * لإيماءة الضغط المطوّل على زر الرئيسية في الفيديو.
+ * زر "ترجمة الشاشة" في الإعدادات السريعة: يبدأ الترجمة أو يوقفها بلمسة،
+ * دون أي فقاعة أو أيقونة دائمة على الشاشة.
  */
 class TranslateTileService : TileService() {
 
@@ -27,7 +27,7 @@ class TranslateTileService : TileService() {
     override fun onClick() {
         super.onClick()
         val intent = Intent(this, OverlayTrampolineActivity::class.java)
-            .setAction(OverlayTrampolineActivity.ACTION_OPEN_PICKER)
+            .setAction(OverlayTrampolineActivity.ACTION_TOGGLE)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startActivityAndCollapse(

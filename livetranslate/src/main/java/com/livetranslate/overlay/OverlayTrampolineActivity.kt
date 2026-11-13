@@ -1,5 +1,6 @@
 package com.livetranslate.overlay
 
+import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import android.os.Bundle
@@ -7,12 +8,13 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.livetranslate.overlay.a11y.TranslateAccessibilityService
 import com.livetranslate.overlay.service.OverlayService
 
 /**
- * نشاط شفاف بلا واجهة (Theme.LiveTranslate.Transparent).
- * - ACTION_REQUEST_CAPTURE: يعرض نافذة موافقة النظام لالتقاط الشاشة ويمرّر النتيجة للخدمة.
- * - ACTION_OPEN_PICKER: يُستدعى من زر الإعدادات السريعة لفتح بطاقة الترجمة مباشرة.
+ * نشاط شفاف بلا واجهة (Theme.LiveTranslate.Transparent):
+ * - ACTION_START: يعرض موافقة النظام لالتقاط الشاشة ثم يشغّل الترجمة مباشرة.
+ * - ACTION_TOGGLE (زر الإعدادات السريعة): يوقف الترجمة إن كانت تعمل، وإلا يبدؤها.
  * وجوده في المقدمة يجعل تشغيل الخدمة الأمامية مسموحاً حتى على Android 14+.
  */
 class OverlayTrampolineActivity : ComponentActivity() {
@@ -24,9 +26,9 @@ class OverlayTrampolineActivity : ComponentActivity() {
                 .putExtra(OverlayService.EXTRA_RESULT_CODE, result.resultCode)
                 .putExtra(OverlayService.EXTRA_RESULT_DATA, data)
         } else {
-            OverlayService.intent(this, OverlayService.ACTION_PROJECTION_DENIED)
+            null
         }
-        ContextCompat.startForegroundService(this, intent)
+        if (intent != null) ContextCompat.startForegroundService(this, intent)
         finishQuietly()
     }
 
@@ -34,22 +36,25 @@ class OverlayTrampolineActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) return // نتيجة الموافقة ستصل عبر captureLauncher
         when (intent?.action) {
-            ACTION_REQUEST_CAPTURE -> {
-                val mpm = getSystemService(MediaProjectionManager::class.java)
-                captureLauncher.launch(mpm.createScreenCaptureIntent())
-            }
-            ACTION_OPEN_PICKER -> {
-                if (Settings.canDrawOverlays(this)) {
-                    ContextCompat.startForegroundService(
-                        this, OverlayService.intent(this, OverlayService.ACTION_OPEN_PICKER),
-                    )
-                } else {
-                    startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }
+            ACTION_TOGGLE -> if (OverlayService.running.value) {
+                startService(OverlayService.intent(this, OverlayService.ACTION_STOP))
                 finishQuietly()
+            } else {
+                start()
             }
+            ACTION_START -> start()
             else -> finishQuietly()
         }
+    }
+
+    private fun start() {
+        if (!canShowOverlay(this)) {
+            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            finishQuietly()
+            return
+        }
+        val mpm = getSystemService(MediaProjectionManager::class.java)
+        captureLauncher.launch(mpm.createScreenCaptureIntent())
     }
 
     private fun finishQuietly() {
@@ -59,7 +64,14 @@ class OverlayTrampolineActivity : ComponentActivity() {
     }
 
     companion object {
-        const val ACTION_REQUEST_CAPTURE = "com.livetranslate.overlay.REQUEST_CAPTURE"
-        const val ACTION_OPEN_PICKER = "com.livetranslate.overlay.TRAMPOLINE_OPEN_PICKER"
+        const val ACTION_START = "com.livetranslate.overlay.START"
+        const val ACTION_TOGGLE = "com.livetranslate.overlay.TOGGLE"
+
+        fun canShowOverlay(context: Context) =
+            Settings.canDrawOverlays(context) || TranslateAccessibilityService.instance != null
+
+        fun startIntent(context: Context) = Intent(context, OverlayTrampolineActivity::class.java)
+            .setAction(ACTION_START)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }

@@ -10,7 +10,10 @@ import androidx.core.app.NotificationCompat
 import com.livetranslate.overlay.MainActivity
 import com.livetranslate.overlay.R
 
-/** إشعار الخدمة الأمامية الدائم (شرط النظام لبقاء النافذة العائمة حيّة في الخلفية). */
+/**
+ * إشعار الخدمة الأمامية (شرط النظام لبقاء الترجمة تعمل في الخلفية).
+ * هو المكان الوحيد للتحكم والحالة، بدلاً من أي عنصر عائم على الشاشة.
+ */
 object NotificationHelper {
     const val NOTIFICATION_ID = 42
     private const val CHANNEL_ID = "overlay"
@@ -22,7 +25,7 @@ object NotificationHelper {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    fun build(context: Context, active: Boolean): Notification {
+    fun build(context: Context, text: String): Notification {
         val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), flags,
@@ -30,19 +33,16 @@ object NotificationHelper {
         val stop = PendingIntent.getService(
             context, 1, OverlayService.intent(context, OverlayService.ACTION_STOP), flags,
         )
-        val picker = PendingIntent.getService(
-            context, 2, OverlayService.intent(context, OverlayService.ACTION_OPEN_PICKER), flags,
-        )
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_translate)
-            .setContentTitle(context.getString(if (active) R.string.notif_title_active else R.string.notif_title_idle))
-            .setContentText(context.getString(if (active) R.string.notif_text_active else R.string.notif_text_idle))
+            .setContentTitle(context.getString(R.string.notif_title_active))
+            .setContentText(text)
             .setContentIntent(open)
             .setOngoing(true)
             .setSilent(true)
+            .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .apply { if (!active) addAction(0, context.getString(R.string.notif_action_translate), picker) }
             .addAction(0, context.getString(R.string.notif_action_stop), stop)
             .build()
     }

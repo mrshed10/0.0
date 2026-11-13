@@ -1,13 +1,12 @@
 package com.livetranslate.overlay.service
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.hardware.input.InputManager
 import android.media.projection.MediaProjectionManager
@@ -15,118 +14,93 @@ import android.os.Build
 import android.provider.Settings
 import android.view.Display
 import android.view.Gravity
-import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.SavedStateRegistry
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import com.livetranslate.overlay.OverlayTrampolineActivity
-import com.livetranslate.overlay.capture.Box
+import com.livetranslate.overlay.R
+import com.livetranslate.overlay.a11y.TranslateAccessibilityService
 import com.livetranslate.overlay.capture.LiveTranslateController
 import com.livetranslate.overlay.capture.ScreenCapturer
 import com.livetranslate.overlay.data.Prefs
-import com.livetranslate.overlay.overlay.ControlPill
-import com.livetranslate.overlay.overlay.DraggableFrame
 import com.livetranslate.overlay.overlay.EngineStatus
-import com.livetranslate.overlay.overlay.OverlayActions
-import com.livetranslate.overlay.overlay.OverlayMode
-import com.livetranslate.overlay.overlay.OverlayUiState
 import com.livetranslate.overlay.overlay.ScreenMetrics
 import com.livetranslate.overlay.overlay.StageView
 import com.livetranslate.overlay.translate.Languages
 import com.livetranslate.overlay.translate.TranslationEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 
 /**
- * خدمة أمامية (Foreground Service) تملك نافذتين فوق كل التطبيقات:
+ * خدمة أمامية تعمل فقط أثناء الترجمة. لا تضيف أي فقاعة أو شريط أو أيقونة على الشاشة:
+ * نافذتها الوحيدة طبقة [StageView] شفافة بالكامل لا تستقبل اللمس، ولا يظهر فيها إلا النص المترجم.
  *
- * 1. [StageView]: طبقة شفافة بملء الشاشة، FLAG_NOT_TOUCHABLE — للإطار المضيء والنص المترجم.
- * 2. فقاعة التحكم: نافذة WRAP_CONTENT شفافة قابلة للسحب، FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL
- *    حتى تبقى بقية الشاشة قابلة للمس، و FLAG_WATCH_OUTSIDE_TOUCH لاكتشاف بدء التمرير.
+ * التحكم: زر الإعدادات السريعة، أو إشعار الخدمة (إيقاف)، أو شاشة التطبيق.
  *
- * نوع الخدمة: specialUse دائماً (النافذة العائمة)، ويُضاف mediaProjection أثناء الترجمة فقط.
+ * مضيف الطبقة:
+ * - إن كانت خدمة إمكانية الوصول مفعّلة: TYPE_ACCESSIBILITY_OVERLAY بعتامة ‎100%‎ (استبدال كامل للنص).
+ * - وإلا: TYPE_APPLICATION_OVERLAY بأقصى عتامة يسمح بها النظام مع مرور اللمس (0.8 على Android 12+).
  */
-class OverlayService : LifecycleService(), SavedStateRegistryOwner, OverlayActions {
-
-    private val savedStateController = SavedStateRegistryController.create(this)
-    override val savedStateRegistry: SavedStateRegistry get() = savedStateController.savedStateRegistry
+class OverlayService : LifecycleService() {
 
     private lateinit var prefs: Prefs
-    private lateinit var windowContext: Context
-    private lateinit var wm: WindowManager
+    private lateinit var appOverlayContext: Context
+    private var languageListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     private var stage: StageView? = null
+    private var stageWm: WindowManager? = null
     private var stageParams: WindowManager.LayoutParams? = null
-    private var pillRoot: DraggableFrame? = null
-    private var pillParams: WindowManager.LayoutParams? = null
-    private var pillCenterX = 0f
-    private var pillBottom = 0f
 
-    private val uiState = mutableStateOf(OverlayUiState(source = Languages.AUTO, target = "ar"))
     private var engine: TranslationEngine? = null
     private var capturer: ScreenCapturer? = null
     private var controller: LiveTranslateController? = null
-    private var languagesChangedWhilePaused = false
+    private var prepareJob: Job? = null
 
     override fun onCreate() {
-        savedStateController.performAttach()
-        savedStateController.performRestore(null)
         super.onCreate()
         prefs = Prefs(this)
-        windowContext = createOverlayContext()
-        wm = windowContext.getSystemService(WindowManager::class.java)
-        uiState.value = OverlayUiState(source = prefs.source, target = prefs.target)
+        appOverlayContext = createOverlayContext()
         NotificationHelper.createChannel(this)
         _running.value = true
+
+        // تفعيل/تعطيل خدمة إمكانية الوصول أثناء العمل ينقل الطبقة بين المضيفين
+        lifecycleScope.launch {
+            TranslateAccessibilityService.connected.drop(1).collect { if (stage != null) attachStage() }
+        }
+        languageListener = prefs.observeLanguages { onLanguagesChanged() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         val granted = intent?.action == ACTION_PROJECTION_GRANTED &&
             intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) == Activity.RESULT_OK
-        // يجب استدعاء startForeground خلال ثوانٍ من startForegroundService في كل الحالات،
-        // ومع موافقة التقاط الشاشة يجب أن يتضمن النوع mediaProjection قبل getMediaProjection (Android 14+)
-        goForeground(withProjection = capturer != null || granted)
-
-        if (!Settings.canDrawOverlays(this)) {
-            stopSelf()
-            return START_NOT_STICKY
-        }
-        showWindows()
+        // startForeground مطلوب خلال ثوانٍ في كل الحالات؛ ومع موافقة الالتقاط يجب أن يتضمن
+        // النوع mediaProjection قبل getMediaProjection (Android 14+)
+        goForeground(withProjection = capturer != null || granted, text = getString(R.string.notif_text_preparing))
 
         when (intent?.action) {
-            ACTION_OPEN_PICKER -> openPicker()
             ACTION_PROJECTION_GRANTED -> {
-                val code = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val data = IntentCompat.getParcelableExtra(intent, EXTRA_RESULT_DATA, Intent::class.java)
-                if (code == Activity.RESULT_OK && data != null) startProjection(code, data)
-                else onCaptureDenied()
+                if (granted && data != null) startTranslating(intent.getIntExtra(EXTRA_RESULT_CODE, 0), data)
+                else stopSelf()
             }
-            ACTION_PROJECTION_DENIED -> onCaptureDenied()
-            ACTION_STOP -> {
-                stopSelf()
-                return START_NOT_STICKY
-            }
-            else -> Unit // ACTION_SHOW أو إعادة تشغيل من النظام: الفقاعة الحالية تبقى كما هي
+            ACTION_PROJECTION_DENIED, ACTION_STOP -> stopSelf()
+            // إعادة تشغيل من النظام: لا يمكن استعادة موافقة الالتقاط، فنتوقف بهدوء
+            else -> if (capturer == null) stopSelf()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
-    // ---------------------------------------------------------------- الخدمة الأمامية
+    // ---------------------------------------------------------------- الخدمة الأمامية والإشعار
 
-    private fun goForeground(withProjection: Boolean) {
+    private fun goForeground(withProjection: Boolean, text: String) {
         val type = when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE ->
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
@@ -136,11 +110,22 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner, OverlayActio
             else -> 0
         }
         ServiceCompat.startForeground(
-            this, NotificationHelper.NOTIFICATION_ID, NotificationHelper.build(this, withProjection), type,
+            this, NotificationHelper.NOTIFICATION_ID, NotificationHelper.build(this, text), type,
         )
     }
 
-    // ---------------------------------------------------------------- النوافذ
+    private fun updateNotification(text: String) {
+        runCatching {
+            NotificationManagerCompat.from(this)
+                .notify(NotificationHelper.NOTIFICATION_ID, NotificationHelper.build(this, text))
+        }
+    }
+
+    private fun activeText() = getString(
+        R.string.notif_text_active, Languages.nameOf(prefs.source), Languages.nameOf(prefs.target),
+    )
+
+    // ---------------------------------------------------------------- طبقة الترجمة
 
     /** سياق نافذة مخصص للطبقات العائمة (الطريقة الموصى بها من Android 11). */
     private fun createOverlayContext(): Context {
@@ -150,267 +135,164 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner, OverlayActio
             .createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
     }
 
-    private fun baseParams(width: Int, height: Int, flags: Int) = WindowManager.LayoutParams(
-        width, height,
-        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-        flags or
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-            WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-        PixelFormat.TRANSLUCENT, // خلفية شفافة تماماً بلا أي إطار
-    ).apply {
-        gravity = Gravity.TOP or Gravity.START
-        windowAnimations = 0
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            } else {
-                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
+    /** يضيف الطبقة (أو ينقلها) إلى أفضل مضيف متاح. يُرجع false إن لم يتوفر أي إذن. */
+    private fun attachStage(): Boolean {
+        detachStage()
+        val a11y = TranslateAccessibilityService.instance
+        val trusted = a11y != null
+        if (!trusted && !Settings.canDrawOverlays(this)) return false
+        val host: Context = a11y ?: appOverlayContext
+        val type = if (trusted) {
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) fitInsetsTypes = 0
-    }
-
-    private fun showWindows() {
-        if (stage == null) addStage()
-        if (pillRoot == null) addPill()
-    }
-
-    private fun addStage() {
-        val m = ScreenMetrics.of(windowContext)
-        val params = baseParams(
-            m.width, m.height,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+        val m = ScreenMetrics.of(host)
+        val params = WindowManager.LayoutParams(
+            m.width, m.height, type,
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+            PixelFormat.TRANSLUCENT, // شفافة تماماً: لا خلفية ولا إطار ولا ظل
         ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            windowAnimations = 0
             title = "LiveTranslateStage"
-            // Android 12+: أقصى شفافية تسمح بمرور اللمس عبر نافذة غير موثوقة (0.8 افتراضياً)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                alpha = windowContext.getSystemService(InputManager::class.java).maximumObscuringOpacityForTouch
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) fitInsetsTypes = 0
+            // النافذة غير الموثوقة: أقصى عتامة تسمح بمرور اللمس للتطبيق تحتها
+            if (!trusted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                alpha = getSystemService(InputManager::class.java).maximumObscuringOpacityForTouch
             }
         }
-        val view = StageView(windowContext).apply { glowAnimated = prefs.glowAnimated }
-        wm.addView(view, params)
-        stage = view
-        stageParams = params
+        val view = stage ?: StageView(this).also { stage = it }
+        val wm = host.getSystemService(WindowManager::class.java)
+        return runCatching { wm.addView(view, params) }
+            .onSuccess {
+                stageWm = wm
+                stageParams = params
+            }
+            .isSuccess
     }
 
-    @SuppressLint("ClickableViewAccessibility")
-    private fun addPill() {
-        val m = ScreenMetrics.of(windowContext)
-        val density = resources.displayMetrics.density
-        pillCenterX = prefs.pillCenterX.takeIf { it >= 0 }?.toFloat() ?: (m.width / 2f)
-        pillBottom = prefs.pillBottom.takeIf { it >= 0 }?.toFloat() ?: (m.height - 96 * density)
-
-        val root = DraggableFrame(
-            windowContext,
-            onDrag = { dx, dy ->
-                pillCenterX += dx
-                pillBottom += dy
-                positionPill()
-            },
-            onDragEnd = {
-                prefs.pillCenterX = pillCenterX.roundToInt()
-                prefs.pillBottom = pillBottom.roundToInt()
-                controller?.invalidate()
-            },
-            onOutsideTouch = { controller?.onOutsideTouch() },
-        )
-        root.setViewTreeLifecycleOwner(this)
-        root.setViewTreeSavedStateRegistryOwner(this)
-
-        val compose = ComposeView(windowContext).apply {
-            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
-            setContent { ControlPill(uiState.value, this@OverlayService) }
-        }
-        root.addView(compose, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        // عند تغيّر حجم الفقاعة (تحوّلها لبطاقة) تبقى متمركزة وتكبر للأعلى
-        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> positionPill() }
-
-        val params = baseParams(
-            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
-        ).apply { title = "LiveTranslatePill" }
-        pillParams = params
-        pillRoot = root
-        wm.addView(root, params)
-        positionPill()
-    }
-
-    private fun positionPill() {
-        val root = pillRoot ?: return
-        val params = pillParams ?: return
-        val m = ScreenMetrics.of(windowContext)
-        val w = root.width
-        val h = root.height
-        pillCenterX = clamp(pillCenterX, w / 2f, m.width - w / 2f)
-        pillBottom = clamp(pillBottom, h.toFloat(), m.height.toFloat())
-        val x = (pillCenterX - w / 2f).roundToInt()
-        val y = (pillBottom - h).roundToInt()
-        if (x != params.x || y != params.y) {
-            params.x = x
-            params.y = y
-            if (root.isAttachedToWindow) wm.updateViewLayout(root, params)
-        }
-        capturer?.excludeBox = Box(x, y, x + w, y + h)
-    }
-
-    private fun clamp(v: Float, lo: Float, hi: Float) = if (lo > hi) (lo + hi) / 2f else v.coerceIn(lo, hi)
-
-    private fun pillRect(): Rect {
-        val p = pillParams ?: return Rect()
-        val root = pillRoot ?: return Rect()
-        return Rect(p.x, p.y, p.x + root.width, p.y + root.height)
-    }
-
-    private fun removeWindows() {
-        stage?.let { runCatching { wm.removeView(it) } }
-        pillRoot?.let { runCatching { wm.removeView(it) } }
-        stage = null
-        pillRoot = null
+    private fun detachStage() {
+        val view = stage ?: return
+        stageWm?.let { wm -> runCatching { wm.removeViewImmediate(view) } }
+        stageWm = null
+        stageParams = null
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        val m = ScreenMetrics.of(windowContext)
-        stageParams?.let { p ->
+        val wm = stageWm
+        val p = stageParams
+        val view = stage
+        if (wm != null && p != null && view != null) {
+            val m = ScreenMetrics.of(appOverlayContext)
             p.width = m.width
             p.height = m.height
-            stage?.let { if (it.isAttachedToWindow) wm.updateViewLayout(it, p) }
+            runCatching { wm.updateViewLayout(view, p) }
         }
-        positionPill()
         capturer?.onDisplayChanged()
         controller?.invalidate()
     }
 
-    // ---------------------------------------------------------------- التقاط الشاشة
+    // ---------------------------------------------------------------- الترجمة
 
-    private fun requestCapturePermission() {
-        // SYSTEM_ALERT_WINDOW يسمح ببدء نشاط من الخلفية؛ النشاط الشفاف يعرض نافذة موافقة النظام
-        startActivity(
-            Intent(this, OverlayTrampolineActivity::class.java)
-                .setAction(OverlayTrampolineActivity.ACTION_REQUEST_CAPTURE)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
-        )
-    }
-
-    private fun startProjection(resultCode: Int, data: Intent) {
+    private fun startTranslating(resultCode: Int, data: Intent) {
         releaseProjection()
+        if (stage == null || stageWm == null) {
+            if (!attachStage()) {
+                stopSelf()
+                return
+            }
+        }
         val projection = getSystemService(MediaProjectionManager::class.java).getMediaProjection(resultCode, data)
         if (projection == null) {
-            goForeground(withProjection = false)
-            onCaptureDenied()
+            stopSelf()
             return
         }
         val stageView = stage ?: return
         val translationEngine = engine ?: TranslationEngine().also { engine = it }
+
         lateinit var ctrl: LiveTranslateController
         lateinit var cap: ScreenCapturer
         cap = ScreenCapturer(
-            context = windowContext,
+            context = appOverlayContext,
             projection = projection,
             onSignature = { ctrl.onSignature(it) },
             // المستخدم أوقف المشاركة من شريط الحالة/النظام
-            onProjectionStopped = { if (capturer === cap) stopTranslating() },
+            onProjectionStopped = { if (capturer === cap) stopSelf() },
         )
         ctrl = LiveTranslateController(
             scope = lifecycleScope,
             capturer = cap,
             engine = translationEngine,
             stage = stageView,
-            languages = { uiState.value.source to uiState.value.target },
-            excludedRects = { listOf(pillRect()) },
-            onStatus = { status -> uiState.value = uiState.value.copy(status = status) },
+            languages = { prefs.source to prefs.target },
+            onStatus = ::onEngineStatus,
         )
         capturer = cap
         controller = ctrl
-        cap.start()
-        positionPill()
-        setMode(OverlayMode.TRANSLATING)
-        ctrl.start()
+
+        // تجهيز الحزم وتسخين النماذج قبل أول إطار، ثم البدء. لا يظهر شيء على الشاشة أثناء ذلك.
+        prepareJob?.cancel()
+        prepareJob = lifecycleScope.launch {
+            try {
+                translationEngine.prepare(prefs.source, prefs.target)
+                updateNotification(activeText())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                updateNotification(getString(R.string.notif_text_model_error))
+            }
+            if (capturer === cap) {
+                cap.start()
+                ctrl.start()
+            }
+        }
+    }
+
+    private fun onEngineStatus(status: EngineStatus) {
+        if (status is EngineStatus.Error) {
+            updateNotification(getString(R.string.notif_text_error, status.message))
+        }
+    }
+
+    private fun onLanguagesChanged() {
+        val ctrl = controller ?: return
+        val translationEngine = engine ?: return
+        prepareJob?.cancel()
+        prepareJob = lifecycleScope.launch {
+            updateNotification(getString(R.string.notif_text_preparing))
+            runCatching { translationEngine.prepare(prefs.source, prefs.target) }
+                .onSuccess { updateNotification(activeText()) }
+                .onFailure { if (it !is CancellationException) updateNotification(getString(R.string.notif_text_model_error)) }
+            ctrl.invalidate()
+        }
     }
 
     private fun releaseProjection() {
+        prepareJob?.cancel()
         controller?.stop()
         controller = null
         capturer?.release()
         capturer = null
     }
 
-    private fun onCaptureDenied() {
-        uiState.value = uiState.value.copy(status = EngineStatus.CaptureDenied)
-        setMode(OverlayMode.PICKER)
-    }
-
-    private fun setMode(mode: OverlayMode) {
-        uiState.value = uiState.value.copy(mode = mode)
-        stage?.setGlowVisible(mode != OverlayMode.LAUNCHER)
-    }
-
-    // ---------------------------------------------------------------- أحداث الفقاعة
-
-    override fun openPicker() {
-        controller?.pause()
-        languagesChangedWhilePaused = false
-        // قد يكون المستخدم غيّر الإعدادات من شاشة التطبيق
-        stage?.glowAnimated = prefs.glowAnimated
-        uiState.value = uiState.value.copy(
-            source = prefs.source,
-            target = prefs.target,
-            status = if (uiState.value.status is EngineStatus.Error) EngineStatus.Ready else uiState.value.status,
-        )
-        setMode(OverlayMode.PICKER)
-    }
-
-    override fun closeOverlay() {
-        stopSelf()
-    }
-
-    override fun startTranslating() {
-        uiState.value = uiState.value.copy(status = EngineStatus.Ready)
-        val ctrl = controller
-        if (ctrl != null) {
-            setMode(OverlayMode.TRANSLATING)
-            ctrl.resume(languagesChangedWhilePaused)
-            languagesChangedWhilePaused = false
-        } else {
-            requestCapturePermission()
-        }
-    }
-
-    override fun stopTranslating() {
-        val wasTranslating = capturer != null
-        releaseProjection()
-        if (wasTranslating) goForeground(withProjection = false)
-        uiState.value = uiState.value.copy(status = EngineStatus.Ready)
-        setMode(OverlayMode.LAUNCHER)
-    }
-
-    override fun selectSource(code: String) {
-        prefs.source = code
-        uiState.value = uiState.value.copy(source = code)
-        languagesChangedWhilePaused = true
-    }
-
-    override fun selectTarget(code: String) {
-        prefs.target = code
-        uiState.value = uiState.value.copy(target = code)
-        languagesChangedWhilePaused = true
-    }
-
-    override fun swapLanguages() {
-        val s = uiState.value
-        // لا يمكن عكس "تلقائي"، ويجب أن تكون اللغة المصدر الجديدة مدعومة في القراءة
-        if (s.source == Languages.AUTO || Languages.sources.none { it.code == s.target }) return
-        if (Languages.targets.none { it.code == s.source }) return
-        selectSource(s.target)
-        selectTarget(s.source)
-    }
-
     override fun onDestroy() {
+        languageListener?.let { prefs.stopObserving(it) }
         releaseProjection()
-        removeWindows()
+        detachStage()
+        stage = null
         engine?.close()
         engine = null
         _running.value = false
@@ -418,8 +300,6 @@ class OverlayService : LifecycleService(), SavedStateRegistryOwner, OverlayActio
     }
 
     companion object {
-        const val ACTION_SHOW = "com.livetranslate.overlay.SHOW"
-        const val ACTION_OPEN_PICKER = "com.livetranslate.overlay.OPEN_PICKER"
         const val ACTION_PROJECTION_GRANTED = "com.livetranslate.overlay.PROJECTION_GRANTED"
         const val ACTION_PROJECTION_DENIED = "com.livetranslate.overlay.PROJECTION_DENIED"
         const val ACTION_STOP = "com.livetranslate.overlay.STOP"
