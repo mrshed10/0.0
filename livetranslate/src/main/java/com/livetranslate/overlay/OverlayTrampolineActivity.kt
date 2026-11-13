@@ -36,8 +36,8 @@ class OverlayTrampolineActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) return // نتيجة الموافقة ستصل عبر captureLauncher
         when (intent?.action) {
-            ACTION_TOGGLE -> if (OverlayService.running.value) {
-                startService(OverlayService.intent(this, OverlayService.ACTION_STOP))
+            ACTION_TOGGLE -> if (OverlayService.translating.value) {
+                startService(OverlayService.intent(this, OverlayService.ACTION_STOP_TRANSLATION))
                 finishQuietly()
             } else {
                 start()

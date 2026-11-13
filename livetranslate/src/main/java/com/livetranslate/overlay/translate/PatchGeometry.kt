@@ -1,8 +1,5 @@
 package com.livetranslate.overlay.translate
 
-import kotlin.math.max
-import kotlin.math.min
-
 /** مستطيل بإحداثيات عشرية (منطق خالص قابل للاختبار). */
 data class RectF4(val left: Float, val top: Float, val right: Float, val bottom: Float) {
     val width get() = right - left
@@ -12,34 +9,6 @@ data class RectF4(val left: Float, val top: Float, val right: Float, val bottom:
 
 /** حسابات أماكن رسم الترجمة. */
 object PatchGeometry {
-
-    /**
-     * النص العمودي يشغل عموداً ضيقاً وطويلاً؛ الترجمة الأفقية فيه ستكون حرفاً أو اثنين في كل سطر.
-     * نوسّع الصندوق أفقياً حول مركزه (حتى ~75% من ارتفاعه أو [maxWidth]) دون أن يتجاوز
-     * أي نص مجاور على نفس الارتفاع، ودون الخروج من الشاشة. الصندوق الناتج يغطي الأصل دائماً.
-     */
-    fun widenVertical(
-        box: RectF4,
-        neighbours: List<RectF4>,
-        screenWidth: Float,
-        maxWidth: Float,
-        gap: Float,
-    ): RectF4 {
-        val desired = min(max(box.width, box.height * 0.75f), maxWidth)
-        if (desired <= box.width) return box
-        var left = box.centerX - desired / 2f
-        var right = box.centerX + desired / 2f
-        for (n in neighbours) {
-            if (n == box) continue
-            val sameRow = n.top < box.bottom && n.bottom > box.top
-            if (!sameRow) continue
-            if (n.right <= box.left) left = max(left, n.right + gap)
-            else if (n.left >= box.right) right = min(right, n.left - gap)
-        }
-        left = min(max(left, 0f), box.left)
-        right = max(min(right, screenWidth), box.right)
-        return RectF4(left, box.top, right, box.bottom)
-    }
 
     /**
      * زاوية الرسم: النص المائل قليلاً (حتى 45°، مثل الكتابة داخل الصور) يُرسم بنفس الميل؛

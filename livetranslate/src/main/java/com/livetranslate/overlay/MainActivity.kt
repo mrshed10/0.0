@@ -35,7 +35,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Accessibility
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Notifications
@@ -56,6 +58,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Switch
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.livetranslate.overlay.translate.OcrPackStore
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -123,6 +132,11 @@ private fun SetupScreen() {
     val context = LocalContext.current
     val prefs = remember { Prefs(context) }
     val running by OverlayService.running.collectAsStateWithLifecycle()
+    val translating by OverlayService.translating.collectAsStateWithLifecycle()
+    val ocrInstalled by OcrPackStore.installed.collectAsStateWithLifecycle()
+    val ocrDownloading by OcrPackStore.downloading.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var bubbleEnabled by remember { mutableStateOf(prefs.bubbleEnabled) }
     val a11yConnected by TranslateAccessibilityService.connected.collectAsStateWithLifecycle()
     val downloaded by ModelStore.downloaded.collectAsStateWithLifecycle()
     val downloading by ModelStore.downloading.collectAsStateWithLifecycle()
@@ -147,7 +161,9 @@ private fun SetupScreen() {
     // تنزيل حزم اللغات المختارة مسبقاً، حتى تبدأ الترجمة فورياً دون أي تنزيل لاحق
     LaunchedEffect(source, target, retry) {
         modelError = false
-        modelError = ModelStore.ensure(Languages.modelsFor(source, target)).isNotEmpty()
+        val modelsFailed = ModelStore.ensure(Languages.modelsFor(source, target))
+        val ocrFailed = OcrPackStore.ensure(Languages.ocrPacksFor(source))
+        modelError = modelsFailed.isNotEmpty() || ocrFailed.isNotEmpty()
     }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -218,10 +234,14 @@ private fun SetupScreen() {
                 prefs.target = it
             }
             Spacer(Modifier.height(12.dp))
+            val ocrMissing = Languages.ocrPacksFor(source).any { it !in ocrInstalled }
             ModelStatus(
                 needed = Languages.modelsFor(source, target),
                 downloaded = downloaded,
-                downloading = downloading,
+                downloading = downloading ?: ocrDownloading?.let { pack ->
+                    Languages.all.firstOrNull { it.tess == pack }?.code ?: pack
+                },
+                ocrMissing = ocrMissing,
                 error = modelError,
                 onRetry = { retry++ },
             )
@@ -235,7 +255,64 @@ private fun SetupScreen() {
             }
         }
 
-        if (!running) {
+        SectionCard {
+            Text(stringResource(R.string.extra_langs_title), fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.extra_langs_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            ExtraLanguages(
+                installedPacks = ocrInstalled,
+                downloadedModels = downloaded,
+                busy = ocrDownloading != null || downloading != null,
+                onAdd = { lang ->
+                    scope.launch {
+                        val tess = lang.tess ?: return@launch
+                        OcrPackStore.ensure(listOf(tess))
+                        ModelStore.ensure(listOf(lang.code))
+                    }
+                },
+            )
+        }
+
+        SectionCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.TouchApp, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.bubble_title), fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(R.string.bubble_body),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                Switch(
+                    checked = bubbleEnabled,
+                    onCheckedChange = { on ->
+                        if (on && !canOverlay && !a11yConnected) {
+                            requestOverlay()
+                            return@Switch
+                        }
+                        bubbleEnabled = on
+                        prefs.bubbleEnabled = on
+                        if (on) {
+                            ContextCompat.startForegroundService(
+                                context, OverlayService.intent(context, OverlayService.ACTION_SHOW_BUBBLE),
+                            )
+                        } else if (running) {
+                            context.startService(OverlayService.intent(context, OverlayService.ACTION_HIDE_BUBBLE))
+                        }
+                    },
+                )
+            }
+        }
+
+        if (!translating) {
             Button(
                 onClick = {
                     if (!canOverlay && !a11yConnected) {
@@ -251,7 +328,7 @@ private fun SetupScreen() {
             ) { Text(stringResource(R.string.start_translation)) }
         } else {
             OutlinedButton(
-                onClick = { context.startService(OverlayService.intent(context, OverlayService.ACTION_STOP)) },
+                onClick = { context.startService(OverlayService.intent(context, OverlayService.ACTION_STOP_TRANSLATION)) },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text(stringResource(R.string.stop_translation)) }
         }
@@ -276,6 +353,7 @@ private fun ModelStatus(
     needed: List<String>,
     downloaded: Set<String>,
     downloading: String?,
+    ocrMissing: Boolean,
     error: Boolean,
     onRetry: () -> Unit,
 ) {
@@ -291,7 +369,7 @@ private fun ModelStatus(
                     modifier = Modifier.weight(1f),
                 )
             }
-            error || missing.isNotEmpty() -> {
+            error || missing.isNotEmpty() || ocrMissing -> {
                 Icon(Icons.Rounded.CloudOff, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(10.dp))
                 Text(
@@ -322,6 +400,29 @@ private fun requestAddTile(context: Context) {
         Icon.createWithResource(context, R.drawable.ic_stat_translate),
         ContextCompat.getMainExecutor(context),
     ) { }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ExtraLanguages(
+    installedPacks: Set<String>,
+    downloadedModels: Set<String>,
+    busy: Boolean,
+    onAdd: (Language) -> Unit,
+) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Languages.all.filter { it.tess != null }.forEach { lang ->
+            val ready = lang.tess in installedPacks && lang.code in downloadedModels
+            FilterChip(
+                selected = ready,
+                onClick = { if (!ready && !busy) onAdd(lang) },
+                label = { Text(lang.nameAr) },
+                leadingIcon = if (ready) {
+                    { Icon(Icons.Rounded.Check, null, Modifier.size(16.dp)) }
+                } else null,
+            )
+        }
+    }
 }
 
 @Composable

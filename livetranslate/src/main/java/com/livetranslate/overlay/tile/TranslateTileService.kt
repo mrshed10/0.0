@@ -18,7 +18,7 @@ class TranslateTileService : TileService() {
     override fun onStartListening() {
         super.onStartListening()
         qsTile?.apply {
-            state = if (OverlayService.running.value) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+            state = if (OverlayService.translating.value) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
             updateTile()
         }
     }

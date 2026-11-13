@@ -30,6 +30,7 @@ class LiveTranslateController(
     private val engine: TranslationEngine,
     private val stage: StageView,
     private val languages: () -> Pair<String, String>,
+    private val excludedRects: () -> List<android.graphics.Rect>,
     private val onStatus: (EngineStatus) -> Unit,
 ) {
     private enum class State { PAUSED, WAITING, PROCESSING, SHOWING }
@@ -61,6 +62,24 @@ class LiveTranslateController(
         main.post(ticker)
         enterWaiting()
         stage.nudge() // نحتاج إطاراً أول حتى لو كانت الشاشة ساكنة
+    }
+
+    val isPaused get() = state == State.PAUSED
+
+    /** إيقاف مؤقت من الزر العائم: تُخفى الترجمة ويتوقف العمل، والتقاط الشاشة يبقى جاهزاً. */
+    fun pause() {
+        job?.cancel()
+        job = null
+        state = State.PAUSED
+        shownSignature = null
+        stage.setPatchesVisible(false)
+        onStatus(EngineStatus.Ready)
+    }
+
+    fun resume() {
+        if (state != State.PAUSED) return
+        enterWaiting()
+        stage.nudge()
     }
 
     fun stop() {
@@ -149,7 +168,7 @@ class LiveTranslateController(
         job = scope.launch {
             val (source, target) = languages()
             val patches = try {
-                engine.process(bitmap, source, target) { partial ->
+                engine.process(bitmap, source, target, excludedRects()) { partial ->
                     // عرض تدريجي: كل كتلة تظهر بمجرد ترجمتها
                     if (state == State.PROCESSING) {
                         stage.setPatches(partial)

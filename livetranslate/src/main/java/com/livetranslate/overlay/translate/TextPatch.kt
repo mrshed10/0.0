@@ -18,6 +18,8 @@ data class TextPatch(
     val padding: Float,
     /** محاذاة في الوسط (فقاعات الكلام والنص العمودي) بدلاً من بداية السطر. */
     val centered: Boolean,
+    /** سطر واحد يطابق سطراً أصلياً بالضبط (لا التفاف). */
+    val singleLine: Boolean,
     val background: Int,
     val textColor: Int,
 )

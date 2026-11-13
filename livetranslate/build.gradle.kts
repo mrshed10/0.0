@@ -60,6 +60,8 @@ dependencies {
     // الترجمة على الجهاز (تُنزَّل حزمة كل لغة مرة واحدة ثم تعمل دون إنترنت) وكشف اللغة
     implementation("com.google.mlkit:translate:17.0.3")
     implementation("com.google.mlkit:language-id:17.0.6")
+    // Tesseract لقراءة السيريلية/العربية/العبرية/اليونانية/التايلاندية… (حزم اللغات تُنزَّل عند الحاجة)
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.7.0")
 
     testImplementation("junit:junit:4.13.2")
 }

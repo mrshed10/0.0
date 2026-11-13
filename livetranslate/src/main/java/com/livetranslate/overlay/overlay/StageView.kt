@@ -134,8 +134,8 @@ class StageView(context: Context) : View(context) {
             typeface = this@StageView.typeface
         }
         val alignment = if (patch.centered) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL
-        val minSize = 7f * density
-        val maxSize = max(minSize, min(patch.glyphSize * 0.9f, min(patch.height * 0.9f, 40f * density)))
+        val minSize = 6f * density
+        val maxSize = max(minSize, min(patch.glyphSize * 0.82f, min(patch.height * 0.9f, 48f * density)))
 
         fun build(size: Float, maxLines: Int = Int.MAX_VALUE): StaticLayout {
             paint.textSize = size
@@ -150,6 +150,14 @@ class StageView(context: Context) : View(context) {
                 .build()
         }
 
+        if (patch.singleLine) {
+            // سطر واحد مطابق للسطر الأصلي: أكبر خط (حتى ارتفاع السطر) يتسع لعرضه، وإلا يُختصر بـ "…"
+            var size = maxSize
+            paint.textSize = size
+            val textWidth = paint.measureText(patch.translated)
+            if (textWidth > width) size = max(minSize, size * width / textWidth * 0.98f)
+            return build(size, maxLines = 1)
+        }
         if (build(maxSize).height <= patch.height) return build(maxSize)
         if (build(minSize).height > patch.height) {
             paint.textSize = minSize

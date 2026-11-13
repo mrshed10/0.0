@@ -36,6 +36,9 @@ class ScreenCapturer(
     private var reader: ImageReader? = null
     private var display: VirtualDisplay? = null
 
+    /** منطقة الزر العائم (بإحداثيات الشاشة) لاستبعادها من كشف الحركة. */
+    @Volatile var excludeBox: Box? = null
+
     /** وقت آخر إطار وصل (uptime) لمعرفة هل الشاشة ساكنة تماماً. */
     @Volatile var lastFrameAt = 0L
         private set
@@ -128,7 +131,7 @@ class ScreenCapturer(
     private fun signatureOf(image: Image): FrameSignature {
         val plane = image.planes[0]
         return FrameSignature.compute(
-            plane.buffer, image.width, image.height, plane.rowStride, plane.pixelStride,
+            plane.buffer, image.width, image.height, plane.rowStride, plane.pixelStride, excludeBox,
         )
     }
 

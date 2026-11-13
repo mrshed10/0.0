@@ -65,16 +65,18 @@ class TranslationEngine : Closeable {
     /** آخر وقت ظهرت فيه حروف كل نظام كتابة (لتشغيل نماذجه في الوضع التلقائي). */
     private val scriptSeenAt = mutableMapOf<Script, Long>()
     private var passCount = 0
+    private val tess = TessReader()
 
     /** يجهّز حزم اللغات ويسخّن نماذج الـ OCR والمترجم (يُستدعى مرة قبل بدء الجلسة). */
     suspend fun prepare(source: String, target: String) {
         val failed = ModelStore.ensure(Languages.modelsFor(source, target))
-        if (target in failed || (source != Languages.AUTO && source in failed)) {
+        val ocrFailed = OcrPackStore.ensure(Languages.ocrPacksFor(source))
+        if (target in failed || (source != Languages.AUTO && (source in failed || ocrFailed.isNotEmpty()))) {
             error("language pack download failed")
         }
         val warm = Bitmap.createBitmap(64, 32, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
         coroutineScope {
-            plan(source, discovery = true).scripts.map { s ->
+            plan(source, discovery = true).scripts.filter { it.readByMlKit }.map { s ->
                 async { runCatching { recognizer(s).process(InputImage.fromBitmap(warm, 0)).await() } }
             }.awaitAll()
         }
@@ -88,6 +90,7 @@ class TranslationEngine : Closeable {
         bitmap: Bitmap,
         source: String,
         target: String,
+        excluded: List<Rect>,
         onPartial: (List<TextPatch>) -> Unit,
     ): List<TextPatch> = coroutineScope {
         val plan = plan(source, discovery = source == Languages.AUTO && passCount++ % DISCOVERY_EVERY == 0)
@@ -95,18 +98,35 @@ class TranslationEngine : Closeable {
         val horizontal = plan.scripts.map { s -> async { safeRecognize { recognize(s, bitmap) } } }
         val vertical = plan.verticalScript?.let { s -> async { safeRecognize { recognizeRotated(s, bitmap) } } }
         val candidates = horizontal.awaitAll().flatten() + (vertical?.await() ?: emptyList())
-        val blocks = if (plan.scripts.size == 1 && vertical == null) candidates else OcrFusion.fuse(candidates)
-        noteScripts(blocks)
+        val fused = if (plan.scripts.size == 1 && vertical == null) candidates else OcrFusion.fuse(candidates)
+        // تجاهل منطقة الزر العائم
+        val blocks = fused.filter { b ->
+            val r = Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())
+            excluded.none { Rect.intersects(it, r) }
+        }
 
-        val bounds = blocks.map { RectF4(it.left, it.top, it.right, it.bottom) }
+        noteScripts(blocks)
         val refineBudget = AtomicInteger(MAX_REFINES)
+        val tessBudget = AtomicInteger(if (plan.tessRereadAll) MAX_TESS_ALL else MAX_TESS_AUTO)
         val done = mutableListOf<TextPatch>()
+        val targetSpaced = !Languages.joinsWithoutSpaces(Languages.scriptOf(target))
 
         blocks.mapIndexed { index, block ->
             async {
+                var current = block
                 var lines = block.lines.map { it.text }
-                val script = ScriptFilter.dominantScript(block.text) ?: block.script
-                if (!block.vertical && block.confidence < REFINE_BELOW && refineBudget.getAndDecrement() > 0) {
+                // لغات لا يقرؤها ML Kit (روسية، عربية، عبرية…): إعادة قراءة المنطقة بـ Tesseract
+                val tessLangs = plan.tessLanguages
+                if (tessLangs != null && !block.vertical && needsTess(block, plan) && tessBudget.getAndDecrement() > 0) {
+                    rereadWithTess(bitmap, block, tessLangs, plan.tessRereadAll)?.let {
+                        current = it
+                        lines = it.lines.map { l -> l.text }
+                    }
+                }
+                val script = ScriptFilter.dominantScript(current.text) ?: current.script
+                if (current === block && script == Script.LATIN && !block.vertical &&
+                    block.confidence < REFINE_BELOW && refineBudget.getAndDecrement() > 0
+                ) {
                     refine(bitmap, block)?.let { lines = it }
                 }
                 val joiner = if (Languages.joinsWithoutSpaces(script)) "" else " "
@@ -115,21 +135,56 @@ class TranslationEngine : Closeable {
                 val from = resolveSourceLanguage(original, source, script, target) ?: return@async null
                 val translated = translate(original, from, target) ?: return@async null
                 if (translated.equals(original, ignoreCase = true)) return@async null
-                val screenWidth = bitmap.width.toFloat()
-                val patch = withContext(Dispatchers.Default) {
-                    buildPatch(block, bounds[index], bounds, translated, bitmap, screenWidth)
-                } ?: return@async null
+                val patches = withContext(Dispatchers.Default) {
+                    buildPatches(current, translated, bitmap, targetSpaced)
+                }
+                if (patches.isEmpty()) return@async null
                 // نعمل على الخيط الرئيسي، فلا حاجة لمزامنة
-                done += patch
+                done += patches
                 onPartial(done.toList())
-                patch
+                patches
             }
-        }.awaitAll().filterNotNull()
+        }.awaitAll().filterNotNull().flatten()
+    }
+
+    private fun needsTess(block: OcrBlock, plan: Plan): Boolean {
+        if (plan.tessRereadAll) return true
+        // في الوضع التلقائي: الكتل التي قرأها ML Kit اللاتيني بثقة منخفضة غالباً نص بحروف أخرى (سيريلية/عربية…)
+        return block.script == Script.LATIN && block.confidence < TESS_BELOW &&
+            ScriptFilter.dominantScript(block.text).let { it == null || it == Script.LATIN }
+    }
+
+    private suspend fun rereadWithTess(bitmap: Bitmap, block: OcrBlock, languages: String, force: Boolean): OcrBlock? {
+        val pad = (block.lineHeight * 0.35f).toInt().coerceAtLeast(4)
+        val region = Rect(
+            block.left.toInt() - pad, block.top.toInt() - pad,
+            block.right.toInt() + pad, block.bottom.toInt() + pad,
+        )
+        val lines = tess.read(bitmap, region, languages)?.filter { it.text.any(Char::isLetter) } ?: return null
+        if (lines.isEmpty()) return null
+        val text = lines.joinToString(" ") { it.text }
+        val confidence = lines.map { it.confidence }.average().toFloat()
+        val native = ScriptFilter.nativeCount(text)
+        val letters = text.count { it.isLetter() }.coerceAtLeast(1)
+        // نقبل قراءة Tesseract إن كانت بحروف غير لاتينية فعلاً (أو كانت اللغة محددة يدوياً)
+        val accepted = if (force) confidence >= 0.3f else native * 2 >= letters && confidence >= 0.5f
+        if (!accepted) return null
+        val script = ScriptFilter.dominantScript(text) ?: Script.LATIN
+        return OcrBlock(lines.sortedBy { it.top }, script = script)
     }
 
     // ------------------------------------------------------------------ خطة القراءة
 
-    private data class Plan(val scripts: List<Script>, val verticalScript: Script?)
+    /**
+     * @param tessLanguages حزم Tesseract لإعادة قراءة المناطق (مثل "rus+ara")، أو null.
+     * @param tessRereadAll لغة Tesseract محددة يدوياً: كل المناطق تُقرأ بها.
+     */
+    private data class Plan(
+        val scripts: List<Script>,
+        val verticalScript: Script?,
+        val tessLanguages: String? = null,
+        val tessRereadAll: Boolean = false,
+    )
 
     private fun recent(script: Script): Boolean {
         val at = scriptSeenAt[script] ?: return false
@@ -139,6 +194,11 @@ class TranslationEngine : Closeable {
     private fun plan(source: String, discovery: Boolean): Plan {
         if (source != Languages.AUTO) {
             val script = Languages.scriptOf(source)
+            val tessPack = Languages.tessOf(source)
+            if (tessPack != null) {
+                // ML Kit اللاتيني يحدد أماكن النص، وTesseract يقرأ كل منطقة بلغتها
+                return Plan(listOf(Script.LATIN), null, tessPack.takeIf { OcrPackStore.isInstalled(it) }, true)
+            }
             val vertical = script == Script.JAPANESE || script == Script.CHINESE
             return Plan(listOf(script), if (vertical) script else null)
         }
@@ -151,7 +211,15 @@ class TranslationEngine : Closeable {
             recent(Script.CHINESE) && !recent(Script.JAPANESE) -> Script.CHINESE
             else -> Script.JAPANESE
         }
-        return Plan(scripts, verticalScript)
+        // كل حزم Tesseract المنزّلة (الروسية مسبقاً، وأي لغة أضافها المستخدم)، بحد أقصى 3 للسرعة
+        val installed = OcrPackStore.installed.value
+        val tessLanguages = Languages.all.mapNotNull { it.tess }.distinct()
+            .filter { it in installed }
+            .sortedBy { if (it == "rus") 0 else 1 }
+            .take(3)
+            .joinToString("+")
+            .ifEmpty { null }
+        return Plan(scripts, verticalScript, tessLanguages)
     }
 
     private fun noteScripts(blocks: List<OcrBlock>) {
@@ -275,6 +343,8 @@ class TranslationEngine : Closeable {
             Script.JAPANESE -> TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().setExecutor(executor).build())
             Script.CHINESE -> TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().setExecutor(executor).build())
             Script.DEVANAGARI -> TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().setExecutor(executor).build())
+            // بقية الأنظمة يقرؤها Tesseract؛ ML Kit اللاتيني يحدد أماكن نصوصها فقط
+            else -> TextRecognition.getClient(TextRecognizerOptions.Builder().setExecutor(executor).build())
         }
     }
 
@@ -293,6 +363,10 @@ class TranslationEngine : Closeable {
         if (source != Languages.AUTO) {
             val sourceScript = Languages.scriptOf(source)
             if (sourceScript != Script.LATIN && !ScriptFilter.containsScript(text, sourceScript)) return null
+            if (sourceScript != Script.LATIN && !ModelStore.isReady(source)) {
+                ModelStore.requestInBackground(source)
+                return null
+            }
             if (source == target || !ModelStore.isReady(source)) return null
             if (sourceScript == Script.LATIN) {
                 if (script != Script.LATIN) return null
@@ -304,7 +378,13 @@ class TranslationEngine : Closeable {
         val code = when (script) {
             Script.LATIN -> return resolveLatin(text, targetTag)
             Script.CHINESE -> candidates(text).firstOrNull { it.first == "zh" || it.first == "ja" }?.first ?: "zh"
-            else -> Languages.languageOfScript(script) ?: return null
+            else -> Languages.languageOfScript(script)
+                // نظام كتابة مشترك (السيريلية: روسية/أوكرانية/بلغارية…، العربية: عربية/فارسية/أردية):
+                // كشف اللغة محصور بين لغات هذا النظام، والافتراضي أشهرها
+                ?: Languages.languagesOfScript(script).let { options ->
+                    candidates(text).firstOrNull { it.first in options }?.first ?: options.firstOrNull()
+                }
+                ?: return null
         }
         if (code == targetTag) return null
         if (!ModelStore.isReady(code)) {
@@ -353,77 +433,81 @@ class TranslationEngine : Closeable {
     // ------------------------------------------------------------------ الرسم
 
     /**
-     * يحدد صندوق الترجمة بحيث يحل محل النص الأصلي تماماً:
-     * - نص أفقي: نفس الصندوق، والفقاعات المتمركزة تُكتب في الوسط.
-     * - نص مائل قليلاً (≤45°، داخل الصور): نفس الزاوية والأبعاد.
-     * - نص عمودي أو جانبي: صندوق مستقيم يغطي الأصل، موسّع أفقياً دون لمس النصوص المجاورة،
-     *   والترجمة أفقية متمركزة.
+     * صناديق الترجمة بنفس مقاس النص الأصلي تماماً:
+     * - نص أفقي: صندوق لكل سطر أصلي بنفس موضعه وعرضه وارتفاعه، والترجمة موزّعة على الأسطر
+     *   بنسبة عرضها ([LineSplitter])؛ حجم الخط بقدر ارتفاع السطر الأصلي، فلا تضخم ولا تداخل.
+     * - نص مائل قليلاً (≤45°، داخل الصور): صندوق الكتلة بنفس الزاوية.
+     * - نص عمودي أو جانبي: صندوق الكتلة الأصلي نفسه (دون توسيع)، والترجمة أفقية متمركزة داخله.
      */
-    private fun buildPatch(
-        block: OcrBlock,
-        box: RectF4,
-        allBounds: List<RectF4>,
-        translated: String,
-        bitmap: Bitmap,
-        screenWidth: Float,
-    ): TextPatch? {
-        val sampleBox = Rect(box.left.toInt(), box.top.toInt(), box.right.toInt(), box.bottom.toInt())
-        if (sampleBox.width() < 4 || sampleBox.height() < 4) return null
+    private fun buildPatches(block: OcrBlock, translated: String, bitmap: Bitmap, targetSpaced: Boolean): List<TextPatch> {
+        val sampleBox = Rect(block.left.toInt(), block.top.toInt(), block.right.toInt(), block.bottom.toInt())
+        if (sampleBox.width() < 4 || sampleBox.height() < 4) return emptyList()
         val bg = ColorSampler.background(bitmap, sampleBox)
         val fg = ColorSampler.foreground(bitmap, sampleBox, bg)
         val c = block.corners
-        val sideways = block.vertical || PatchGeometry.isUprightVertical(block.angle, box.width, box.height)
+        val sideways = block.vertical || PatchGeometry.isUprightVertical(block.angle, block.width, block.height)
         val tilt = if (sideways || c == null) 0f else PatchGeometry.drawAngle(block.angle)
 
         if (sideways) {
-            // حجم الحرف الأصلي في النص العمودي = عرض العمود
             val glyph = block.lines.map { it.right - it.left }.average().toFloat()
-            val gap = glyph * 0.3f
-            val neighbours = allBounds.filter { it != box }
-            val wide = PatchGeometry.widenVertical(box, neighbours, screenWidth, screenWidth * 0.5f, gap)
-            return TextPatch(
-                translated = translated,
-                centerX = wide.centerX, centerY = (wide.top + wide.bottom) / 2f,
-                width = wide.width, height = wide.height,
-                angle = 0f,
-                glyphSize = max(glyph, 1f),
-                padding = max(2f, glyph * 0.12f),
-                centered = true,
-                background = bg, textColor = fg,
+            return listOf(
+                TextPatch(
+                    translated = translated,
+                    centerX = (block.left + block.right) / 2f, centerY = (block.top + block.bottom) / 2f,
+                    width = block.width, height = block.height,
+                    angle = 0f,
+                    glyphSize = max(glyph, 1f),
+                    padding = max(1f, glyph * 0.08f),
+                    centered = true,
+                    singleLine = false,
+                    background = bg, textColor = fg,
+                ),
             )
         }
 
-        val glyph = block.lineHeight
         if (tilt != 0f && c != null) {
-            return TextPatch(
-                translated = translated,
-                centerX = (c[0] + c[2] + c[4] + c[6]) / 4f,
-                centerY = (c[1] + c[3] + c[5] + c[7]) / 4f,
-                width = hypot(c[2] - c[0], c[3] - c[1]),
-                height = hypot(c[6] - c[0], c[7] - c[1]),
-                angle = tilt,
-                glyphSize = glyph,
-                padding = max(2f, glyph * 0.12f),
-                centered = block.isCentered,
+            val glyph = block.lineHeight
+            return listOf(
+                TextPatch(
+                    translated = translated,
+                    centerX = (c[0] + c[2] + c[4] + c[6]) / 4f,
+                    centerY = (c[1] + c[3] + c[5] + c[7]) / 4f,
+                    width = hypot(c[2] - c[0], c[3] - c[1]),
+                    height = hypot(c[6] - c[0], c[7] - c[1]),
+                    angle = tilt,
+                    glyphSize = glyph,
+                    padding = max(1f, glyph * 0.08f),
+                    centered = block.isCentered,
+                    singleLine = false,
+                    background = bg, textColor = fg,
+                ),
+            )
+        }
+
+        val lines = block.lines.sortedBy { it.top }
+        val parts = LineSplitter.distribute(translated, lines.map { it.right - it.left }, targetSpaced)
+        val centered = block.isCentered
+        return lines.mapIndexed { i, line ->
+            val h = line.bottom - line.top
+            TextPatch(
+                translated = parts.getOrElse(i) { "" },
+                centerX = (line.left + line.right) / 2f, centerY = (line.top + line.bottom) / 2f,
+                width = line.right - line.left, height = h,
+                angle = 0f,
+                glyphSize = h,
+                padding = max(1f, min(h * 0.1f, 6f)),
+                centered = centered,
+                singleLine = true,
                 background = bg, textColor = fg,
             )
         }
-        return TextPatch(
-            translated = translated,
-            centerX = box.centerX, centerY = (box.top + box.bottom) / 2f,
-            width = box.width, height = box.height,
-            angle = 0f,
-            glyphSize = glyph,
-            padding = max(2f, min(glyph * 0.12f, 12f)),
-            centered = block.isCentered,
-            background = bg, textColor = fg,
-        )
     }
 
     override fun close() {
         recognizers.values.forEach { it.close() }
         translators.values.forEach { it.close() }
         executors.values.forEach { it.shutdown() }
+        tess.close()
         languageId.close()
         recognizers.clear()
         translators.clear()
@@ -433,6 +517,9 @@ class TranslationEngine : Closeable {
     private companion object {
         const val REFINE_BELOW = 0.7f
         const val MAX_REFINES = 6
+        const val TESS_BELOW = 0.75f
+        const val MAX_TESS_AUTO = 10
+        const val MAX_TESS_ALL = 40
         const val DISCOVERY_EVERY = 5
         const val SCRIPT_MEMORY_MS = 90_000L
     }

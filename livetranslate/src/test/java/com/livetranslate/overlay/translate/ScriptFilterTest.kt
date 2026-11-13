@@ -48,12 +48,41 @@ class DominantScriptTest {
         assertEquals(Script.LATIN, ScriptFilter.dominantScript("Hello world"))
         assertEquals(Script.JAPANESE, ScriptFilter.dominantScript("NARUTO ナルト"))
         assertEquals(null, ScriptFilter.dominantScript("123 !!"))
+        assertEquals(Script.CYRILLIC, ScriptFilter.dominantScript("Привет, как дела?"))
+        assertEquals(Script.ARABIC, ScriptFilter.dominantScript("مرحبا بالعالم"))
+        assertEquals(Script.HEBREW, ScriptFilter.dominantScript("שלום עולם"))
+        assertEquals(Script.GREEK, ScriptFilter.dominantScript("Καλημέρα κόσμε"))
+        assertEquals(Script.THAI, ScriptFilter.dominantScript("สวัสดีครับ"))
+        assertEquals(Script.LATIN, ScriptFilter.dominantScript("Xin chào thế giới"))
     }
 
     @Test
     fun autoModePreloadsAsianPacks() {
-        assertEquals(listOf("ar", "ja", "zh", "ko"), Languages.modelsFor(Languages.AUTO, "ar"))
+        assertEquals(listOf("ar", "ja", "zh", "ko", "ru"), Languages.modelsFor(Languages.AUTO, "ar"))
+        assertEquals(listOf("rus"), Languages.ocrPacksFor(Languages.AUTO))
+        assertEquals(listOf("ara"), Languages.ocrPacksFor("ar"))
+        assertEquals(emptyList<String>(), Languages.ocrPacksFor("ja"))
         assertEquals(listOf("ar", "fr"), Languages.modelsFor("fr", "ar"))
         assertEquals(listOf("ar"), Languages.modelsFor("en", "ar"))
+    }
+}
+
+class LanguageTableTest {
+    @Test
+    fun coversAllTranslationLanguages() {
+        assertEquals(59, Languages.all.size)
+        assertEquals(Languages.all.size, Languages.all.map { it.code }.toSet().size)
+        assertEquals("rus", Languages.tessOf("ru"))
+        assertEquals(null, Languages.tessOf("ja"))
+        assertEquals(Script.CYRILLIC, Languages.scriptOf("uk"))
+    }
+
+    @Test
+    fun scriptCertainLanguages() {
+        assertEquals("ko", Languages.languageOfScript(Script.KOREAN))
+        assertEquals("he", Languages.languageOfScript(Script.HEBREW))
+        assertEquals("hi", Languages.languageOfScript(Script.DEVANAGARI))
+        assertEquals(null, Languages.languageOfScript(Script.CYRILLIC))
+        assertEquals(listOf("ru", "uk", "be", "bg", "mk"), Languages.languagesOfScript(Script.CYRILLIC))
     }
 }

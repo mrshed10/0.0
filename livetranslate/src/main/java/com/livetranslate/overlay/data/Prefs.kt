@@ -16,6 +16,19 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_TARGET, "ar") ?: "ar"
         set(value) = sp.edit().putString(KEY_TARGET, value).apply()
 
+    /** الزر العائم على حافة الشاشة. */
+    var bubbleEnabled: Boolean
+        get() = sp.getBoolean(KEY_BUBBLE, true)
+        set(value) = sp.edit().putBoolean(KEY_BUBBLE, value).apply()
+
+    var bubbleOnRight: Boolean
+        get() = sp.getBoolean(KEY_BUBBLE_RIGHT, true)
+        set(value) = sp.edit().putBoolean(KEY_BUBBLE_RIGHT, value).apply()
+
+    var bubbleY: Int
+        get() = sp.getInt(KEY_BUBBLE_Y, -1)
+        set(value) = sp.edit().putInt(KEY_BUBBLE_Y, value).apply()
+
     fun observeLanguages(onChange: () -> Unit): SharedPreferences.OnSharedPreferenceChangeListener {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == KEY_SOURCE || key == KEY_TARGET) onChange()
@@ -31,5 +44,8 @@ class Prefs(context: Context) {
     private companion object {
         const val KEY_SOURCE = "source"
         const val KEY_TARGET = "target"
+        const val KEY_BUBBLE = "bubble"
+        const val KEY_BUBBLE_RIGHT = "bubble_right"
+        const val KEY_BUBBLE_Y = "bubble_y"
     }
 }

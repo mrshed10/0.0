@@ -20,7 +20,12 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import android.graphics.Rect
+import com.livetranslate.overlay.OverlayTrampolineActivity
 import com.livetranslate.overlay.R
+import com.livetranslate.overlay.capture.Box
+import com.livetranslate.overlay.overlay.FloatingBubble
+import com.livetranslate.overlay.translate.OcrPackStore
 import com.livetranslate.overlay.a11y.TranslateAccessibilityService
 import com.livetranslate.overlay.capture.LiveTranslateController
 import com.livetranslate.overlay.capture.ScreenCapturer
@@ -63,6 +68,7 @@ class OverlayService : LifecycleService() {
     private var capturer: ScreenCapturer? = null
     private var controller: LiveTranslateController? = null
     private var prepareJob: Job? = null
+    private var bubble: FloatingBubble? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -73,13 +79,22 @@ class OverlayService : LifecycleService() {
 
         // تفعيل/تعطيل خدمة إمكانية الوصول أثناء العمل ينقل الطبقة بين المضيفين
         lifecycleScope.launch {
-            TranslateAccessibilityService.connected.drop(1).collect { if (stage != null) attachStage() }
+            TranslateAccessibilityService.connected.drop(1).collect {
+                if (stage != null) attachStage()
+                if (bubble != null) {
+                    hideBubble()
+                    showBubble()
+                }
+            }
         }
         languageListener = prefs.observeLanguages { onLanguagesChanged() }
 
         // حزمة لغة اكتملت في الخلفية (لغة اكتُشفت تلقائياً): نعيد ترجمة الشاشة لتظهر فوراً
         lifecycleScope.launch {
             ModelStore.downloaded.drop(1).collect { controller?.invalidate() }
+        }
+        lifecycleScope.launch {
+            OcrPackStore.installed.drop(1).collect { controller?.invalidate() }
         }
         lifecycleScope.launch {
             ModelStore.downloading.drop(1).collect { code ->
@@ -97,19 +112,35 @@ class OverlayService : LifecycleService() {
             intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) == Activity.RESULT_OK
         // startForeground مطلوب خلال ثوانٍ في كل الحالات؛ ومع موافقة الالتقاط يجب أن يتضمن
         // النوع mediaProjection قبل getMediaProjection (Android 14+)
-        goForeground(withProjection = capturer != null || granted, text = getString(R.string.notif_text_preparing))
+        goForeground(withProjection = capturer != null || granted, text = currentText())
 
         when (intent?.action) {
             ACTION_PROJECTION_GRANTED -> {
                 val data = IntentCompat.getParcelableExtra(intent, EXTRA_RESULT_DATA, Intent::class.java)
                 if (granted && data != null) startTranslating(intent.getIntExtra(EXTRA_RESULT_CODE, 0), data)
-                else stopSelf()
+                else stopIfIdle()
             }
-            ACTION_PROJECTION_DENIED, ACTION_STOP -> stopSelf()
-            // إعادة تشغيل من النظام: لا يمكن استعادة موافقة الالتقاط، فنتوقف بهدوء
-            else -> if (capturer == null) stopSelf()
+            ACTION_PROJECTION_DENIED -> stopIfIdle()
+            ACTION_SHOW_BUBBLE -> {
+                prefs.bubbleEnabled = true
+                if (!showBubble()) stopIfIdle()
+            }
+            ACTION_HIDE_BUBBLE -> {
+                prefs.bubbleEnabled = false
+                hideBubble()
+                stopIfIdle()
+            }
+            ACTION_STOP_TRANSLATION -> stopTranslation()
+            ACTION_STOP -> stopSelf()
+            // إعادة تشغيل من النظام: لا يمكن استعادة موافقة الالتقاط
+            else -> stopIfIdle()
         }
         return START_NOT_STICKY
+    }
+
+    /** تبقى الخدمة حيّة ما دام الزر العائم ظاهراً أو الترجمة تعمل. */
+    private fun stopIfIdle() {
+        if (capturer == null && bubble?.isShown != true) stopSelf() else refreshUi()
     }
 
     // ---------------------------------------------------------------- الخدمة الأمامية والإشعار
@@ -133,6 +164,25 @@ class OverlayService : LifecycleService() {
             NotificationManagerCompat.from(this)
                 .notify(NotificationHelper.NOTIFICATION_ID, NotificationHelper.build(this, text))
         }
+    }
+
+    private fun currentText(): String = when {
+        capturer == null -> getString(R.string.notif_text_idle)
+        controller?.isPaused == true -> getString(R.string.notif_text_paused)
+        else -> activeText()
+    }
+
+    /** يحدّث الإشعار وشكل الزر العائم حسب الحالة. */
+    private fun refreshUi() {
+        updateNotification(currentText())
+        bubble?.setState(
+            when {
+                capturer == null -> FloatingBubble.State.IDLE
+                controller?.isPaused == true -> FloatingBubble.State.PAUSED
+                else -> FloatingBubble.State.ACTIVE
+            },
+        )
+        _translating.value = capturer != null
     }
 
     private fun activeText() = getString(
@@ -216,6 +266,7 @@ class OverlayService : LifecycleService() {
             runCatching { wm.updateViewLayout(view, p) }
         }
         capturer?.onDisplayChanged()
+        bubble?.onScreenChanged()
         controller?.invalidate()
     }
 
@@ -231,9 +282,10 @@ class OverlayService : LifecycleService() {
         }
         val projection = getSystemService(MediaProjectionManager::class.java).getMediaProjection(resultCode, data)
         if (projection == null) {
-            stopSelf()
+            stopIfIdle()
             return
         }
+        if (prefs.bubbleEnabled) showBubble()
         val stageView = stage ?: return
         val translationEngine = engine ?: TranslationEngine().also { engine = it }
 
@@ -244,18 +296,21 @@ class OverlayService : LifecycleService() {
             projection = projection,
             onSignature = { ctrl.onSignature(it) },
             // المستخدم أوقف المشاركة من شريط الحالة/النظام
-            onProjectionStopped = { if (capturer === cap) stopSelf() },
-        )
+            onProjectionStopped = { if (capturer === cap) stopTranslation() },
+        ).apply { excludeBox = bubble?.bounds() }
         ctrl = LiveTranslateController(
             scope = lifecycleScope,
             capturer = cap,
             engine = translationEngine,
             stage = stageView,
             languages = { prefs.source to prefs.target },
+            excludedRects = { listOfNotNull(bubble?.bounds()?.let { Rect(it.left, it.top, it.right, it.bottom) }) },
             onStatus = ::onEngineStatus,
         )
         capturer = cap
         controller = ctrl
+        refreshUi()
+        bubble?.setState(FloatingBubble.State.BUSY)
 
         // تجهيز الحزم وتسخين النماذج قبل أول إطار، ثم البدء. لا يظهر شيء على الشاشة أثناء ذلك.
         prepareJob?.cancel()
@@ -271,6 +326,7 @@ class OverlayService : LifecycleService() {
             if (capturer === cap) {
                 cap.start()
                 ctrl.start()
+                refreshUi()
             }
         }
     }
@@ -294,6 +350,75 @@ class OverlayService : LifecycleService() {
         }
     }
 
+    /** ينهي جلسة الترجمة؛ تبقى الخدمة إن كان الزر العائم ظاهراً. */
+    private fun stopTranslation() {
+        val wasActive = capturer != null
+        releaseProjection()
+        if (wasActive) goForeground(withProjection = false, text = currentText())
+        stopIfIdle()
+    }
+
+    private fun requestCapture() {
+        // نافذة ظاهرة + إذن الظهور فوق التطبيقات يسمحان ببدء نشاط من الخلفية
+        runCatching { startActivity(OverlayTrampolineActivity.startIntent(this)) }
+    }
+
+    // ---------------------------------------------------------------- الزر العائم
+
+    private val bubbleListener = object : FloatingBubble.Listener {
+        override fun onBubbleTap() {
+            val ctrl = controller
+            when {
+                capturer == null -> requestCapture()
+                ctrl == null -> Unit
+                ctrl.isPaused -> ctrl.resume()
+                else -> ctrl.pause()
+            }
+            refreshUi()
+        }
+
+        override fun onBubbleLongPress() {
+            if (capturer != null) {
+                stopTranslation()
+            } else {
+                prefs.bubbleEnabled = false
+                hideBubble()
+                stopIfIdle()
+            }
+        }
+
+        override fun onBubbleMoved(bounds: Box) {
+            capturer?.excludeBox = bounds
+        }
+    }
+
+    /** يُظهر الزر على أفضل مضيف متاح (إمكانية الوصول أو الظهور فوق التطبيقات). */
+    private fun showBubble(): Boolean {
+        if (bubble?.isShown == true) return true
+        val a11y = TranslateAccessibilityService.instance
+        val host: Context = when {
+            a11y != null -> a11y
+            Settings.canDrawOverlays(this) -> appOverlayContext
+            else -> return false
+        }
+        val type = if (a11y != null) {
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        } else {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        }
+        val b = FloatingBubble(host, host.getSystemService(WindowManager::class.java), type, prefs, bubbleListener)
+        b.show()
+        bubble = b
+        refreshUi()
+        return b.isShown
+    }
+
+    private fun hideBubble() {
+        bubble?.hide()
+        bubble = null
+        capturer?.excludeBox = null
+    }
+
     private fun releaseProjection() {
         prepareJob?.cancel()
         controller?.stop()
@@ -305,11 +430,13 @@ class OverlayService : LifecycleService() {
     override fun onDestroy() {
         languageListener?.let { prefs.stopObserving(it) }
         releaseProjection()
+        hideBubble()
         detachStage()
         stage = null
         engine?.close()
         engine = null
         _running.value = false
+        _translating.value = false
         super.onDestroy()
     }
 
@@ -317,11 +444,18 @@ class OverlayService : LifecycleService() {
         const val ACTION_PROJECTION_GRANTED = "com.livetranslate.overlay.PROJECTION_GRANTED"
         const val ACTION_PROJECTION_DENIED = "com.livetranslate.overlay.PROJECTION_DENIED"
         const val ACTION_STOP = "com.livetranslate.overlay.STOP"
+        const val ACTION_STOP_TRANSLATION = "com.livetranslate.overlay.STOP_TRANSLATION"
+        const val ACTION_SHOW_BUBBLE = "com.livetranslate.overlay.SHOW_BUBBLE"
+        const val ACTION_HIDE_BUBBLE = "com.livetranslate.overlay.HIDE_BUBBLE"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_RESULT_DATA = "result_data"
 
         private val _running = MutableStateFlow(false)
         val running: StateFlow<Boolean> = _running.asStateFlow()
+
+        /** هل جلسة ترجمة (التقاط شاشة) نشطة الآن. */
+        private val _translating = MutableStateFlow(false)
+        val translating: StateFlow<Boolean> = _translating.asStateFlow()
 
         fun intent(context: Context, action: String) = Intent(context, OverlayService::class.java).setAction(action)
     }
