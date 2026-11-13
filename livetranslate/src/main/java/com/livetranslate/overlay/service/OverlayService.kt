@@ -29,6 +29,7 @@ import com.livetranslate.overlay.overlay.EngineStatus
 import com.livetranslate.overlay.overlay.ScreenMetrics
 import com.livetranslate.overlay.overlay.StageView
 import com.livetranslate.overlay.translate.Languages
+import com.livetranslate.overlay.translate.ModelStore
 import com.livetranslate.overlay.translate.TranslationEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -75,6 +76,19 @@ class OverlayService : LifecycleService() {
             TranslateAccessibilityService.connected.drop(1).collect { if (stage != null) attachStage() }
         }
         languageListener = prefs.observeLanguages { onLanguagesChanged() }
+
+        // حزمة لغة اكتملت في الخلفية (لغة اكتُشفت تلقائياً): نعيد ترجمة الشاشة لتظهر فوراً
+        lifecycleScope.launch {
+            ModelStore.downloaded.drop(1).collect { controller?.invalidate() }
+        }
+        lifecycleScope.launch {
+            ModelStore.downloading.drop(1).collect { code ->
+                if (controller == null) return@collect
+                updateNotification(
+                    if (code != null) getString(R.string.notif_text_downloading, Languages.nameOf(code)) else activeText(),
+                )
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

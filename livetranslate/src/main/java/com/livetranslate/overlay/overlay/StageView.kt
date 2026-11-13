@@ -10,6 +10,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextDirectionHeuristics
 import android.text.TextPaint
+import android.text.TextUtils
 import android.view.View
 import com.livetranslate.overlay.capture.Box
 import com.livetranslate.overlay.translate.TextPatch
@@ -52,10 +53,7 @@ class StageView(context: Context) : View(context) {
     }
 
     fun setPatches(patches: List<TextPatch>) {
-        prepared = patches.map { p ->
-            val layout = fitText(p)
-            Prepared(p, layout, max(p.height, layout.height.toFloat()))
-        }
+        prepared = patches.map { p -> Prepared(p, fitText(p), p.height) }
         boxes = prepared.map { boundsOf(it) }
         invalidate()
     }
@@ -76,12 +74,10 @@ class StageView(context: Context) : View(context) {
         invalidate()
     }
 
-    private fun pad() = 2f * density
-
     private fun boundsOf(p: Prepared): Box {
         val patch = p.patch
-        val hw = patch.width / 2f + pad()
-        val hh = p.drawnHeight / 2f + pad()
+        val hw = patch.width / 2f + patch.padding
+        val hh = p.drawnHeight / 2f + patch.padding
         val rad = Math.toRadians(patch.angle.toDouble())
         val c = abs(cos(rad)).toFloat()
         val s = abs(sin(rad)).toFloat()
@@ -107,10 +103,10 @@ class StageView(context: Context) : View(context) {
     }
 
     private fun drawPatches(canvas: Canvas) {
-        val pad = pad()
         val radius = 4f * density
         for (p in prepared) {
             val patch = p.patch
+            val pad = patch.padding
             val w = patch.width
             val h = p.drawnHeight
             canvas.save()
@@ -127,30 +123,42 @@ class StageView(context: Context) : View(context) {
         }
     }
 
-    /** أكبر حجم خط يجعل الترجمة تتسع داخل صندوق النص الأصلي. */
+    /**
+     * أكبر حجم خط (حتى حجم الحرف الأصلي) يجعل الترجمة تتسع داخل صندوق النص الأصلي.
+     * لا تتجاوز الترجمة صندوقها أبداً (لا تداخل مع النصوص المجاورة): إن لم تتسع حتى بأصغر خط تُختصر بـ "…".
+     */
     private fun fitText(patch: TextPatch): StaticLayout {
         val width = max(1, patch.width.toInt())
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = patch.textColor
             typeface = this@StageView.typeface
         }
-        val minSize = 8f * density
-        val maxSize = max(minSize, min(patch.height / max(1, patch.lineCount) * 0.85f, 40f * density))
+        val alignment = if (patch.centered) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL
+        val minSize = 7f * density
+        val maxSize = max(minSize, min(patch.glyphSize * 0.9f, min(patch.height * 0.9f, 40f * density)))
 
-        fun build(size: Float): StaticLayout {
+        fun build(size: Float, maxLines: Int = Int.MAX_VALUE): StaticLayout {
             paint.textSize = size
             return StaticLayout.Builder.obtain(patch.translated, 0, patch.translated.length, paint, width)
-                .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                .setAlignment(alignment)
                 .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
                 .setLineSpacing(0f, 0.95f)
                 .setIncludePad(false)
+                .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
+                .setMaxLines(maxLines)
+                .setEllipsize(if (maxLines == Int.MAX_VALUE) null else TextUtils.TruncateAt.END)
                 .build()
         }
 
+        if (build(maxSize).height <= patch.height) return build(maxSize)
+        if (build(minSize).height > patch.height) {
+            paint.textSize = minSize
+            val lineHeight = paint.fontMetrics.let { it.descent - it.ascent } * 0.95f
+            return build(minSize, max(1, (patch.height / lineHeight).toInt()))
+        }
         var lo = minSize
         var hi = maxSize
-        if (build(hi).height <= patch.height) return build(hi)
-        repeat(6) {
+        repeat(7) {
             val mid = (lo + hi) / 2f
             if (build(mid).height <= patch.height) lo = mid else hi = mid
         }

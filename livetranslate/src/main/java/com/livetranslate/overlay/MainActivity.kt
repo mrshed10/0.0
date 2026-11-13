@@ -89,7 +89,6 @@ import com.livetranslate.overlay.tile.TranslateTileService
 import com.livetranslate.overlay.translate.Language
 import com.livetranslate.overlay.translate.Languages
 import com.livetranslate.overlay.translate.ModelStore
-import kotlinx.coroutines.CancellationException
 
 /** شاشة الإعداد: الأذونات، اللغات، وتشغيل/إيقاف النافذة العائمة. */
 class MainActivity : ComponentActivity() {
@@ -148,13 +147,7 @@ private fun SetupScreen() {
     // تنزيل حزم اللغات المختارة مسبقاً، حتى تبدأ الترجمة فورياً دون أي تنزيل لاحق
     LaunchedEffect(source, target, retry) {
         modelError = false
-        try {
-            ModelStore.ensure(listOfNotNull(target, source.takeIf { it != Languages.AUTO }))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            modelError = true
-        }
+        modelError = ModelStore.ensure(Languages.modelsFor(source, target)).isNotEmpty()
     }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -226,7 +219,7 @@ private fun SetupScreen() {
             }
             Spacer(Modifier.height(12.dp))
             ModelStatus(
-                needed = listOfNotNull(target, source.takeIf { it != Languages.AUTO }),
+                needed = Languages.modelsFor(source, target),
                 downloaded = downloaded,
                 downloading = downloading,
                 error = modelError,

@@ -10,9 +10,14 @@ data class TextPatch(
     val centerY: Float,
     val width: Float,
     val height: Float,
-    /** زاوية ميل النص الأصلي بالدرجات (نص مائل داخل صورة مثلاً). */
+    /** زاوية الرسم بالدرجات (0 للنص الأفقي والعمودي؛ ميل حتى ±45° للنص المائل داخل الصور). */
     val angle: Float,
-    val lineCount: Int,
+    /** حجم حرف النص الأصلي بالبكسل (ارتفاع السطر، أو عرض العمود في النص العمودي): أقصى حجم للترجمة. */
+    val glyphSize: Float,
+    /** حشوة تُضاف حول الصندوق لتغطية أطراف الحروف الأصلية بالكامل. */
+    val padding: Float,
+    /** محاذاة في الوسط (فقاعات الكلام والنص العمودي) بدلاً من بداية السطر. */
+    val centered: Boolean,
     val background: Int,
     val textColor: Int,
 )

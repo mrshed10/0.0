@@ -37,3 +37,23 @@ class ScriptFilterTest {
         assertFalse(Languages.joinsWithoutSpaces(Script.KOREAN))
     }
 }
+
+class DominantScriptTest {
+    @Test
+    fun detectsDominantScript() {
+        assertEquals(Script.JAPANESE, ScriptFilter.dominantScript("今日はいい天気ですね"))
+        assertEquals(Script.CHINESE, ScriptFilter.dominantScript("今天天气很好"))
+        assertEquals(Script.KOREAN, ScriptFilter.dominantScript("오늘 날씨 좋네요"))
+        assertEquals(Script.DEVANAGARI, ScriptFilter.dominantScript("नमस्ते दुनिया"))
+        assertEquals(Script.LATIN, ScriptFilter.dominantScript("Hello world"))
+        assertEquals(Script.JAPANESE, ScriptFilter.dominantScript("NARUTO ナルト"))
+        assertEquals(null, ScriptFilter.dominantScript("123 !!"))
+    }
+
+    @Test
+    fun autoModePreloadsAsianPacks() {
+        assertEquals(listOf("ar", "ja", "zh", "ko"), Languages.modelsFor(Languages.AUTO, "ar"))
+        assertEquals(listOf("ar", "fr"), Languages.modelsFor("fr", "ar"))
+        assertEquals(listOf("ar"), Languages.modelsFor("en", "ar"))
+    }
+}
