@@ -49,3 +49,14 @@ com.saudi.salariesapp/
 ```
 
 يبني GitHub Actions ملف APK تلقائياً مع كل push (ملف `.github/workflows/android.yml`).
+
+---
+
+## تطبيق ثانٍ في المستودع: الترجمة العائمة (`livetranslate/`)
+
+نافذة شفافة عائمة فوق كل التطبيقات تترجم محتوى الشاشة في مكانه أثناء التمرير.
+التفاصيل والشرح الكامل للأذونات في [`livetranslate/README.md`](livetranslate/README.md).
+
+```bash
+./gradlew :livetranslate:assembleDebug   # livetranslate/build/outputs/apk/debug/livetranslate-debug.apk
+```

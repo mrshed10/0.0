@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "SaudiSalariesApp"
 include(":app")
+include(":livetranslate")
