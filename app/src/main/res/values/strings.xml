@@ -331,6 +331,20 @@
     <string name="lock_card_body">Shows an item on your lock screen, with a live countdown to the next prayer.</string>
     <string name="lock_card_note">Samsung phones do not allow third-party widgets on the lock screen, so Athar uses a silent lock-screen notification instead.</string>
 
+    <string name="fonts_title">Fonts</string>
+    <string name="font_ui">Arabic interface font</string>
+    <string name="font_latin">English font</string>
+    <string name="font_decorative">Verses &amp; adhkar font</string>
+    <string name="font_same_as_arabic">Same as Arabic</string>
+    <string name="font_import_arabic">Import Arabic font</string>
+    <string name="font_import_latin">Import English font</string>
+    <string name="fonts_hint">Import any TTF or OTF font file, for example a Thuluth or Diwani font you own. Fonts are used in the app and can be chosen per widget.</string>
+    <string name="font_imported">Font imported. Choose it from the lists above.</string>
+    <string name="font_invalid">This file is not a usable font (TTF/OTF).</string>
+    <string name="widget_font">Font</string>
+    <string name="font_system">System</string>
+    <string name="widget_font_hint">Custom fonts are drawn as images on the widget, so they look exactly like in the app.</string>
+
     <string-array name="hijri_months">
         <item>Muharram</item>
         <item>Safar</item>

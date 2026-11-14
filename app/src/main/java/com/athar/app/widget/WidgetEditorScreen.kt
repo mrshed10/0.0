@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.TextFields
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -56,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +73,8 @@ import com.athar.app.core.designsystem.component.GlassIconButton
 import com.athar.app.core.designsystem.component.GlassSegmented
 import com.athar.app.core.designsystem.glass.GlassCard
 import com.athar.app.core.designsystem.theme.AtharColors
+import com.athar.app.core.fonts.FontRegistry
+import com.athar.app.core.format.currentLocale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -285,6 +289,26 @@ fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (Wid
         }
 
         item {
+            val fonts = remember { FontRegistry.all(context) }
+            val locale = currentLocale()
+            GlassCard(Modifier.fillMaxWidth()) {
+                CardHeader(stringResource(R.string.widget_font), Icons.Rounded.TextFields, tint = AtharColors.Gold)
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FontChip(stringResource(R.string.font_system), FontFamily.Default, style.fontId == null) {
+                        setStyle(style.copy(fontId = null))
+                    }
+                    fonts.forEach { info ->
+                        val family = remember(info.id) { FontRegistry.composeFamily(context, info.id) }
+                        FontChip(info.name(locale), family, style.fontId == info.id) { setStyle(style.copy(fontId = info.id)) }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.widget_font_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+            }
+        }
+
+        item {
             GlassButton(
                 stringResource(R.string.save),
                 { onSave(config) },
@@ -294,6 +318,21 @@ fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (Wid
             )
         }
     }
+}
+
+@Composable
+private fun FontChip(name: String, family: FontFamily, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        name,
+        fontFamily = family,
+        fontSize = 16.sp,
+        color = if (selected) AtharColors.Gold else AtharColors.TextSecondary,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (selected) AtharColors.Gold.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -350,10 +389,13 @@ private fun WidgetPreview(style: WidgetStyle, data: WidgetData) {
         val text = Color(style.textColor)
         val accent = Color(style.accentColor)
         val (title, main, sub) = previewLines(data)
+        val family = remember(style.fontId) {
+            style.fontId?.let { FontRegistry.composeFamily(context, it) } ?: FontFamily.Default
+        }
         Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center) {
-            Text(title, color = accent, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(main, color = text, fontWeight = FontWeight.Bold, fontSize = 30.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(sub, color = text.copy(alpha = 0.75f), fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Start)
+            Text(title, color = accent, fontFamily = family, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(main, color = text, fontFamily = family, fontWeight = FontWeight.Bold, fontSize = 30.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(sub, color = text.copy(alpha = 0.75f), fontFamily = family, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Start)
         }
     }
 }

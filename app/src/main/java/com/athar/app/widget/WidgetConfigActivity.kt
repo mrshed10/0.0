@@ -16,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.athar.app.core.designsystem.glass.AuroraBackground
 import com.athar.app.core.designsystem.glass.LocalHazeState
-import com.athar.app.core.designsystem.theme.AtharTheme
+import com.athar.app.core.designsystem.theme.AtharFontsTheme
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 
@@ -43,7 +43,7 @@ class WidgetConfigActivity : ComponentActivity() {
         val initial = store.get(appWidgetId) ?: store.pending ?: WidgetConfig(WidgetContent(WidgetType.NextPrayer))
 
         setContent {
-            AtharTheme {
+            AtharFontsTheme {
                 val haze = remember { HazeState() }
                 CompositionLocalProvider(LocalHazeState provides haze) {
                     Box(Modifier.fillMaxSize()) {

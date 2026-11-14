@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.font.FontFamily
 import com.athar.app.core.designsystem.glass.GlassStyle
 import com.athar.app.core.designsystem.glass.LocalGlassStyle
@@ -23,10 +24,14 @@ private val AtharColorScheme = darkColorScheme(
     error = AtharColors.Rose,
 )
 
+/** Font for Quran verses, adhkar and Hijri dates (user-selectable). */
+val LocalDecorativeFont = staticCompositionLocalOf { Amiri }
+
 @Composable
 fun AtharTheme(
     glassStyle: GlassStyle = GlassStyle(),
     fontFamily: FontFamily = Tajawal,
+    decorativeFamily: FontFamily = Amiri,
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(
@@ -36,6 +41,7 @@ fun AtharTheme(
         CompositionLocalProvider(
             LocalContentColor provides AtharColors.TextPrimary,
             LocalGlassStyle provides glassStyle,
+            LocalDecorativeFont provides decorativeFamily,
             content = content,
         )
     }

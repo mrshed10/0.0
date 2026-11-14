@@ -2,6 +2,7 @@ package com.athar.app.core.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.athar.app.core.fonts.FontRegistry
 import com.athar.app.core.region.Cities
 import com.athar.app.core.region.Country
 import com.athar.app.feature.prayer.AsrMadhab
@@ -39,6 +40,13 @@ data class GeneralPrefs(
     val country: Country,
     val salaryTone: String?,
     val reminderTone: String?,
+)
+
+/** App fonts: Arabic UI, optional separate Latin font, and verses/adhkar font. */
+data class FontPrefs(
+    val uiId: String,
+    val latinId: String?,
+    val decorativeId: String,
 )
 
 data class TasbihState(
@@ -162,6 +170,26 @@ class AppSettings(context: Context) {
         todayEpochDay = prefs.getLong("tasbih_day", 0),
         lifetime = prefs.getLong("tasbih_lifetime", 0),
     )
+
+    // --- fonts ---
+    private val _fonts = MutableStateFlow(
+        FontPrefs(
+            uiId = prefs.getString("font_ui", FontRegistry.DEFAULT_UI) ?: FontRegistry.DEFAULT_UI,
+            latinId = prefs.getString("font_latin", null),
+            decorativeId = prefs.getString("font_deco", FontRegistry.DEFAULT_DECORATIVE) ?: FontRegistry.DEFAULT_DECORATIVE,
+        ),
+    )
+    val fonts: StateFlow<FontPrefs> = _fonts.asStateFlow()
+
+    fun updateFonts(transform: (FontPrefs) -> FontPrefs) {
+        val value = transform(_fonts.value)
+        prefs.edit()
+            .putString("font_ui", value.uiId)
+            .putString("font_latin", value.latinId)
+            .putString("font_deco", value.decorativeId)
+            .apply()
+        _fonts.value = value
+    }
 
     // --- lock-screen card ---
     private val _lockCard = MutableStateFlow(readLockCard())

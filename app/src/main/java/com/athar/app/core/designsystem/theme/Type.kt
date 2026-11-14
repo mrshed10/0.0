@@ -15,7 +15,7 @@ val Tajawal = FontFamily(
 )
 
 /** Classical Naskh font for Quran verses, adhkar and Hijri dates. */
-val Amiri = FontFamily(Font(R.font.amiri_regular, FontWeight.Normal))
+val Amiri = FontFamily(Font(R.font.amiri_regular, FontWeight.Normal), Font(R.font.amiri_bold, FontWeight.Bold))
 
 private fun TextStyle.withFamily(family: FontFamily) = copy(fontFamily = family)
 

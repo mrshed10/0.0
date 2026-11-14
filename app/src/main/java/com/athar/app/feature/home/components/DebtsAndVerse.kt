@@ -26,7 +26,7 @@ import com.athar.app.R
 import com.athar.app.core.region.LocalCurrency
 import com.athar.app.core.designsystem.component.CardHeader
 import com.athar.app.core.designsystem.glass.GlassCard
-import com.athar.app.core.designsystem.theme.Amiri
+import com.athar.app.core.designsystem.theme.LocalDecorativeFont
 import com.athar.app.core.designsystem.theme.AtharColors
 import com.athar.app.core.format.Money
 import com.athar.app.core.format.formatNumber
@@ -98,7 +98,7 @@ fun VerseCard(verse: SpiritualContent.Verse, modifier: Modifier = Modifier) {
         Text(
             "﴿ ${verse.ar} ﴾",
             style = MaterialTheme.typography.bodyLarge.copy(
-                fontFamily = Amiri,
+                fontFamily = LocalDecorativeFont.current,
                 fontSize = 24.sp,
                 lineHeight = 42.sp,
                 textAlign = TextAlign.Center,

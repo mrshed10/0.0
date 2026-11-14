@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.athar.app.R
 import com.athar.app.core.designsystem.component.GlassIconButton
-import com.athar.app.core.designsystem.theme.Amiri
+import com.athar.app.core.designsystem.theme.LocalDecorativeFont
 import com.athar.app.core.designsystem.theme.AtharColors
 import com.athar.app.core.format.currentLocale
 import com.athar.app.core.format.displayName
@@ -48,7 +48,7 @@ fun HomeHeader(today: LocalDate, onOpenSettings: () -> Unit, modifier: Modifier 
             )
             Text(
                 today.formatHijri(),
-                style = MaterialTheme.typography.titleMedium.copy(fontFamily = Amiri),
+                style = MaterialTheme.typography.titleMedium.copy(fontFamily = LocalDecorativeFont.current),
                 color = AtharColors.Gold,
             )
         }

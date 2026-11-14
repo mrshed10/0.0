@@ -59,7 +59,7 @@ import com.athar.app.core.designsystem.component.GlassSegmented
 import com.athar.app.core.designsystem.component.GlassTextField
 import com.athar.app.core.designsystem.glass.GlassCard
 import com.athar.app.core.designsystem.glass.GlassSheet
-import com.athar.app.core.designsystem.theme.Amiri
+import com.athar.app.core.designsystem.theme.LocalDecorativeFont
 import com.athar.app.core.designsystem.theme.AtharColors
 import com.athar.app.core.format.currentLocale
 import com.athar.app.core.format.formatNumber
@@ -107,7 +107,7 @@ fun TasbihPanel(
         GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Violet, horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 dhikr.ar,
-                style = MaterialTheme.typography.headlineSmall.copy(fontFamily = Amiri),
+                style = MaterialTheme.typography.headlineSmall.copy(fontFamily = LocalDecorativeFont.current),
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(16.dp))
@@ -236,7 +236,7 @@ fun AdhkarPanel() {
             ) {
                 Text(
                     dhikr.ar,
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = Amiri),
+                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = LocalDecorativeFont.current),
                     color = if (done) AtharColors.TextTertiary else AtharColors.TextPrimary,
                 )
                 if (locale.language != "ar") {

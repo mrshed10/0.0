@@ -6,7 +6,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
-import com.athar.app.core.designsystem.theme.AtharTheme
+import com.athar.app.core.designsystem.theme.AtharFontsTheme
 import com.athar.app.navigation.AtharApp
 
 /** FragmentActivity (a ComponentActivity) so BiometricPrompt can attach. */
@@ -19,7 +19,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         val startTab = intent?.getStringExtra(EXTRA_TAB)
         setContent {
-            AtharTheme {
+            AtharFontsTheme {
                 AtharApp(startTab = startTab)
             }
         }

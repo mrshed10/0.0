@@ -322,6 +322,20 @@
     <string name="lock_card_body">تعرض عنصراً على شاشة القفل، مع عدّاد مباشر للصلاة القادمة.</string>
     <string name="lock_card_note">هواتف سامسونج لا تسمح بويدجت التطبيقات الأخرى على شاشة القفل، لذلك يستخدم أثر إشعاراً صامتاً يظهر عليها.</string>
 
+    <string name="fonts_title">الخطوط</string>
+    <string name="font_ui">خط الواجهة العربي</string>
+    <string name="font_latin">خط الإنجليزية</string>
+    <string name="font_decorative">خط الآيات والأذكار</string>
+    <string name="font_same_as_arabic">مثل الخط العربي</string>
+    <string name="font_import_arabic">استيراد خط عربي</string>
+    <string name="font_import_latin">استيراد خط إنجليزي</string>
+    <string name="fonts_hint">استورد أي ملف خط TTF أو OTF، مثل خط ثلث أو ديواني تملكه. تُستخدم الخطوط في التطبيق ويمكن اختيارها لكل ويدجت.</string>
+    <string name="font_imported">تم استيراد الخط. اختره من القوائم بالأعلى.</string>
+    <string name="font_invalid">هذا الملف ليس خطاً صالحاً (TTF/OTF).</string>
+    <string name="widget_font">الخط</string>
+    <string name="font_system">خط النظام</string>
+    <string name="widget_font_hint">الخطوط المخصصة تُرسم كصور داخل الويدجت لتظهر تماماً كما في التطبيق.</string>
+
     <string-array name="hijri_months">
         <item>محرم</item>
         <item>صفر</item>
