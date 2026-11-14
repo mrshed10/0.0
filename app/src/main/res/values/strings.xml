@@ -1,6 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">مواعيد الرواتب</string>
-    <string name="widget_name">مواعيدي</string>
-    <string name="widget_description">الرواتب والخدمات والعدادات الشخصية بألوانك</string>
+    <string name="app_name">Athar</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_counters">Counters</string>
+    <string name="nav_tasks">Tasks</string>
+    <string name="nav_debts">Debts</string>
+    <string name="nav_prayer">Prayer</string>
+    <string name="coming_soon">This section is coming in the next steps</string>
+
+    <!-- Home -->
+    <string name="greeting">Assalamu alaikum</string>
+    <string name="settings">Settings</string>
+    <string name="pin_to_widget">Pin as widget</string>
+    <string name="pin_to_widget_soon">Widgets arrive in the widget step</string>
+    <string name="next_prayer">Next prayer</string>
+    <string name="in_time">in %1$s</string>
+    <string name="sample_data">Sample</string>
+    <string name="salary">Salary</string>
+    <string name="salary_country_sa">Saudi Arabia · 27th</string>
+    <string name="tasbih">Tasbih</string>
+    <string name="tasbih_hint">Tap to count</string>
+    <string name="counters">Counters</string>
+    <string name="today_tasks">Today\'s tasks</string>
+    <string name="tasks_done">%1$s of %2$s done</string>
+    <string name="habits">Habits</string>
+    <string name="debts">Debts</string>
+    <string name="debts_owed_to_me">Owed to me</string>
+    <string name="debts_i_owe">I owe</string>
+    <string name="debts_clients">%1$s people</string>
+    <string name="verse_of_day">Verse of the day</string>
+
+    <!-- Units -->
+    <string name="unit_days">days</string>
+    <string name="unit_day_short">d</string>
+    <string name="unit_hour_short">h</string>
+    <string name="unit_minute_short">m</string>
+    <string name="counter_until">until</string>
+    <string name="counter_since">since</string>
+    <string name="today">Today</string>
+    <string name="currency_sar">SAR</string>
+
+    <!-- Prayers -->
+    <string name="prayer_fajr">Fajr</string>
+    <string name="prayer_sunrise">Sunrise</string>
+    <string name="prayer_dhuhr">Dhuhr</string>
+    <string name="prayer_asr">Asr</string>
+    <string name="prayer_maghrib">Maghrib</string>
+    <string name="prayer_isha">Isha</string>
+
+    <!-- Sample content -->
+    <string name="sample_counter_ramadan">Ramadan 1448</string>
+    <string name="sample_counter_quit">Quit smoking</string>
+    <string name="sample_counter_trip">Umrah trip</string>
+    <string name="sample_task_1">Pay the electricity bill</string>
+    <string name="sample_task_2">Read 10 pages</string>
+    <string name="sample_task_3">Call mom</string>
+    <string name="sample_task_4">Review the weekly plan</string>
+    <string name="sample_habit_quran">Wird</string>
+    <string name="sample_habit_walk">Walk</string>
+    <string name="sample_habit_water">Water</string>
+    <string name="sample_habit_sleep">Early sleep</string>
+    <string name="sample_verse">So remember Me; I will remember you.</string>
+    <string name="sample_verse_ref">Al-Baqarah · 152</string>
+
+    <string-array name="hijri_months">
+        <item>Muharram</item>
+        <item>Safar</item>
+        <item>Rabi\' al-Awwal</item>
+        <item>Rabi\' al-Thani</item>
+        <item>Jumada al-Ula</item>
+        <item>Jumada al-Akhirah</item>
+        <item>Rajab</item>
+        <item>Sha\'ban</item>
+        <item>Ramadan</item>
+        <item>Shawwal</item>
+        <item>Dhu al-Qa\'dah</item>
+        <item>Dhu al-Hijjah</item>
+    </string-array>
+    <string name="hijri_suffix">AH</string>
 </resources>

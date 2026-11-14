@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">أثر</string>
+
+    <string name="nav_home">الرئيسية</string>
+    <string name="nav_counters">العدادات</string>
+    <string name="nav_tasks">المهام</string>
+    <string name="nav_debts">الديون</string>
+    <string name="nav_prayer">الصلاة</string>
+    <string name="coming_soon">هذا القسم قادم في الخطوات التالية</string>
+
+    <string name="greeting">السلام عليكم</string>
+    <string name="settings">الإعدادات</string>
+    <string name="pin_to_widget">تثبيت كودجت</string>
+    <string name="pin_to_widget_soon">الويدجت قادم في خطوة الويدجت</string>
+    <string name="next_prayer">الصلاة القادمة</string>
+    <string name="in_time">بعد %1$s</string>
+    <string name="sample_data">تجريبي</string>
+    <string name="salary">الراتب</string>
+    <string name="salary_country_sa">السعودية · يوم 27</string>
+    <string name="tasbih">السبحة</string>
+    <string name="tasbih_hint">اضغط للتسبيح</string>
+    <string name="counters">العدادات</string>
+    <string name="today_tasks">مهام اليوم</string>
+    <string name="tasks_done">أُنجز %1$s من %2$s</string>
+    <string name="habits">العادات</string>
+    <string name="debts">الديون</string>
+    <string name="debts_owed_to_me">لي</string>
+    <string name="debts_i_owe">عليّ</string>
+    <string name="debts_clients">%1$s أشخاص</string>
+    <string name="verse_of_day">آية اليوم</string>
+
+    <string name="unit_days">يوم</string>
+    <string name="unit_day_short">ي</string>
+    <string name="unit_hour_short">س</string>
+    <string name="unit_minute_short">د</string>
+    <string name="counter_until">متبقٍ</string>
+    <string name="counter_since">منذ</string>
+    <string name="today">اليوم</string>
+    <string name="currency_sar">ر.س</string>
+
+    <string name="prayer_fajr">الفجر</string>
+    <string name="prayer_sunrise">الشروق</string>
+    <string name="prayer_dhuhr">الظهر</string>
+    <string name="prayer_asr">العصر</string>
+    <string name="prayer_maghrib">المغرب</string>
+    <string name="prayer_isha">العشاء</string>
+
+    <string name="sample_counter_ramadan">رمضان 1448</string>
+    <string name="sample_counter_quit">ترك التدخين</string>
+    <string name="sample_counter_trip">رحلة العمرة</string>
+    <string name="sample_task_1">سداد فاتورة الكهرباء</string>
+    <string name="sample_task_2">قراءة 10 صفحات</string>
+    <string name="sample_task_3">الاتصال بالوالدة</string>
+    <string name="sample_task_4">مراجعة خطة الأسبوع</string>
+    <string name="sample_habit_quran">الورد</string>
+    <string name="sample_habit_walk">المشي</string>
+    <string name="sample_habit_water">الماء</string>
+    <string name="sample_habit_sleep">نوم مبكر</string>
+    <string name="sample_verse">فَاذْكُرُونِي أَذْكُرْكُمْ وَاشْكُرُوا لِي وَلَا تَكْفُرُونِ</string>
+    <string name="sample_verse_ref">البقرة · 152</string>
+
+    <string-array name="hijri_months">
+        <item>محرم</item>
+        <item>صفر</item>
+        <item>ربيع الأول</item>
+        <item>ربيع الآخر</item>
+        <item>جمادى الأولى</item>
+        <item>جمادى الآخرة</item>
+        <item>رجب</item>
+        <item>شعبان</item>
+        <item>رمضان</item>
+        <item>شوال</item>
+        <item>ذو القعدة</item>
+        <item>ذو الحجة</item>
+    </string-array>
+    <string name="hijri_suffix">هـ</string>
+</resources>
