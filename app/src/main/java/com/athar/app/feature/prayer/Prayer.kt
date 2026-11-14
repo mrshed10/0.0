@@ -2,8 +2,18 @@ package com.athar.app.feature.prayer
 
 import androidx.annotation.StringRes
 import com.athar.app.R
+import com.athar.app.core.calendar.HijriCalendar
+import com.batoulapps.adhan.CalculationMethod
+import com.batoulapps.adhan.Coordinates
+import com.batoulapps.adhan.Madhab
+import com.batoulapps.adhan.PrayerTimes
+import com.batoulapps.adhan.Qibla
+import com.batoulapps.adhan.data.DateComponents
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
+import java.util.Date
 
 enum class Prayer(@StringRes val label: Int, val isObligatory: Boolean) {
     Fajr(R.string.prayer_fajr, true),
@@ -14,24 +24,74 @@ enum class Prayer(@StringRes val label: Int, val isObligatory: Boolean) {
     Isha(R.string.prayer_isha, true),
 }
 
+enum class PrayerMethod(@StringRes val label: Int, internal val adhan: CalculationMethod) {
+    UmmAlQura(R.string.method_umm_al_qura, CalculationMethod.UMM_AL_QURA),
+    MuslimWorldLeague(R.string.method_mwl, CalculationMethod.MUSLIM_WORLD_LEAGUE),
+    Egyptian(R.string.method_egyptian, CalculationMethod.EGYPTIAN),
+    Karachi(R.string.method_karachi, CalculationMethod.KARACHI),
+    Dubai(R.string.method_dubai, CalculationMethod.DUBAI),
+    Kuwait(R.string.method_kuwait, CalculationMethod.KUWAIT),
+    Qatar(R.string.method_qatar, CalculationMethod.QATAR),
+    NorthAmerica(R.string.method_isna, CalculationMethod.NORTH_AMERICA),
+    Singapore(R.string.method_singapore, CalculationMethod.SINGAPORE),
+}
+
+/** Asr: Shafi/Maliki/Hanbali (shadow = 1x) or Hanafi (2x). */
+enum class AsrMadhab { Standard, Hanafi }
+
 data class PrayerTime(val prayer: Prayer, val time: LocalTime)
 
 data class NextPrayer(val prayer: Prayer, val at: LocalDateTime)
 
+/** Offline calculation via the adhan library (astronomical, no internet). */
+object PrayerCalculator {
+    fun times(
+        date: LocalDate,
+        latitude: Double,
+        longitude: Double,
+        method: PrayerMethod,
+        madhab: AsrMadhab,
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): List<PrayerTime> {
+        val params = method.adhan.parameters
+        params.madhab = if (madhab == AsrMadhab.Hanafi) Madhab.HANAFI else Madhab.SHAFI
+        val p = PrayerTimes(
+            Coordinates(latitude, longitude),
+            DateComponents(date.year, date.monthValue, date.dayOfMonth),
+            params,
+        )
+        fun local(d: Date): LocalTime = d.toInstant().atZone(zone).toLocalTime().withSecond(0).withNano(0)
+
+        var isha = local(p.isha)
+        // Umm al-Qura: Isha is 120 min after Maghrib during Ramadan (90 otherwise).
+        if (method == PrayerMethod.UmmAlQura && HijriCalendar.fromGregorian(date).month == 9) {
+            isha = isha.plusMinutes(30)
+        }
+        return listOf(
+            PrayerTime(Prayer.Fajr, local(p.fajr)),
+            PrayerTime(Prayer.Sunrise, local(p.sunrise)),
+            PrayerTime(Prayer.Dhuhr, local(p.dhuhr)),
+            PrayerTime(Prayer.Asr, local(p.asr)),
+            PrayerTime(Prayer.Maghrib, local(p.maghrib)),
+            PrayerTime(Prayer.Isha, isha),
+        )
+    }
+
+    /** Degrees clockwise from true north. */
+    fun qibla(latitude: Double, longitude: Double): Double = Qibla(Coordinates(latitude, longitude)).direction
+}
+
 object PrayerSchedule {
     /**
-     * The next obligatory prayer after [now]; after Isha it is tomorrow's Fajr.
-     * (Uses today's times for tomorrow; the real calculator will supply them.)
+     * The next obligatory prayer after [now]. After Isha it is tomorrow's Fajr,
+     * taken from [tomorrow] when given (otherwise today's Fajr time).
      */
-    fun next(now: LocalDateTime, times: List<PrayerTime>): NextPrayer {
+    fun next(now: LocalDateTime, times: List<PrayerTime>, tomorrow: List<PrayerTime>? = null): NextPrayer {
         val obligatory = times.filter { it.prayer.isObligatory }.sortedBy { it.time }
         require(obligatory.isNotEmpty()) { "No prayer times" }
         val later = obligatory.firstOrNull { it.time.isAfter(now.toLocalTime()) }
-        return if (later != null) {
-            NextPrayer(later.prayer, now.toLocalDate().atTime(later.time))
-        } else {
-            val first = obligatory.first()
-            NextPrayer(first.prayer, now.toLocalDate().plusDays(1).atTime(first.time))
-        }
+        if (later != null) return NextPrayer(later.prayer, now.toLocalDate().atTime(later.time))
+        val fajr = tomorrow?.firstOrNull { it.prayer == Prayer.Fajr } ?: obligatory.first()
+        return NextPrayer(fajr.prayer, now.toLocalDate().plusDays(1).atTime(fajr.time))
     }
 }

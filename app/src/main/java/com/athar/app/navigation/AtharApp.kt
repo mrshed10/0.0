@@ -20,6 +20,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.athar.app.R
@@ -46,13 +48,17 @@ import com.athar.app.feature.habits.HabitsRoute
 import com.athar.app.feature.settings.SettingsRoute
 import com.athar.app.feature.tasks.TasksRoute
 import com.athar.app.feature.home.HomeRoute
-import com.athar.app.feature.placeholder.ComingSoonScreen
+import com.athar.app.AtharApplication
+import com.athar.app.core.region.LocalCurrency
+import com.athar.app.feature.dates.RemindersRoute
+import com.athar.app.feature.dates.SalariesRoute
+import com.athar.app.feature.prayer.PrayerTabRoute
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 
 enum class AtharTab(@StringRes val label: Int, val icon: ImageVector) {
     Home(R.string.nav_home, Icons.Rounded.Home),
-    Counters(R.string.nav_counters, Icons.Rounded.HourglassTop),
+    Dates(R.string.nav_dates, Icons.Rounded.HourglassTop),
     Tasks(R.string.nav_tasks, Icons.Rounded.TaskAlt),
     Debts(R.string.nav_debts, Icons.Rounded.AccountBalanceWallet),
     Prayer(R.string.nav_prayer, Icons.Rounded.Mosque),
@@ -64,6 +70,7 @@ fun AtharApp() {
     val hazeState = remember { HazeState() }
     var tab by rememberSaveable { mutableStateOf(AtharTab.Home) }
     var tasksPage by rememberSaveable { mutableIntStateOf(0) }
+    var datesPage by rememberSaveable { mutableIntStateOf(0) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -72,9 +79,13 @@ fun AtharApp() {
 
     val bottomBar = remember { BottomBarController() }
 
+    val context = LocalContext.current
+    val general by (context.applicationContext as AtharApplication).container.settings.general.collectAsState()
+
     CompositionLocalProvider(
         LocalHazeState provides hazeState,
         LocalBottomBarController provides bottomBar,
+        LocalCurrency provides stringResource(general.country.currency),
     ) {
         Box(Modifier.fillMaxSize()) {
             AuroraBackground(hazeState)
@@ -86,12 +97,31 @@ fun AtharApp() {
                     AtharTab.Home -> HomeRoute(
                         onPinToWidget = showPinMessage,
                         onOpenSettings = { showSettings = true },
-                        onOpenCounters = { tab = AtharTab.Counters },
+                        onOpenCounters = { datesPage = 0; tab = AtharTab.Dates },
+                        onOpenSalaries = { datesPage = 1; tab = AtharTab.Dates },
+                        onOpenPrayer = { tab = AtharTab.Prayer },
                         onOpenTasks = { tasksPage = 0; tab = AtharTab.Tasks },
                         onOpenHabits = { tasksPage = 1; tab = AtharTab.Tasks },
                         onOpenDebts = { tab = AtharTab.Debts },
                     )
-                    AtharTab.Counters -> CountersRoute()
+                    AtharTab.Dates -> {
+                        val switcher: @Composable () -> Unit = {
+                            GlassSegmented(
+                                options = listOf(
+                                    stringResource(R.string.counters),
+                                    stringResource(R.string.salaries),
+                                    stringResource(R.string.reminders),
+                                ),
+                                selectedIndex = datesPage,
+                                onSelect = { datesPage = it },
+                            )
+                        }
+                        when (datesPage) {
+                            0 -> CountersRoute(switcher)
+                            1 -> SalariesRoute(switcher)
+                            else -> RemindersRoute(switcher)
+                        }
+                    }
                     AtharTab.Tasks -> {
                         val switcher: @Composable () -> Unit = {
                             GlassSegmented(
@@ -103,7 +133,7 @@ fun AtharApp() {
                         if (tasksPage == 0) TasksRoute(switcher) else HabitsRoute(switcher)
                     }
                     AtharTab.Debts -> DebtsRoute()
-                    else -> ComingSoonScreen(stringResource(tab.label), tab.icon)
+                    AtharTab.Prayer -> PrayerTabRoute()
                 }
             }
 

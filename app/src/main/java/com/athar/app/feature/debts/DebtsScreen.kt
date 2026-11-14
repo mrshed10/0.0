@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.athar.app.R
+import com.athar.app.core.region.LocalCurrency
 import com.athar.app.core.designsystem.component.EmptyState
 import com.athar.app.core.designsystem.component.GlassButton
 import com.athar.app.core.designsystem.component.GlassIconButton
@@ -210,7 +211,7 @@ private fun AmountColumn(label: String, minor: Long, color: Color, modifier: Mod
                 modifier = Modifier.alignByBaseline(),
             )
             Text(
-                " " + stringResource(R.string.currency_sar),
+                " " + LocalCurrency.current,
                 style = MaterialTheme.typography.labelMedium,
                 color = AtharColors.TextSecondary,
                 modifier = Modifier.alignByBaseline(),
@@ -323,7 +324,7 @@ private fun PersonLedger(
                         modifier = Modifier.alignByBaseline(),
                     )
                     Text(
-                        " " + stringResource(R.string.currency_sar),
+                        " " + LocalCurrency.current,
                         style = MaterialTheme.typography.titleSmall,
                         color = AtharColors.TextSecondary,
                         modifier = Modifier.alignByBaseline(),

@@ -139,3 +139,49 @@ interface DebtDao {
     @Query("DELETE FROM people")
     suspend fun clearPeople()
 }
+
+@Dao
+interface PlannerDao {
+    @Query("SELECT * FROM salary_sources ORDER BY created_at ASC")
+    fun observeSalaries(): Flow<List<SalarySourceEntity>>
+
+    @Upsert
+    suspend fun upsertSalary(source: SalarySourceEntity): Long
+
+    @Query("DELETE FROM salary_sources WHERE id = :id")
+    suspend fun deleteSalary(id: Long)
+
+    @Query("SELECT COUNT(*) FROM salary_sources")
+    suspend fun salaryCount(): Int
+
+    @Query("SELECT * FROM reminders ORDER BY created_at ASC")
+    fun observeReminders(): Flow<List<ReminderEntity>>
+
+    @Upsert
+    suspend fun upsertReminder(reminder: ReminderEntity): Long
+
+    @Query("DELETE FROM reminders WHERE id = :id")
+    suspend fun deleteReminder(id: Long)
+
+    @Query("UPDATE reminders SET enabled = :enabled WHERE id = :id")
+    suspend fun setReminderEnabled(id: Long, enabled: Boolean)
+
+    // Backup
+    @Query("SELECT * FROM salary_sources")
+    suspend fun allSalaries(): List<SalarySourceEntity>
+
+    @Query("SELECT * FROM reminders")
+    suspend fun allReminders(): List<ReminderEntity>
+
+    @Insert
+    suspend fun insertSalaries(items: List<SalarySourceEntity>)
+
+    @Insert
+    suspend fun insertReminders(items: List<ReminderEntity>)
+
+    @Query("DELETE FROM salary_sources")
+    suspend fun clearSalaries()
+
+    @Query("DELETE FROM reminders")
+    suspend fun clearReminders()
+}

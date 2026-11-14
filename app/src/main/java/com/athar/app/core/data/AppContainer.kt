@@ -6,18 +6,42 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.athar.app.AtharApplication
 import com.athar.app.core.backup.BackupManager
 import com.athar.app.core.database.AtharDatabase
+import com.athar.app.core.notify.AlarmScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 
 /** Manual dependency container; can be swapped for Hilt when the app grows. */
 class AppContainer(context: Context) {
     private val database = AtharDatabase.build(context)
 
+    val settings = AppSettings(context)
     val counterRepository = CounterRepository(database.counterDao())
     val taskRepository = TaskRepository(database.taskDao())
     val habitRepository = HabitRepository(database.habitDao())
     val debtRepository = DebtRepository(database.debtDao())
+    val plannerRepository = PlannerRepository(database.plannerDao())
     val backupManager = BackupManager(database)
-    val settings = AppSettings(context)
     val debtsSession = DebtsSession()
+    val alarmScheduler = AlarmScheduler(context, settings, plannerRepository)
+
+    /** Re-plans all notifications whenever anything they depend on changes. */
+    fun keepAlarmsInSync(scope: CoroutineScope) {
+        scope.launch {
+            combine(
+                settings.prayer,
+                settings.general,
+                plannerRepository.salaries,
+                plannerRepository.reminders,
+            ) { a, b, c, d -> listOf(a, b, c, d) }
+                .collectLatest {
+                    delay(300) // coalesce bursts of edits
+                    runCatching { alarmScheduler.rescheduleAll() }
+                }
+        }
+    }
 }
 
 /** For use inside `viewModelFactory { initializer { ... } }`. */

@@ -38,12 +38,25 @@ import com.athar.app.feature.tasks.Task
 import dev.chrisbanes.haze.HazeState
 import java.time.LocalDateTime
 
-/** Connects [HomeViewModel] to the stateless [HomeScreen]. */
+/** Navigation callbacks from the home screen. */
+data class HomeNavigation(
+    val onPinToWidget: () -> Unit = {},
+    val onOpenSettings: () -> Unit = {},
+    val onOpenCounters: () -> Unit = {},
+    val onOpenSalaries: () -> Unit = {},
+    val onOpenTasks: () -> Unit = {},
+    val onOpenHabits: () -> Unit = {},
+    val onOpenDebts: () -> Unit = {},
+    val onOpenPrayer: () -> Unit = {},
+)
+
 @Composable
 fun HomeRoute(
     onPinToWidget: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCounters: () -> Unit,
+    onOpenSalaries: () -> Unit,
+    onOpenPrayer: () -> Unit,
     onOpenTasks: () -> Unit,
     onOpenHabits: () -> Unit,
     onOpenDebts: () -> Unit,
@@ -52,32 +65,24 @@ fun HomeRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     HomeScreen(
         state = state,
+        nav = HomeNavigation(
+            onPinToWidget, onOpenSettings, onOpenCounters, onOpenSalaries, onOpenTasks, onOpenHabits, onOpenDebts, onOpenPrayer,
+        ),
         onToggleTask = viewModel::toggleTask,
         onToggleHabit = viewModel::toggleHabit,
         onTasbih = viewModel::incrementTasbih,
         onTasbihReset = viewModel::resetTasbih,
-        onPinToWidget = onPinToWidget,
-        onOpenSettings = onOpenSettings,
-        onOpenCounters = onOpenCounters,
-        onOpenTasks = onOpenTasks,
-        onOpenHabits = onOpenHabits,
-        onOpenDebts = onOpenDebts,
     )
 }
 
 @Composable
 fun HomeScreen(
     state: HomeUiState,
+    nav: HomeNavigation,
     onToggleTask: (Task) -> Unit,
     onToggleHabit: (Long) -> Unit,
     onTasbih: () -> Unit,
     onTasbihReset: () -> Unit,
-    onPinToWidget: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenCounters: () -> Unit,
-    onOpenTasks: () -> Unit,
-    onOpenHabits: () -> Unit,
-    onOpenDebts: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -85,38 +90,36 @@ fun HomeScreen(
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = top + 12.dp,
-            bottom = bottom + 120.dp, // room for the floating glass bar
-        ),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = bottom + 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item(key = "header") { HomeHeader(state.today, onOpenSettings) }
-        item(key = "prayer") {
-            NextPrayerCard(
-                now = state.now,
-                prayers = state.prayers,
-                next = state.nextPrayer,
-                isSample = state.prayersAreSample,
-                onPin = onPinToWidget,
-            )
+        item(key = "header") { HomeHeader(state.today, nav.onOpenSettings) }
+        state.nextPrayer?.let { next ->
+            item(key = "prayer") {
+                NextPrayerCard(
+                    now = state.now,
+                    prayers = state.prayers,
+                    next = next,
+                    cityId = state.cityId,
+                    onPin = nav.onPinToWidget,
+                    onOpen = nav.onOpenPrayer,
+                )
+            }
         }
         item(key = "quick") {
             Row(
                 Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                SalaryCard(state.today, state.nextPayDate, onPinToWidget, Modifier.weight(1f))
-                TasbihCard(state.tasbihCount, onTasbih, onTasbihReset, Modifier.weight(1f))
+                SalaryCard(state.today, state.nextSalary, nav.onPinToWidget, nav.onOpenSalaries, Modifier.weight(1f))
+                TasbihCard(state.tasbih, onTasbih, onTasbihReset, Modifier.weight(1f))
             }
         }
-        item(key = "counters") { CountersSection(state.today, state.counters, onPinToWidget, onOpenCounters) }
-        item(key = "tasks") { TasksCard(state.todayTasks, state.today, onToggleTask, onPinToWidget, onOpenTasks) }
-        item(key = "habits") { HabitsCard(state.habits, onToggleHabit, onPinToWidget, onOpenHabits) }
-        item(key = "debts") { DebtsCard(state.debts, onPinToWidget, onOpenDebts) }
-        item(key = "verse") { VerseCard() }
+        item(key = "counters") { CountersSection(state.today, state.counters, nav.onPinToWidget, nav.onOpenCounters) }
+        item(key = "tasks") { TasksCard(state.todayTasks, state.today, onToggleTask, nav.onPinToWidget, nav.onOpenTasks) }
+        item(key = "habits") { HabitsCard(state.habits, onToggleHabit, nav.onPinToWidget, nav.onOpenHabits) }
+        item(key = "debts") { DebtsCard(state.debts, nav.onPinToWidget, nav.onOpenDebts) }
+        item(key = "verse") { VerseCard(state.verse) }
     }
 }
 
@@ -129,17 +132,12 @@ private fun HomeScreenPreview() {
             Box {
                 AuroraBackground(hazeState)
                 HomeScreen(
-                    state = SampleData.homeState(LocalDateTime.now()),
+                    state = HomeUiState(now = LocalDateTime.now()),
+                    nav = HomeNavigation(),
                     onToggleTask = {},
                     onToggleHabit = {},
                     onTasbih = {},
                     onTasbihReset = {},
-                    onPinToWidget = {},
-                    onOpenSettings = {},
-                    onOpenCounters = {},
-                    onOpenTasks = {},
-                    onOpenHabits = {},
-                    onOpenDebts = {},
                 )
             }
         }

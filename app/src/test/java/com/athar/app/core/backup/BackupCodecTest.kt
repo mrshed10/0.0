@@ -5,6 +5,8 @@ import com.athar.app.core.database.DebtEntryEntity
 import com.athar.app.core.database.HabitEntity
 import com.athar.app.core.database.HabitLogEntity
 import com.athar.app.core.database.PersonEntity
+import com.athar.app.core.database.ReminderEntity
+import com.athar.app.core.database.SalarySourceEntity
 import com.athar.app.core.database.TaskEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,7 +24,19 @@ class BackupCodecTest {
         habitLogs = listOf(HabitLogEntity(1, 20_400), HabitLogEntity(1, 20_401)),
         people = listOf(PersonEntity(1, "علي", "0500000000", 444)),
         debtEntries = listOf(DebtEntryEntity(1, 1, "Gave", 150_050, "قرض", 20_400, 555)),
+        salaries = listOf(
+            SalarySourceEntity(1, "رواتب الموظفين", 27, "Gregorian", "Before", 1, null, 666),
+            SalarySourceEntity(2, "Hijri pay", 1, "Hijri", "None", -1, "content://media/1", 667),
+        ),
+        reminders = listOf(ReminderEntity(1, "دواء", 20_400, 540, "Daily", "Gregorian", null, true, 777)),
     )
+
+    @Test
+    fun oldBackupWithoutNewTablesStillLoads() {
+        val raw = BackupCodec.encode(data.copy(salaries = emptyList(), reminders = emptyList()))
+            .replace("\"salaries\"", "\"x_salaries\"").replace("\"reminders\"", "\"x_reminders\"")
+        assertEquals(data.copy(salaries = emptyList(), reminders = emptyList()), BackupCodec.decode(raw))
+    }
 
     @Test
     fun plainRoundTrip() {

@@ -5,6 +5,8 @@ import com.athar.app.core.database.DebtEntryEntity
 import com.athar.app.core.database.HabitEntity
 import com.athar.app.core.database.HabitLogEntity
 import com.athar.app.core.database.PersonEntity
+import com.athar.app.core.database.ReminderEntity
+import com.athar.app.core.database.SalarySourceEntity
 import com.athar.app.core.database.TaskEntity
 import org.json.JSONArray
 import org.json.JSONException
@@ -26,9 +28,11 @@ data class BackupData(
     val habitLogs: List<HabitLogEntity> = emptyList(),
     val people: List<PersonEntity> = emptyList(),
     val debtEntries: List<DebtEntryEntity> = emptyList(),
+    val salaries: List<SalarySourceEntity> = emptyList(),
+    val reminders: List<ReminderEntity> = emptyList(),
 ) {
     val itemCount: Int
-        get() = counters.size + tasks.size + habits.size + people.size + debtEntries.size
+        get() = counters.size + tasks.size + habits.size + people.size + debtEntries.size + salaries.size + reminders.size
 }
 
 sealed class BackupException(message: String) : Exception(message) {
@@ -150,6 +154,16 @@ object BackupCodec {
                 .put("amount", it.amountMinor).put("note", it.note).put("day", it.epochDay)
                 .put("createdAt", it.createdAt)
         })
+        .put("salaries", array(d.salaries) {
+            JSONObject().put("id", it.id).put("name", it.name).put("payDay", it.payDay).put("calendar", it.calendar)
+                .put("shift", it.shift).put("remind", it.remindDaysBefore).put("tone", it.tone ?: JSONObject.NULL)
+                .put("createdAt", it.createdAt)
+        })
+        .put("reminders", array(d.reminders) {
+            JSONObject().put("id", it.id).put("title", it.title).put("day", it.epochDay).put("minute", it.minuteOfDay)
+                .put("repeat", it.repeatRule).put("calendar", it.calendar).put("tone", it.tone ?: JSONObject.NULL)
+                .put("enabled", it.enabled).put("createdAt", it.createdAt)
+        })
 
     private fun fromJson(o: JSONObject) = BackupData(
         counters = list(o, "counters") {
@@ -177,6 +191,19 @@ object BackupCodec {
                 it.optString("note", ""), it.getLong("day"), it.getLong("createdAt"),
             )
         },
+        salaries = list(o, "salaries") {
+            SalarySourceEntity(
+                it.getLong("id"), it.getString("name"), it.getInt("payDay"), it.getString("calendar"),
+                it.getString("shift"), it.getInt("remind"), it.optStringOrNull("tone"), it.getLong("createdAt"),
+            )
+        },
+        reminders = list(o, "reminders") {
+            ReminderEntity(
+                it.getLong("id"), it.getString("title"), it.getLong("day"), it.getInt("minute"),
+                it.getString("repeat"), it.getString("calendar"), it.optStringOrNull("tone"),
+                it.getBoolean("enabled"), it.getLong("createdAt"),
+            )
+        },
     )
 
     private fun <T> array(items: List<T>, map: (T) -> JSONObject): JSONArray =
@@ -188,4 +215,5 @@ object BackupCodec {
     }
 
     private fun JSONObject.optLongOrNull(key: String): Long? = if (isNull(key)) null else getLong(key)
+    private fun JSONObject.optStringOrNull(key: String): String? = if (isNull(key)) null else getString(key)
 }

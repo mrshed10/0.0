@@ -65,6 +65,9 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // Prayer times (offline astronomical calculation)
+    implementation(libs.adhan)
+
     // Fingerprint / screen-lock protection for debts
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)

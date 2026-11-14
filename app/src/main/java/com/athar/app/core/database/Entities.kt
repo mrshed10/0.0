@@ -89,3 +89,28 @@ data class DebtEntryEntity(
     @ColumnInfo(name = "epoch_day") val epochDay: Long,
     @ColumnInfo(name = "created_at") val createdAt: Long,
 )
+
+@Entity(tableName = "salary_sources")
+data class SalarySourceEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    @ColumnInfo(name = "pay_day") val payDay: Int,
+    val calendar: String,
+    val shift: String,
+    @ColumnInfo(name = "remind_days_before") val remindDaysBefore: Int,
+    val tone: String?,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)
+
+@Entity(tableName = "reminders")
+data class ReminderEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    @ColumnInfo(name = "epoch_day") val epochDay: Long,
+    @ColumnInfo(name = "minute_of_day") val minuteOfDay: Int,
+    @ColumnInfo(name = "repeat_rule") val repeatRule: String,
+    val calendar: String,
+    val tone: String?,
+    val enabled: Boolean,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+)

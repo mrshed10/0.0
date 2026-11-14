@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.athar.app.R
+import com.athar.app.core.region.LocalCurrency
 import com.athar.app.core.calendar.CalendarKind
 import com.athar.app.core.designsystem.component.ConfirmButton
 import com.athar.app.core.designsystem.component.FieldLabel
@@ -106,7 +107,7 @@ fun EntryEditorSheet(
             accent = accent,
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FieldLabel(stringResource(R.string.amount_label) + " (" + stringResource(R.string.currency_sar) + ")")
+            FieldLabel(stringResource(R.string.amount_label) + " (" + LocalCurrency.current + ")")
             GlassTextField(
                 amountText,
                 { amountText = it },

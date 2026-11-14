@@ -28,4 +28,11 @@ class PrayerScheduleTest {
         assertEquals(Prayer.Fajr, next.prayer)
         assertEquals(LocalDateTime.of(2026, 11, 15, 4, 57), next.at)
     }
+
+    @Test
+    fun afterIshaUsesTomorrowsTimesWhenGiven() {
+        val tomorrow = listOf(PrayerTime(Prayer.Fajr, LocalTime.of(4, 58)))
+        val next = PrayerSchedule.next(LocalDateTime.of(2026, 11, 14, 21, 0), times, tomorrow)
+        assertEquals(LocalDateTime.of(2026, 11, 15, 4, 58), next.at)
+    }
 }

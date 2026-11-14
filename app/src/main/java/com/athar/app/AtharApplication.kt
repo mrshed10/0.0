@@ -2,7 +2,16 @@ package com.athar.app
 
 import android.app.Application
 import com.athar.app.core.data.AppContainer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class AtharApplication : Application() {
     val container: AppContainer by lazy { AppContainer(this) }
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    override fun onCreate() {
+        super.onCreate()
+        container.keepAlarmsInSync(appScope)
+    }
 }

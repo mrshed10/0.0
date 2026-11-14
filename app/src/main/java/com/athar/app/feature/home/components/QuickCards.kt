@@ -24,17 +24,30 @@ import com.athar.app.core.designsystem.theme.AtharColors
 import com.athar.app.core.format.currentLocale
 import com.athar.app.core.format.formatGregorian
 import com.athar.app.core.format.formatNumber
+import com.athar.app.core.data.TasbihState
+import com.athar.app.feature.home.NextSalary
+import com.athar.app.feature.prayer.dhikr
+import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 @Composable
-fun SalaryCard(today: LocalDate, payDate: LocalDate, onPin: () -> Unit, modifier: Modifier = Modifier) {
+fun SalaryCard(
+    today: LocalDate,
+    salary: NextSalary?,
+    onPin: () -> Unit,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val locale = currentLocale()
-    val days = ChronoUnit.DAYS.between(today, payDate)
-
-    GlassCard(modifier.fillMaxHeight(), accent = AtharColors.Teal) {
+    GlassCard(modifier.fillMaxHeight(), accent = AtharColors.Teal, onClick = onOpen) {
         CardHeader(stringResource(R.string.salary), Icons.Rounded.Payments, tint = AtharColors.Teal, onPin = onPin)
         Spacer(Modifier.height(12.dp))
+        if (salary == null) {
+            Text(stringResource(R.string.add_salary), style = MaterialTheme.typography.bodyLarge, color = AtharColors.Teal)
+            return@GlassCard
+        }
+        val days = ChronoUnit.DAYS.between(today, salary.date)
         if (days == 0L) {
             Text(
                 stringResource(R.string.today),
@@ -59,27 +72,33 @@ fun SalaryCard(today: LocalDate, payDate: LocalDate, onPin: () -> Unit, modifier
             }
         }
         Text(
-            payDate.formatGregorian(locale, "EEEE d MMMM"),
+            salary.date.formatGregorian(locale, "EEEE d MMMM"),
             style = MaterialTheme.typography.bodySmall,
             color = AtharColors.TextSecondary,
         )
         Text(
-            stringResource(R.string.salary_country_sa),
+            salary.name,
             style = MaterialTheme.typography.labelSmall,
             color = AtharColors.TextTertiary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
-/** Tap to count, long-press to reset. A cycle is 33. */
+/** Tap to count, long-press to reset the round. Shares state with the Tasbih page. */
 @Composable
-fun TasbihCard(count: Int, onTap: () -> Unit, onReset: () -> Unit, modifier: Modifier = Modifier) {
+fun TasbihCard(state: TasbihState, onTap: () -> Unit, onReset: () -> Unit, modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
+    val dhikr = state.dhikr()
+    val target = dhikr.count.coerceAtLeast(1)
+    val inRound = state.count % target
     GlassCard(
         modifier = modifier.fillMaxHeight(),
         accent = AtharColors.Violet,
         onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            val completes = (state.count + 1) % target == 0
+            haptics.performHapticFeedback(if (completes) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove)
             onTap()
         },
         onLongClick = {
@@ -89,13 +108,28 @@ fun TasbihCard(count: Int, onTap: () -> Unit, onReset: () -> Unit, modifier: Mod
     ) {
         CardHeader(stringResource(R.string.tasbih), Icons.Rounded.TouchApp, tint = AtharColors.Violet)
         Spacer(Modifier.height(12.dp))
-        Text(count.formatNumber(), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
+        Row {
+            Text(
+                inRound.formatNumber(),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.alignByBaseline(),
+            )
+            Text(
+                " / " + target.formatNumber(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtharColors.TextSecondary,
+                modifier = Modifier.alignByBaseline(),
+            )
+        }
         Text(
-            stringResource(R.string.tasbih_hint),
+            dhikr.ar,
             style = MaterialTheme.typography.bodySmall,
             color = AtharColors.TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(10.dp))
-        GlassProgressBar(progress = (count % 33) / 33f, color = AtharColors.Violet)
+        GlassProgressBar(progress = inRound / target.toFloat(), color = AtharColors.Violet)
     }
 }

@@ -33,6 +33,9 @@ object HijriCalendar {
     fun plusMonths(date: LocalDate, months: Long): LocalDate =
         LocalDate.from(HijrahDate.from(date).plus(months, ChronoUnit.MONTHS))
 
+    fun lengthOfMonth(year: Int, month: Int): Int =
+        HijrahChronology.INSTANCE.date(year, month, 1).lengthOfMonth()
+
     fun plusYears(date: LocalDate, years: Long): LocalDate =
         LocalDate.from(HijrahDate.from(date).plus(years, ChronoUnit.YEARS))
 }

@@ -25,6 +25,7 @@ import com.athar.app.core.designsystem.theme.AtharColors
 import com.athar.app.core.format.currentLocale
 import com.athar.app.core.format.formatClock
 import com.athar.app.core.format.formatRemaining
+import com.athar.app.core.region.Cities
 import com.athar.app.feature.prayer.NextPrayer
 import com.athar.app.feature.prayer.PrayerTime
 import java.time.Duration
@@ -35,21 +36,21 @@ fun NextPrayerCard(
     now: LocalDateTime,
     prayers: List<PrayerTime>,
     next: NextPrayer,
-    isSample: Boolean,
+    cityId: String?,
     onPin: () -> Unit,
+    onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val locale = currentLocale()
     val minutesLeft = Duration.between(now, next.at).toMinutes()
+    val place = Cities.byId(cityId)?.name(locale) ?: stringResource(R.string.my_location)
 
-    GlassCard(modifier.fillMaxWidth(), accent = AtharColors.Gold) {
+    GlassCard(modifier.fillMaxWidth(), accent = AtharColors.Gold, onClick = onOpen) {
         CardHeader(
             title = stringResource(R.string.next_prayer),
             icon = Icons.Rounded.Mosque,
             onPin = onPin,
-            trailing = {
-                if (isSample) GlassChip(stringResource(R.string.sample_data), AtharColors.Gold)
-            },
+            trailing = { GlassChip(place, AtharColors.Gold) },
         )
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.Bottom) {

@@ -17,6 +17,8 @@ class BackupManager(private val db: AtharDatabase) {
                 habitLogs = db.habitDao().allLogs(),
                 people = db.debtDao().allPeople(),
                 debtEntries = db.debtDao().allEntries(),
+                salaries = db.plannerDao().allSalaries(),
+                reminders = db.plannerDao().allReminders(),
             )
         }
     }
@@ -29,6 +31,8 @@ class BackupManager(private val db: AtharDatabase) {
             db.debtDao().clearPeople()
             db.counterDao().clear()
             db.taskDao().clear()
+            db.plannerDao().clearSalaries()
+            db.plannerDao().clearReminders()
 
             db.counterDao().insertAll(data.counters)
             db.taskDao().insertAll(data.tasks)
@@ -36,6 +40,8 @@ class BackupManager(private val db: AtharDatabase) {
             db.habitDao().insertLogs(data.habitLogs)
             db.debtDao().insertPeople(data.people)
             db.debtDao().insertEntries(data.debtEntries)
+            db.plannerDao().insertSalaries(data.salaries)
+            db.plannerDao().insertReminders(data.reminders)
         }
     }
 }

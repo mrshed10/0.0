@@ -23,13 +23,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.athar.app.R
+import com.athar.app.core.region.LocalCurrency
 import com.athar.app.core.designsystem.component.CardHeader
 import com.athar.app.core.designsystem.glass.GlassCard
 import com.athar.app.core.designsystem.theme.Amiri
 import com.athar.app.core.designsystem.theme.AtharColors
 import com.athar.app.core.format.Money
 import com.athar.app.core.format.formatNumber
+import com.athar.app.core.format.currentLocale
 import com.athar.app.feature.debts.DebtTotals
+import com.athar.app.feature.prayer.SpiritualContent
 
 @Composable
 fun DebtsCard(debts: DebtTotals, onPin: () -> Unit, onOpen: () -> Unit, modifier: Modifier = Modifier) {
@@ -69,7 +72,7 @@ private fun DebtAmount(label: String, amount: Long, color: Color, modifier: Modi
                 modifier = Modifier.alignByBaseline(),
             )
             Text(
-                " " + stringResource(R.string.currency_sar),
+                " " + LocalCurrency.current,
                 style = MaterialTheme.typography.labelMedium,
                 color = AtharColors.TextSecondary,
                 modifier = Modifier.alignByBaseline(),
@@ -79,7 +82,8 @@ private fun DebtAmount(label: String, amount: Long, color: Color, modifier: Modi
 }
 
 @Composable
-fun VerseCard(modifier: Modifier = Modifier) {
+fun VerseCard(verse: SpiritualContent.Verse, modifier: Modifier = Modifier) {
+    val arabic = currentLocale().language == "ar"
     GlassCard(
         modifier.fillMaxWidth(),
         accent = AtharColors.Violet,
@@ -92,7 +96,7 @@ fun VerseCard(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            stringResource(R.string.sample_verse),
+            "﴿ ${verse.ar} ﴾",
             style = MaterialTheme.typography.bodyLarge.copy(
                 fontFamily = Amiri,
                 fontSize = 24.sp,
@@ -100,9 +104,18 @@ fun VerseCard(modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center,
             ),
         )
+        if (!arabic) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                verse.en,
+                style = MaterialTheme.typography.bodyMedium,
+                color = AtharColors.TextSecondary,
+                textAlign = TextAlign.Center,
+            )
+        }
         Spacer(Modifier.height(8.dp))
         Text(
-            stringResource(R.string.sample_verse_ref),
+            if (arabic) verse.refAr else verse.refEn,
             style = MaterialTheme.typography.labelMedium,
             color = AtharColors.TextTertiary,
         )

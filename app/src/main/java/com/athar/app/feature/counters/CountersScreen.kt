@@ -50,14 +50,18 @@ import com.athar.app.core.format.formatNumber
 import java.time.LocalDate
 
 @Composable
-fun CountersRoute(viewModel: CountersViewModel = viewModel(factory = CountersViewModel.Factory)) {
+fun CountersRoute(
+    switcher: @Composable () -> Unit,
+    viewModel: CountersViewModel = viewModel(factory = CountersViewModel.Factory),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    CountersScreen(state, viewModel::setFilter, viewModel::save, viewModel::delete)
+    CountersScreen(state, switcher, viewModel::setFilter, viewModel::save, viewModel::delete)
 }
 
 @Composable
 fun CountersScreen(
     state: CountersUiState,
+    switcher: @Composable () -> Unit,
     onFilter: (CounterFilter) -> Unit,
     onSave: (Counter) -> Unit,
     onDelete: (Long) -> Unit,
@@ -81,6 +85,7 @@ fun CountersScreen(
                     },
                 )
             }
+            item(key = "switcher") { switcher() }
             item(key = "filter") {
                 GlassSegmented(
                     options = listOf(

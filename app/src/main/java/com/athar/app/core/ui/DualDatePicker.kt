@@ -17,7 +17,16 @@ import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -112,7 +121,7 @@ fun DualDatePicker(
 }
 
 @Composable
-private fun Stepper(label: String, value: String, onStep: (Long) -> Unit, modifier: Modifier) {
+internal fun Stepper(label: String, value: String, onStep: (Long) -> Unit, modifier: Modifier) {
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
@@ -122,7 +131,7 @@ private fun Stepper(label: String, value: String, onStep: (Long) -> Unit, modifi
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            StepButton(Icons.Rounded.Remove) { onStep(-1) }
+            RepeatingStepButton(Icons.Rounded.Remove) { onStep(-1) }
             Text(
                 value,
                 style = MaterialTheme.typography.titleSmall,
@@ -132,15 +141,38 @@ private fun Stepper(label: String, value: String, onStep: (Long) -> Unit, modifi
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            StepButton(Icons.Rounded.Add) { onStep(1) }
+            RepeatingStepButton(Icons.Rounded.Add) { onStep(1) }
         }
     }
 }
 
+/** Tap to step once; hold to keep stepping faster. */
 @Composable
-private fun StepButton(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+internal fun RepeatingStepButton(icon: ImageVector, onStep: () -> Unit) {
+    val current by rememberUpdatedState(onStep)
+    val scope = rememberCoroutineScope()
     Box(
-        Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onClick),
+        Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        val job = scope.launch {
+                            current()
+                            delay(400)
+                            var interval = 120L
+                            while (isActive) {
+                                current()
+                                delay(interval)
+                                interval = (interval - 10).coerceAtLeast(40)
+                            }
+                        }
+                        tryAwaitRelease()
+                        job.cancel()
+                    },
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = AtharColors.TextSecondary, modifier = Modifier.size(18.dp))
