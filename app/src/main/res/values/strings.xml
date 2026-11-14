@@ -51,19 +51,56 @@
     <string name="prayer_isha">Isha</string>
 
     <!-- Sample content -->
-    <string name="sample_counter_ramadan">Ramadan 1448</string>
-    <string name="sample_counter_quit">Quit smoking</string>
-    <string name="sample_counter_trip">Umrah trip</string>
-    <string name="sample_task_1">Pay the electricity bill</string>
-    <string name="sample_task_2">Read 10 pages</string>
-    <string name="sample_task_3">Call mom</string>
-    <string name="sample_task_4">Review the weekly plan</string>
     <string name="sample_habit_quran">Wird</string>
     <string name="sample_habit_walk">Walk</string>
     <string name="sample_habit_water">Water</string>
     <string name="sample_habit_sleep">Early sleep</string>
     <string name="sample_verse">So remember Me; I will remember you.</string>
     <string name="sample_verse_ref">Al-Baqarah · 152</string>
+
+    <!-- Counters -->
+    <string name="counters_count">%1$s counters</string>
+    <string name="add_counter">New counter</string>
+    <string name="edit_counter">Edit counter</string>
+    <string name="counter_title_hint">Name (e.g. Eid, graduation)</string>
+    <string name="counter_countdown">Countdown</string>
+    <string name="counter_countup">Count up</string>
+    <string name="counter_passed">ago</string>
+    <string name="counter_starts_in">starts in</string>
+    <string name="filter_all">All</string>
+    <string name="empty_counters_title">No counters yet</string>
+    <string name="empty_counters_body">Count down to an occasion, or count the days since a milestone.</string>
+    <string name="home_add_counter">Add your first counter</string>
+    <string name="see_all">See all</string>
+
+    <!-- Date & form -->
+    <string name="calendar_gregorian">Gregorian</string>
+    <string name="calendar_hijri">Hijri</string>
+    <string name="date_label">Date</string>
+    <string name="color_label">Color</string>
+    <string name="day_label">Day</string>
+    <string name="month_label">Month</string>
+    <string name="year_label">Year</string>
+    <string name="tomorrow">Tomorrow</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="add">Add</string>
+
+    <!-- Tasks -->
+    <string name="add_task">New task</string>
+    <string name="edit_task">Edit task</string>
+    <string name="task_hint">What do you need to do?</string>
+    <string name="quick_add_hint">Add a task…</string>
+    <string name="due_none">No date</string>
+    <string name="due_pick">Pick</string>
+    <string name="section_overdue">Overdue</string>
+    <string name="section_upcoming">Upcoming</string>
+    <string name="section_done">Completed</string>
+    <string name="clear_completed">Clear</string>
+    <string name="empty_tasks_title">No tasks</string>
+    <string name="empty_tasks_body">Type a task above and press add.</string>
+    <string name="home_no_tasks">Nothing due today.</string>
 
     <string-array name="hijri_months">
         <item>Muharram</item>

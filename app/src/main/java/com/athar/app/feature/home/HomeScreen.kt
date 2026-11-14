@@ -34,6 +34,7 @@ import com.athar.app.feature.home.components.SalaryCard
 import com.athar.app.feature.home.components.TasbihCard
 import com.athar.app.feature.home.components.TasksCard
 import com.athar.app.feature.home.components.VerseCard
+import com.athar.app.feature.tasks.Task
 import dev.chrisbanes.haze.HazeState
 import java.time.LocalDateTime
 
@@ -42,7 +43,9 @@ import java.time.LocalDateTime
 fun HomeRoute(
     onPinToWidget: () -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: HomeViewModel = viewModel(),
+    onOpenCounters: () -> Unit,
+    onOpenTasks: () -> Unit,
+    viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     HomeScreen(
@@ -53,18 +56,22 @@ fun HomeRoute(
         onTasbihReset = viewModel::resetTasbih,
         onPinToWidget = onPinToWidget,
         onOpenSettings = onOpenSettings,
+        onOpenCounters = onOpenCounters,
+        onOpenTasks = onOpenTasks,
     )
 }
 
 @Composable
 fun HomeScreen(
     state: HomeUiState,
-    onToggleTask: (Long) -> Unit,
+    onToggleTask: (Task) -> Unit,
     onToggleHabit: (Long) -> Unit,
     onTasbih: () -> Unit,
     onTasbihReset: () -> Unit,
     onPinToWidget: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenCounters: () -> Unit,
+    onOpenTasks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -99,8 +106,8 @@ fun HomeScreen(
                 TasbihCard(state.tasbihCount, onTasbih, onTasbihReset, Modifier.weight(1f))
             }
         }
-        item(key = "counters") { CountersSection(state.today, state.counters, onPinToWidget) }
-        item(key = "tasks") { TasksCard(state.tasks, onToggleTask, onPinToWidget) }
+        item(key = "counters") { CountersSection(state.today, state.counters, onPinToWidget, onOpenCounters) }
+        item(key = "tasks") { TasksCard(state.todayTasks, state.today, onToggleTask, onPinToWidget, onOpenTasks) }
         item(key = "habits") { HabitsCard(state.habits, onToggleHabit, onPinToWidget) }
         item(key = "debts") { DebtsCard(state.debts, onPinToWidget) }
         item(key = "verse") { VerseCard() }
@@ -123,6 +130,8 @@ private fun HomeScreenPreview() {
                     onTasbihReset = {},
                     onPinToWidget = {},
                     onOpenSettings = {},
+                    onOpenCounters = {},
+                    onOpenTasks = {},
                 )
             }
         }

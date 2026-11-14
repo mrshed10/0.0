@@ -2,35 +2,57 @@ package com.athar.app.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import com.athar.app.core.data.CounterRepository
+import com.athar.app.core.data.TaskRepository
+import com.athar.app.core.data.appContainer
+import com.athar.app.feature.counters.CounterMath
+import com.athar.app.feature.tasks.Task
+import com.athar.app.feature.tasks.TaskGrouping
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.LocalDateTime
 
-class HomeViewModel : ViewModel() {
+class HomeViewModel(
+    private val counterRepository: CounterRepository,
+    private val taskRepository: TaskRepository,
+) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SampleData.homeState(LocalDateTime.now()))
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    /** Clock + sections that are still sample/in-memory (prayer, habits, debts, tasbih). */
+    private val local = MutableStateFlow(SampleData.homeState(LocalDateTime.now()))
+
+    val uiState: StateFlow<HomeUiState> =
+        combine(local, counterRepository.counters, taskRepository.tasks) { state, counters, tasks ->
+            state.copy(
+                counters = CounterMath.sort(counters, state.today),
+                todayTasks = TaskGrouping.forToday(tasks, state.today),
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), local.value)
 
     init {
         // Keep "next prayer in …" and the day counters current.
         viewModelScope.launch {
             while (isActive) {
                 delay(TICK_MILLIS)
-                _uiState.update { it.copy(now = LocalDateTime.now()) }
+                local.update { it.copy(now = LocalDateTime.now()) }
             }
         }
     }
 
-    fun toggleTask(id: Long) = _uiState.update { state ->
-        state.copy(tasks = state.tasks.map { if (it.id == id) it.copy(done = !it.done) else it })
+    fun toggleTask(task: Task) {
+        viewModelScope.launch { taskRepository.setDone(task.id, !task.done, LocalDate.now()) }
     }
 
-    fun toggleHabit(id: Long) = _uiState.update { state ->
+    fun toggleHabit(id: Long) = local.update { state ->
         state.copy(
             habits = state.habits.map {
                 if (it.id != id) {
@@ -43,11 +65,18 @@ class HomeViewModel : ViewModel() {
         )
     }
 
-    fun incrementTasbih() = _uiState.update { it.copy(tasbihCount = it.tasbihCount + 1) }
+    fun incrementTasbih() = local.update { it.copy(tasbihCount = it.tasbihCount + 1) }
 
-    fun resetTasbih() = _uiState.update { it.copy(tasbihCount = 0) }
+    fun resetTasbih() = local.update { it.copy(tasbihCount = 0) }
 
-    private companion object {
-        const val TICK_MILLIS = 30_000L
+    companion object {
+        private const val TICK_MILLIS = 30_000L
+
+        val Factory = viewModelFactory {
+            initializer {
+                val container = appContainer()
+                HomeViewModel(container.counterRepository, container.taskRepository)
+            }
+        }
     }
 }

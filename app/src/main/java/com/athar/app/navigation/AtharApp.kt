@@ -1,6 +1,11 @@
 package com.athar.app.navigation
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -30,7 +35,11 @@ import com.athar.app.R
 import com.athar.app.core.designsystem.glass.AuroraBackground
 import com.athar.app.core.designsystem.glass.GlassBarItem
 import com.athar.app.core.designsystem.glass.GlassBottomBar
+import com.athar.app.core.designsystem.glass.BottomBarController
+import com.athar.app.core.designsystem.glass.LocalBottomBarController
 import com.athar.app.core.designsystem.glass.LocalHazeState
+import com.athar.app.feature.counters.CountersRoute
+import com.athar.app.feature.tasks.TasksRoute
 import com.athar.app.feature.home.HomeRoute
 import com.athar.app.feature.placeholder.ComingSoonScreen
 import dev.chrisbanes.haze.HazeState
@@ -54,12 +63,24 @@ fun AtharApp() {
     val pinMessage = stringResource(R.string.pin_to_widget_soon)
     val showPinMessage: () -> Unit = { scope.launch { snackbar.showSnackbar(pinMessage) } }
 
-    CompositionLocalProvider(LocalHazeState provides hazeState) {
+    val bottomBar = remember { BottomBarController() }
+
+    CompositionLocalProvider(
+        LocalHazeState provides hazeState,
+        LocalBottomBarController provides bottomBar,
+    ) {
         Box(Modifier.fillMaxSize()) {
             AuroraBackground(hazeState)
 
             when (tab) {
-                AtharTab.Home -> HomeRoute(onPinToWidget = showPinMessage, onOpenSettings = {})
+                AtharTab.Home -> HomeRoute(
+                    onPinToWidget = showPinMessage,
+                    onOpenSettings = {},
+                    onOpenCounters = { tab = AtharTab.Counters },
+                    onOpenTasks = { tab = AtharTab.Tasks },
+                )
+                AtharTab.Counters -> CountersRoute()
+                AtharTab.Tasks -> TasksRoute()
                 else -> ComingSoonScreen(stringResource(tab.label), tab.icon)
             }
 
@@ -67,15 +88,21 @@ fun AtharApp() {
                 snackbar,
                 Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 96.dp),
             )
-            GlassBottomBar(
-                items = AtharTab.entries.map { GlassBarItem(stringResource(it.label), it.icon) },
-                selectedIndex = tab.ordinal,
-                onSelect = { tab = AtharTab.entries[it] },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
+            AnimatedVisibility(
+                visible = bottomBar.visible,
+                enter = fadeIn() + slideInVertically { it },
+                exit = fadeOut() + slideOutVertically { it },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                GlassBottomBar(
+                    items = AtharTab.entries.map { GlassBarItem(stringResource(it.label), it.icon) },
+                    selectedIndex = tab.ordinal,
+                    onSelect = { tab = AtharTab.entries[it] },
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            }
         }
     }
 }

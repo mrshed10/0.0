@@ -1,25 +1,14 @@
 package com.athar.app.feature.home
 
-import com.athar.app.core.designsystem.theme.AccentTone
 import com.athar.app.core.ui.UiText
+import com.athar.app.feature.counters.Counter
 import com.athar.app.feature.prayer.NextPrayer
 import com.athar.app.feature.prayer.PrayerSchedule
 import com.athar.app.feature.prayer.PrayerTime
 import com.athar.app.feature.salary.SalarySchedule
+import com.athar.app.feature.tasks.Task
 import java.time.LocalDate
 import java.time.LocalDateTime
-
-enum class CounterDirection { CountDown, CountUp }
-
-data class CounterItem(
-    val id: Long,
-    val title: UiText,
-    val date: LocalDate,
-    val direction: CounterDirection,
-    val tone: AccentTone,
-)
-
-data class TaskItem(val id: Long, val title: UiText, val done: Boolean)
 
 enum class HabitIcon { Quran, Walk, Water, Sleep }
 
@@ -38,8 +27,10 @@ data class HomeUiState(
     val prayers: List<PrayerTime>,
     val prayersAreSample: Boolean,
     val payDay: Int,
-    val counters: List<CounterItem>,
-    val tasks: List<TaskItem>,
+    /** From the database. */
+    val counters: List<Counter>,
+    /** From the database: overdue + due today + completed today. */
+    val todayTasks: List<Task>,
     val habits: List<HabitItem>,
     val debts: DebtSummary,
     val tasbihCount: Int,

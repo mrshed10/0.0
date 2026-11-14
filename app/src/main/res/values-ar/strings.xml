@@ -45,20 +45,53 @@
     <string name="prayer_asr">العصر</string>
     <string name="prayer_maghrib">المغرب</string>
     <string name="prayer_isha">العشاء</string>
-
-    <string name="sample_counter_ramadan">رمضان 1448</string>
-    <string name="sample_counter_quit">ترك التدخين</string>
-    <string name="sample_counter_trip">رحلة العمرة</string>
-    <string name="sample_task_1">سداد فاتورة الكهرباء</string>
-    <string name="sample_task_2">قراءة 10 صفحات</string>
-    <string name="sample_task_3">الاتصال بالوالدة</string>
-    <string name="sample_task_4">مراجعة خطة الأسبوع</string>
     <string name="sample_habit_quran">الورد</string>
     <string name="sample_habit_walk">المشي</string>
     <string name="sample_habit_water">الماء</string>
     <string name="sample_habit_sleep">نوم مبكر</string>
     <string name="sample_verse">فَاذْكُرُونِي أَذْكُرْكُمْ وَاشْكُرُوا لِي وَلَا تَكْفُرُونِ</string>
     <string name="sample_verse_ref">البقرة · 152</string>
+
+    <string name="counters_count">عدد العدادات: %1$s</string>
+    <string name="add_counter">عداد جديد</string>
+    <string name="edit_counter">تعديل العداد</string>
+    <string name="counter_title_hint">الاسم (مثل: العيد، التخرج)</string>
+    <string name="counter_countdown">تنازلي</string>
+    <string name="counter_countup">تصاعدي</string>
+    <string name="counter_passed">مضى</string>
+    <string name="counter_starts_in">يبدأ بعد</string>
+    <string name="filter_all">الكل</string>
+    <string name="empty_counters_title">لا توجد عدادات بعد</string>
+    <string name="empty_counters_body">عُدّ الأيام لمناسبة قادمة، أو منذ حدث مهم في حياتك.</string>
+    <string name="home_add_counter">أضف أول عداد</string>
+    <string name="see_all">عرض الكل</string>
+
+    <string name="calendar_gregorian">ميلادي</string>
+    <string name="calendar_hijri">هجري</string>
+    <string name="date_label">التاريخ</string>
+    <string name="color_label">اللون</string>
+    <string name="day_label">اليوم</string>
+    <string name="month_label">الشهر</string>
+    <string name="year_label">السنة</string>
+    <string name="tomorrow">غداً</string>
+    <string name="yesterday">أمس</string>
+    <string name="save">حفظ</string>
+    <string name="delete">حذف</string>
+    <string name="add">إضافة</string>
+
+    <string name="add_task">مهمة جديدة</string>
+    <string name="edit_task">تعديل المهمة</string>
+    <string name="task_hint">ماذا تريد أن تنجز؟</string>
+    <string name="quick_add_hint">أضف مهمة…</string>
+    <string name="due_none">بدون موعد</string>
+    <string name="due_pick">تاريخ</string>
+    <string name="section_overdue">متأخرة</string>
+    <string name="section_upcoming">القادمة</string>
+    <string name="section_done">المنجزة</string>
+    <string name="clear_completed">مسح</string>
+    <string name="empty_tasks_title">لا توجد مهام</string>
+    <string name="empty_tasks_body">اكتب مهمة في الأعلى ثم اضغط إضافة.</string>
+    <string name="home_no_tasks">لا مهام لليوم.</string>
 
     <string-array name="hijri_months">
         <item>محرم</item>
