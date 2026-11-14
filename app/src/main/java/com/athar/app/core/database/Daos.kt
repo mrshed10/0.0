@@ -1,6 +1,8 @@
 package com.athar.app.core.database
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +17,16 @@ interface CounterDao {
 
     @Query("DELETE FROM counters WHERE id = :id")
     suspend fun delete(id: Long)
+
+    // Backup
+    @Query("SELECT * FROM counters")
+    suspend fun all(): List<CounterEntity>
+
+    @Insert
+    suspend fun insertAll(items: List<CounterEntity>)
+
+    @Query("DELETE FROM counters")
+    suspend fun clear()
 }
 
 @Dao
@@ -33,4 +45,97 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks WHERE done = 1")
     suspend fun deleteCompleted()
+
+    // Backup
+    @Query("SELECT * FROM tasks")
+    suspend fun all(): List<TaskEntity>
+
+    @Insert
+    suspend fun insertAll(items: List<TaskEntity>)
+
+    @Query("DELETE FROM tasks")
+    suspend fun clear()
+}
+
+@Dao
+interface HabitDao {
+    @Query("SELECT * FROM habits ORDER BY created_at ASC")
+    fun observeHabits(): Flow<List<HabitEntity>>
+
+    @Query("SELECT * FROM habit_logs")
+    fun observeLogs(): Flow<List<HabitLogEntity>>
+
+    @Upsert
+    suspend fun upsert(habit: HabitEntity): Long
+
+    @Query("DELETE FROM habits WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertLog(log: HabitLogEntity)
+
+    @Query("DELETE FROM habit_logs WHERE habit_id = :habitId AND epoch_day = :epochDay")
+    suspend fun deleteLog(habitId: Long, epochDay: Long)
+
+    @Query("SELECT COUNT(*) FROM habit_logs WHERE habit_id = :habitId AND epoch_day = :epochDay")
+    suspend fun countLog(habitId: Long, epochDay: Long): Int
+
+    // Backup
+    @Query("SELECT * FROM habits")
+    suspend fun allHabits(): List<HabitEntity>
+
+    @Query("SELECT * FROM habit_logs")
+    suspend fun allLogs(): List<HabitLogEntity>
+
+    @Insert
+    suspend fun insertHabits(items: List<HabitEntity>)
+
+    @Insert
+    suspend fun insertLogs(items: List<HabitLogEntity>)
+
+    @Query("DELETE FROM habit_logs")
+    suspend fun clearLogs()
+
+    @Query("DELETE FROM habits")
+    suspend fun clearHabits()
+}
+
+@Dao
+interface DebtDao {
+    @Query("SELECT * FROM people ORDER BY name COLLATE NOCASE ASC")
+    fun observePeople(): Flow<List<PersonEntity>>
+
+    @Query("SELECT * FROM debt_entries ORDER BY epoch_day DESC, created_at DESC")
+    fun observeEntries(): Flow<List<DebtEntryEntity>>
+
+    @Upsert
+    suspend fun upsertPerson(person: PersonEntity): Long
+
+    @Query("DELETE FROM people WHERE id = :id")
+    suspend fun deletePerson(id: Long)
+
+    @Upsert
+    suspend fun upsertEntry(entry: DebtEntryEntity): Long
+
+    @Query("DELETE FROM debt_entries WHERE id = :id")
+    suspend fun deleteEntry(id: Long)
+
+    // Backup
+    @Query("SELECT * FROM people")
+    suspend fun allPeople(): List<PersonEntity>
+
+    @Query("SELECT * FROM debt_entries")
+    suspend fun allEntries(): List<DebtEntryEntity>
+
+    @Insert
+    suspend fun insertPeople(items: List<PersonEntity>)
+
+    @Insert
+    suspend fun insertEntries(items: List<DebtEntryEntity>)
+
+    @Query("DELETE FROM debt_entries")
+    suspend fun clearEntries()
+
+    @Query("DELETE FROM people")
+    suspend fun clearPeople()
 }

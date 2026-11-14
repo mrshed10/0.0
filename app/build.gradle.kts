@@ -36,6 +36,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -64,5 +65,11 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // Fingerprint / screen-lock protection for debts
+    implementation(libs.androidx.biometric)
+    implementation(libs.androidx.fragment.ktx)
+
     testImplementation(libs.junit)
+    // Real org.json for JVM unit tests (android.jar only has stubs)
+    testImplementation(libs.org.json)
 }

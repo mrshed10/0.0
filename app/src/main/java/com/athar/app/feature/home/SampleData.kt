@@ -1,7 +1,6 @@
 package com.athar.app.feature.home
 
-import com.athar.app.R
-import com.athar.app.core.ui.UiText
+import com.athar.app.feature.debts.DebtTotals
 import com.athar.app.feature.prayer.Prayer
 import com.athar.app.feature.prayer.PrayerTime
 import com.athar.app.feature.salary.SalarySchedule
@@ -9,8 +8,8 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 /**
- * Placeholder content for sections that are not built yet (prayer times,
- * habits, debts). Counters and tasks come from the database.
+ * Placeholder content for sections that are not built yet (prayer times).
+ * Counters, tasks, habits and debts come from the database.
  * Prayer times are fixed sample values, not real ones.
  */
 object SampleData {
@@ -28,13 +27,8 @@ object SampleData {
         payDay = SalarySchedule.SAUDI_PAY_DAY,
         counters = emptyList(),
         todayTasks = emptyList(),
-        habits = listOf(
-            HabitItem(1, UiText.Res(R.string.sample_habit_quran), HabitIcon.Quran, streak = 12, doneToday = true),
-            HabitItem(2, UiText.Res(R.string.sample_habit_walk), HabitIcon.Walk, streak = 5, doneToday = false),
-            HabitItem(3, UiText.Res(R.string.sample_habit_water), HabitIcon.Water, streak = 21, doneToday = true),
-            HabitItem(4, UiText.Res(R.string.sample_habit_sleep), HabitIcon.Sleep, streak = 0, doneToday = false),
-        ),
-        debts = DebtSummary(owedToMe = 4_250, iOwe = 1_100, people = 6),
+        habits = emptyList(),
+        debts = DebtTotals.Empty,
         tasbihCount = 0,
     )
 }

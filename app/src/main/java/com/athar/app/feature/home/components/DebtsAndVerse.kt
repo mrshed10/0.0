@@ -27,12 +27,13 @@ import com.athar.app.core.designsystem.component.CardHeader
 import com.athar.app.core.designsystem.glass.GlassCard
 import com.athar.app.core.designsystem.theme.Amiri
 import com.athar.app.core.designsystem.theme.AtharColors
+import com.athar.app.core.format.Money
 import com.athar.app.core.format.formatNumber
-import com.athar.app.feature.home.DebtSummary
+import com.athar.app.feature.debts.DebtTotals
 
 @Composable
-fun DebtsCard(debts: DebtSummary, onPin: () -> Unit, modifier: Modifier = Modifier) {
-    GlassCard(modifier.fillMaxWidth(), accent = AtharColors.Teal) {
+fun DebtsCard(debts: DebtTotals, onPin: () -> Unit, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    GlassCard(modifier.fillMaxWidth(), accent = AtharColors.Teal, onClick = onOpen) {
         CardHeader(
             title = stringResource(R.string.debts),
             icon = Icons.Rounded.AccountBalanceWallet,
@@ -40,7 +41,7 @@ fun DebtsCard(debts: DebtSummary, onPin: () -> Unit, modifier: Modifier = Modifi
             onPin = onPin,
             trailing = {
                 Text(
-                    stringResource(R.string.debts_clients, debts.people.formatNumber()),
+                    stringResource(R.string.debts_clients, debts.openPeople.formatNumber()),
                     style = MaterialTheme.typography.labelMedium,
                     color = AtharColors.TextSecondary,
                 )
@@ -48,9 +49,9 @@ fun DebtsCard(debts: DebtSummary, onPin: () -> Unit, modifier: Modifier = Modifi
         )
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            DebtAmount(stringResource(R.string.debts_owed_to_me), debts.owedToMe, AtharColors.Teal, Modifier.weight(1f))
+            DebtAmount(stringResource(R.string.debts_owed_to_me), debts.owedToMeMinor, AtharColors.Teal, Modifier.weight(1f))
             Box(Modifier.width(1.dp).height(44.dp).background(Color.White.copy(alpha = 0.15f)))
-            DebtAmount(stringResource(R.string.debts_i_owe), debts.iOwe, AtharColors.Rose, Modifier.weight(1f))
+            DebtAmount(stringResource(R.string.debts_i_owe), debts.iOweMinor, AtharColors.Rose, Modifier.weight(1f))
         }
     }
 }
@@ -61,7 +62,7 @@ private fun DebtAmount(label: String, amount: Long, color: Color, modifier: Modi
         Text(label, style = MaterialTheme.typography.labelMedium, color = AtharColors.TextSecondary)
         Row {
             Text(
-                amount.formatNumber(),
+                Money.format(amount),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = color,

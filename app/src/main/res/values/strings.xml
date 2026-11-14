@@ -51,10 +51,6 @@
     <string name="prayer_isha">Isha</string>
 
     <!-- Sample content -->
-    <string name="sample_habit_quran">Wird</string>
-    <string name="sample_habit_walk">Walk</string>
-    <string name="sample_habit_water">Water</string>
-    <string name="sample_habit_sleep">Early sleep</string>
     <string name="sample_verse">So remember Me; I will remember you.</string>
     <string name="sample_verse_ref">Al-Baqarah · 152</string>
 
@@ -101,6 +97,66 @@
     <string name="empty_tasks_title">No tasks</string>
     <string name="empty_tasks_body">Type a task above and press add.</string>
     <string name="home_no_tasks">Nothing due today.</string>
+
+    <string name="back">Back</string>
+    <string name="call">Call</string>
+    <string name="tap_to_confirm">Tap again to confirm</string>
+    <string name="icon_label">Icon</string>
+    <string name="note_hint">Note (optional)</string>
+    <string name="unlock">Unlock</string>
+    <string name="add_habit">New habit</string>
+    <string name="edit_habit">Edit habit</string>
+    <string name="habit_title_hint">Habit (e.g. Morning adhkar)</string>
+    <string name="habits_done_today">%1$s of %2$s done today</string>
+    <string name="streak_days">%1$s days in a row</string>
+    <string name="streak_best">Best streak: %1$s days</string>
+    <string name="empty_habits_title">No habits yet</string>
+    <string name="empty_habits_body">Build a habit one day at a time and keep your streak alive.</string>
+    <string name="debts_people_count">%1$s people</string>
+    <string name="add_person">Add person</string>
+    <string name="edit_person">Edit person</string>
+    <string name="person_name_hint">Name</string>
+    <string name="person_phone_hint">Phone (optional)</string>
+    <string name="delete_person_confirm">Delete with all records?</string>
+    <string name="search_people">Search by name or phone</string>
+    <string name="empty_debts_title">Your ledger is empty</string>
+    <string name="empty_debts_body">Add a person, then record what you gave or received. Balances are calculated for you.</string>
+    <string name="balance_owes_you">owes you</string>
+    <string name="balance_you_owe">you owe</string>
+    <string name="balance_settled">settled</string>
+    <string name="entry_gave">I gave</string>
+    <string name="entry_took">I received</string>
+    <string name="entry_explain">“I gave” increases what they owe you; “I received” reduces it (or records what you borrowed).</string>
+    <string name="add_entry">New record</string>
+    <string name="edit_entry">Edit record</string>
+    <string name="amount_label">Amount</string>
+    <string name="amount_invalid">Enter a valid amount (up to 2 decimals)</string>
+    <string name="no_entries">No records yet.</string>
+    <string name="debts_locked_title">Debts are locked</string>
+    <string name="debts_locked_body">Use your fingerprint or screen lock to open.</string>
+    <string name="backup_title">Backup &amp; restore</string>
+    <string name="backup_body">Saves everything (counters, tasks, habits, debts) to a file you choose, e.g. Google Drive or Samsung storage.</string>
+    <string name="backup_password_label">Password (optional)</string>
+    <string name="backup_password_hint">Encrypt the file with a password</string>
+    <string name="backup_create">Create backup</string>
+    <string name="backup_restore">Restore</string>
+    <string name="backup_restore_now">Restore and replace</string>
+    <string name="backup_saved">Backup saved (%1$s items).</string>
+    <string name="backup_restored">Restored %1$s items.</string>
+    <string name="backup_wrong_password">Wrong password.</string>
+    <string name="backup_invalid_file">This is not an Athar backup file.</string>
+    <string name="backup_newer_version">This backup was made by a newer version of the app.</string>
+    <string name="backup_failed">Something went wrong: %1$s</string>
+    <string name="backup_encrypted_prompt">This backup is encrypted. Enter its password.</string>
+    <string name="backup_contents">Counters: %1$s\nTasks: %2$s\nHabits: %3$s\nPeople: %4$s\nDebt records: %5$s</string>
+    <string name="backup_replace_warning">Restoring replaces all current data in the app.</string>
+    <string name="security_title">Security</string>
+    <string name="debts_lock">Lock debts</string>
+    <string name="debts_lock_body">Ask for fingerprint or screen lock to open debts.</string>
+    <string name="debts_lock_unavailable">Set up a screen lock or fingerprint on your phone first.</string>
+    <string name="debts_lock_confirm">Confirm it is you</string>
+    <string name="about_title">About</string>
+    <string name="about_body">Athar %1$s · All data stays on your phone. No ads, no tracking.</string>
 
     <string-array name="hijri_months">
         <item>Muharram</item>

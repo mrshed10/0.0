@@ -45,6 +45,8 @@ fun HomeRoute(
     onOpenSettings: () -> Unit,
     onOpenCounters: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenHabits: () -> Unit,
+    onOpenDebts: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -58,6 +60,8 @@ fun HomeRoute(
         onOpenSettings = onOpenSettings,
         onOpenCounters = onOpenCounters,
         onOpenTasks = onOpenTasks,
+        onOpenHabits = onOpenHabits,
+        onOpenDebts = onOpenDebts,
     )
 }
 
@@ -72,6 +76,8 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenCounters: () -> Unit,
     onOpenTasks: () -> Unit,
+    onOpenHabits: () -> Unit,
+    onOpenDebts: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -108,8 +114,8 @@ fun HomeScreen(
         }
         item(key = "counters") { CountersSection(state.today, state.counters, onPinToWidget, onOpenCounters) }
         item(key = "tasks") { TasksCard(state.todayTasks, state.today, onToggleTask, onPinToWidget, onOpenTasks) }
-        item(key = "habits") { HabitsCard(state.habits, onToggleHabit, onPinToWidget) }
-        item(key = "debts") { DebtsCard(state.debts, onPinToWidget) }
+        item(key = "habits") { HabitsCard(state.habits, onToggleHabit, onPinToWidget, onOpenHabits) }
+        item(key = "debts") { DebtsCard(state.debts, onPinToWidget, onOpenDebts) }
         item(key = "verse") { VerseCard() }
     }
 }
@@ -132,6 +138,8 @@ private fun HomeScreenPreview() {
                     onOpenSettings = {},
                     onOpenCounters = {},
                     onOpenTasks = {},
+                    onOpenHabits = {},
+                    onOpenDebts = {},
                 )
             }
         }

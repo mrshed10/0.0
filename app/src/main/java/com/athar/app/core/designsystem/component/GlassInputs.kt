@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,6 +34,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.athar.app.core.designsystem.theme.AccentTone
 import com.athar.app.core.designsystem.theme.AtharColors
@@ -45,6 +49,8 @@ fun GlassTextField(
     placeholder: String,
     modifier: Modifier = Modifier,
     onDone: (() -> Unit)? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isPassword: Boolean = false,
 ) {
     val shape = RoundedCornerShape(16.dp)
     BasicTextField(
@@ -54,9 +60,11 @@ fun GlassTextField(
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = AtharColors.TextPrimary),
         cursorBrush = SolidColor(AtharColors.Gold),
         keyboardOptions = KeyboardOptions(
-            capitalization = KeyboardCapitalization.Sentences,
+            capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
+            keyboardType = if (isPassword) KeyboardType.Password else keyboardType,
             imeAction = ImeAction.Done,
         ),
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
         modifier = modifier,
         decorationBox = { inner ->
@@ -185,4 +193,28 @@ fun TonePicker(selected: AccentTone, onSelect: (AccentTone) -> Unit, modifier: M
 @Composable
 fun FieldLabel(text: String, modifier: Modifier = Modifier) {
     Text(text, style = MaterialTheme.typography.labelLarge, color = AtharColors.TextSecondary, modifier = modifier)
+}
+
+/**
+ * Destructive button that needs two taps: the first arms it ("tap again to
+ * confirm"), the second runs [onConfirm].
+ */
+@Composable
+fun ConfirmButton(
+    text: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+    color: Color = AtharColors.Rose,
+    icon: ImageVector? = null,
+) {
+    var armed by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    GlassButton(
+        text = if (armed) confirmText else text,
+        onClick = { if (armed) onConfirm() else armed = true },
+        modifier = modifier,
+        color = color,
+        filled = armed,
+        icon = icon,
+    )
 }

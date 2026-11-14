@@ -50,10 +50,14 @@ import java.time.LocalDate
 enum class QuickDue { Today, Tomorrow, None }
 
 @Composable
-fun TasksRoute(viewModel: TasksViewModel = viewModel(factory = TasksViewModel.Factory)) {
+fun TasksRoute(
+    switcher: @Composable () -> Unit,
+    viewModel: TasksViewModel = viewModel(factory = TasksViewModel.Factory),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     TasksScreen(
         state = state,
+        switcher = switcher,
         onQuickAdd = viewModel::quickAdd,
         onToggle = viewModel::toggle,
         onSave = viewModel::save,
@@ -65,6 +69,7 @@ fun TasksRoute(viewModel: TasksViewModel = viewModel(factory = TasksViewModel.Fa
 @Composable
 fun TasksScreen(
     state: TasksUiState,
+    switcher: @Composable () -> Unit,
     onQuickAdd: (String, LocalDate?) -> Unit,
     onToggle: (Task) -> Unit,
     onSave: (Task) -> Unit,
@@ -90,6 +95,7 @@ fun TasksScreen(
                     },
                 )
             }
+            item(key = "switcher") { switcher() }
             item(key = "quickAdd") { QuickAddCard(state.today, onQuickAdd) }
 
             if (state.loaded && state.total == 0) {

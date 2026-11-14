@@ -21,6 +21,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,7 +39,11 @@ import com.athar.app.core.designsystem.glass.GlassBottomBar
 import com.athar.app.core.designsystem.glass.BottomBarController
 import com.athar.app.core.designsystem.glass.LocalBottomBarController
 import com.athar.app.core.designsystem.glass.LocalHazeState
+import com.athar.app.core.designsystem.component.GlassSegmented
 import com.athar.app.feature.counters.CountersRoute
+import com.athar.app.feature.debts.DebtsRoute
+import com.athar.app.feature.habits.HabitsRoute
+import com.athar.app.feature.settings.SettingsRoute
 import com.athar.app.feature.tasks.TasksRoute
 import com.athar.app.feature.home.HomeRoute
 import com.athar.app.feature.placeholder.ComingSoonScreen
@@ -58,6 +63,8 @@ enum class AtharTab(@StringRes val label: Int, val icon: ImageVector) {
 fun AtharApp() {
     val hazeState = remember { HazeState() }
     var tab by rememberSaveable { mutableStateOf(AtharTab.Home) }
+    var tasksPage by rememberSaveable { mutableIntStateOf(0) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val pinMessage = stringResource(R.string.pin_to_widget_soon)
@@ -72,16 +79,32 @@ fun AtharApp() {
         Box(Modifier.fillMaxSize()) {
             AuroraBackground(hazeState)
 
-            when (tab) {
-                AtharTab.Home -> HomeRoute(
-                    onPinToWidget = showPinMessage,
-                    onOpenSettings = {},
-                    onOpenCounters = { tab = AtharTab.Counters },
-                    onOpenTasks = { tab = AtharTab.Tasks },
-                )
-                AtharTab.Counters -> CountersRoute()
-                AtharTab.Tasks -> TasksRoute()
-                else -> ComingSoonScreen(stringResource(tab.label), tab.icon)
+            if (showSettings) {
+                SettingsRoute(onBack = { showSettings = false })
+            } else {
+                when (tab) {
+                    AtharTab.Home -> HomeRoute(
+                        onPinToWidget = showPinMessage,
+                        onOpenSettings = { showSettings = true },
+                        onOpenCounters = { tab = AtharTab.Counters },
+                        onOpenTasks = { tasksPage = 0; tab = AtharTab.Tasks },
+                        onOpenHabits = { tasksPage = 1; tab = AtharTab.Tasks },
+                        onOpenDebts = { tab = AtharTab.Debts },
+                    )
+                    AtharTab.Counters -> CountersRoute()
+                    AtharTab.Tasks -> {
+                        val switcher: @Composable () -> Unit = {
+                            GlassSegmented(
+                                options = listOf(stringResource(R.string.nav_tasks), stringResource(R.string.habits)),
+                                selectedIndex = tasksPage,
+                                onSelect = { tasksPage = it },
+                            )
+                        }
+                        if (tasksPage == 0) TasksRoute(switcher) else HabitsRoute(switcher)
+                    }
+                    AtharTab.Debts -> DebtsRoute()
+                    else -> ComingSoonScreen(stringResource(tab.label), tab.icon)
+                }
             }
 
             SnackbarHost(
@@ -97,7 +120,7 @@ fun AtharApp() {
                 GlassBottomBar(
                     items = AtharTab.entries.map { GlassBarItem(stringResource(it.label), it.icon) },
                     selectedIndex = tab.ordinal,
-                    onSelect = { tab = AtharTab.entries[it] },
+                    onSelect = { showSettings = false; tab = AtharTab.entries[it] },
                     modifier = Modifier
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 12.dp),
