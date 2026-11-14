@@ -32,6 +32,45 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".widget.WidgetConfigActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Athar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <receiver
+            android:name=".widget.AtharWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/athar_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.AtharSmallWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_small_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/athar_widget_small_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.WidgetPinnedReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".core.notify.AlarmReceiver"
             android:exported="false" />

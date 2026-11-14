@@ -62,6 +62,7 @@ fun SettingsRoute(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(f
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var exportPassword by remember { mutableStateOf("") }
+    var widgetMessage by remember { mutableStateOf<String?>(null) }
 
     val createFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) viewModel.export(uri, exportPassword)
@@ -136,6 +137,16 @@ fun SettingsRoute(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(f
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (status.isError) AtharColors.Rose else AtharColors.Teal,
                         )
+                    }
+                }
+            }
+
+            item(key = "widgets") {
+                Column {
+                    WidgetsSettingsCard(onMessage = { widgetMessage = it })
+                    widgetMessage?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodyMedium, color = AtharColors.Gold, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }

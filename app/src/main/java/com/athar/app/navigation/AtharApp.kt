@@ -49,6 +49,8 @@ import com.athar.app.feature.settings.SettingsRoute
 import com.athar.app.feature.tasks.TasksRoute
 import com.athar.app.feature.home.HomeRoute
 import com.athar.app.AtharApplication
+import com.athar.app.widget.WidgetContent
+import com.athar.app.widget.WidgetPinner
 import com.athar.app.core.region.LocalCurrency
 import com.athar.app.feature.dates.RemindersRoute
 import com.athar.app.feature.dates.SalariesRoute
@@ -66,16 +68,31 @@ enum class AtharTab(@StringRes val label: Int, val icon: ImageVector) {
 
 /** App shell: aurora background (blur source), current tab, floating glass bar. */
 @Composable
-fun AtharApp() {
+fun AtharApp(startTab: String? = null) {
     val hazeState = remember { HazeState() }
-    var tab by rememberSaveable { mutableStateOf(AtharTab.Home) }
-    var tasksPage by rememberSaveable { mutableIntStateOf(0) }
-    var datesPage by rememberSaveable { mutableIntStateOf(0) }
+    var tab by rememberSaveable {
+        mutableStateOf(
+            when (startTab) {
+                "dates", "salaries" -> AtharTab.Dates
+                "tasks", "habits" -> AtharTab.Tasks
+                "debts" -> AtharTab.Debts
+                "prayer" -> AtharTab.Prayer
+                else -> AtharTab.Home
+            },
+        )
+    }
+    var tasksPage by rememberSaveable { mutableIntStateOf(if (startTab == "habits") 1 else 0) }
+    var datesPage by rememberSaveable { mutableIntStateOf(if (startTab == "salaries") 1 else 0) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val pinMessage = stringResource(R.string.pin_to_widget_soon)
-    val showPinMessage: () -> Unit = { scope.launch { snackbar.showSnackbar(pinMessage) } }
+    val pinContext = LocalContext.current
+    val pinRequested = stringResource(R.string.pin_requested)
+    val pinUnsupported = stringResource(R.string.pin_unsupported)
+    val pinWidget: (WidgetContent) -> Unit = { content ->
+        val ok = WidgetPinner.pin(pinContext, content)
+        scope.launch { snackbar.showSnackbar(if (ok) pinRequested else pinUnsupported) }
+    }
 
     val bottomBar = remember { BottomBarController() }
 
@@ -95,7 +112,7 @@ fun AtharApp() {
             } else {
                 when (tab) {
                     AtharTab.Home -> HomeRoute(
-                        onPinToWidget = showPinMessage,
+                        onPinToWidget = pinWidget,
                         onOpenSettings = { showSettings = true },
                         onOpenCounters = { datesPage = 0; tab = AtharTab.Dates },
                         onOpenSalaries = { datesPage = 1; tab = AtharTab.Dates },

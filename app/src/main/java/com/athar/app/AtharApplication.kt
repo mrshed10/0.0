@@ -2,6 +2,7 @@ package com.athar.app
 
 import android.app.Application
 import com.athar.app.core.data.AppContainer
+import com.athar.app.core.data.keepWidgetsInSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,5 +14,6 @@ class AtharApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container.keepAlarmsInSync(appScope)
+        container.keepWidgetsInSync(this, appScope)
     }
 }

@@ -24,7 +24,8 @@ import java.time.format.DateTimeFormatter
 data class Alarm(
     val code: Int,
     val at: LocalDateTime,
-    val kind: AlertKind,
+    /** null = silent refresh of widgets / lock card. */
+    val kind: AlertKind?,
     val tone: String?,
     val title: String,
     val text: String,
@@ -44,7 +45,7 @@ class AlarmScheduler(
     fun canScheduleExact(): Boolean = Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()
 
     suspend fun rescheduleAll(now: LocalDateTime = LocalDateTime.now()) {
-        val alarms = prayerAlarms(now) + salaryAlarms(now) + reminderAlarms(now)
+        val alarms = prayerAlarms(now) + salaryAlarms(now) + reminderAlarms(now) + refreshAlarms(now)
         val codes = alarms.map { it.code }.toSet()
         (settings.scheduledAlarmCodes - codes).forEach { cancel(it) }
         alarms.forEach { schedule(it) }
@@ -93,6 +94,20 @@ class AlarmScheduler(
             }
         }
         return result
+    }
+
+    /** Widgets show "next prayer" and dates: refresh at each prayer time and after midnight. */
+    private fun refreshAlarms(now: LocalDateTime): List<Alarm> {
+        val prefs = settings.prayer.value
+        val nextPrayer = com.athar.app.feature.prayer.PrayerSchedule.next(
+            now,
+            prefs.timesFor(now.toLocalDate()),
+            prefs.timesFor(now.toLocalDate().plusDays(1)),
+        )
+        return listOf(
+            Alarm(9_000, now.toLocalDate().plusDays(1).atTime(0, 0, 30), null, null, "", ""),
+            Alarm(9_001, nextPrayer.at.plusSeconds(5), null, null, "", ""),
+        )
     }
 
     private suspend fun salaryAlarms(now: LocalDateTime): List<Alarm> {
@@ -144,7 +159,7 @@ class AlarmScheduler(
         val intent = Intent(context, AlarmReceiver::class.java).setAction("com.athar.app.ALARM_$code")
         if (alarm != null) {
             intent.putExtra(AlarmReceiver.EXTRA_CODE, code)
-                .putExtra(AlarmReceiver.EXTRA_KIND, alarm.kind.name)
+                .putExtra(AlarmReceiver.EXTRA_KIND, alarm.kind?.name)
                 .putExtra(AlarmReceiver.EXTRA_TONE, alarm.tone)
                 .putExtra(AlarmReceiver.EXTRA_TITLE, alarm.title)
                 .putExtra(AlarmReceiver.EXTRA_TEXT, alarm.text)

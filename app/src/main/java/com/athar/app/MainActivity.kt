@@ -17,11 +17,17 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        val startTab = intent?.getStringExtra(EXTRA_TAB)
         setContent {
             AtharTheme {
-                AtharApp()
+                AtharApp(startTab = startTab)
             }
         }
+    }
+
+    companion object {
+        /** Tab to open (from widgets): home, dates, salaries, tasks, habits, debts, prayer. */
+        const val EXTRA_TAB = "tab"
     }
 
     override fun onStop() {

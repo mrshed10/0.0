@@ -35,12 +35,14 @@ import com.athar.app.feature.home.components.TasbihCard
 import com.athar.app.feature.home.components.TasksCard
 import com.athar.app.feature.home.components.VerseCard
 import com.athar.app.feature.tasks.Task
+import com.athar.app.widget.WidgetContent
+import com.athar.app.widget.WidgetType
 import dev.chrisbanes.haze.HazeState
 import java.time.LocalDateTime
 
 /** Navigation callbacks from the home screen. */
 data class HomeNavigation(
-    val onPinToWidget: () -> Unit = {},
+    val onPinToWidget: (WidgetContent) -> Unit = {},
     val onOpenSettings: () -> Unit = {},
     val onOpenCounters: () -> Unit = {},
     val onOpenSalaries: () -> Unit = {},
@@ -52,7 +54,7 @@ data class HomeNavigation(
 
 @Composable
 fun HomeRoute(
-    onPinToWidget: () -> Unit,
+    onPinToWidget: (WidgetContent) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenCounters: () -> Unit,
     onOpenSalaries: () -> Unit,
@@ -101,7 +103,7 @@ fun HomeScreen(
                     prayers = state.prayers,
                     next = next,
                     cityId = state.cityId,
-                    onPin = nav.onPinToWidget,
+                    onPin = { nav.onPinToWidget(WidgetContent(WidgetType.NextPrayer)) },
                     onOpen = nav.onOpenPrayer,
                 )
             }
@@ -111,14 +113,14 @@ fun HomeScreen(
                 Modifier.fillMaxWidth().height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                SalaryCard(state.today, state.nextSalary, nav.onPinToWidget, nav.onOpenSalaries, Modifier.weight(1f))
+                SalaryCard(state.today, state.nextSalary, { nav.onPinToWidget(WidgetContent(WidgetType.Salary)) }, nav.onOpenSalaries, Modifier.weight(1f))
                 TasbihCard(state.tasbih, onTasbih, onTasbihReset, Modifier.weight(1f))
             }
         }
-        item(key = "counters") { CountersSection(state.today, state.counters, nav.onPinToWidget, nav.onOpenCounters) }
-        item(key = "tasks") { TasksCard(state.todayTasks, state.today, onToggleTask, nav.onPinToWidget, nav.onOpenTasks) }
-        item(key = "habits") { HabitsCard(state.habits, onToggleHabit, nav.onPinToWidget, nav.onOpenHabits) }
-        item(key = "debts") { DebtsCard(state.debts, nav.onPinToWidget, nav.onOpenDebts) }
+        item(key = "counters") { CountersSection(state.today, state.counters, { id -> nav.onPinToWidget(WidgetContent(WidgetType.Counter, id)) }, nav.onOpenCounters) }
+        item(key = "tasks") { TasksCard(state.todayTasks, state.today, onToggleTask, { nav.onPinToWidget(WidgetContent(WidgetType.TodayTasks)) }, nav.onOpenTasks) }
+        item(key = "habits") { HabitsCard(state.habits, onToggleHabit, { nav.onPinToWidget(WidgetContent(WidgetType.Habits)) }, nav.onOpenHabits) }
+        item(key = "debts") { DebtsCard(state.debts, { nav.onPinToWidget(WidgetContent(WidgetType.Debts)) }, nav.onOpenDebts) }
         item(key = "verse") { VerseCard(state.verse) }
     }
 }

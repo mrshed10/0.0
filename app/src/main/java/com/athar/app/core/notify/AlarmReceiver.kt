@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import com.athar.app.AtharApplication
 import com.athar.app.MainActivity
 import com.athar.app.R
+import com.athar.app.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -54,6 +55,7 @@ private fun BroadcastReceiver.rescheduleAsync(context: Context) {
     CoroutineScope(Dispatchers.IO).launch {
         try {
             container.alarmScheduler.rescheduleAll()
+            WidgetUpdater.refreshAll(context)
         } finally {
             pending.finish()
         }

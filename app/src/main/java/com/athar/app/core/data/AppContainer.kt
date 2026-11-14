@@ -11,6 +11,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.merge
+import com.athar.app.widget.WidgetUpdater
 import kotlinx.coroutines.launch
 
 /** Manual dependency container; can be swapped for Hilt when the app grows. */
@@ -40,6 +42,28 @@ class AppContainer(context: Context) {
                     delay(300) // coalesce bursts of edits
                     runCatching { alarmScheduler.rescheduleAll() }
                 }
+        }
+    }
+}
+
+/** Redraws widgets and the lock-screen card when any shown data changes. */
+fun AppContainer.keepWidgetsInSync(context: Context, scope: CoroutineScope) {
+    scope.launch {
+        merge(
+            counterRepository.counters,
+            taskRepository.tasks,
+            habitRepository.habits,
+            habitRepository.doneDays,
+            debtRepository.people,
+            debtRepository.entries,
+            plannerRepository.salaries,
+            settings.prayer,
+            settings.general,
+            settings.tasbih,
+            settings.lockCard,
+        ).collectLatest {
+            delay(600)
+            WidgetUpdater.refreshAll(context)
         }
     }
 }

@@ -45,7 +45,7 @@ import java.time.LocalDate
 fun CountersSection(
     today: LocalDate,
     counters: List<Counter>,
-    onPin: () -> Unit,
+    onPin: (Long) -> Unit,
     onOpenAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -71,7 +71,7 @@ fun CountersSection(
         } else {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(counters, key = { it.id }) { counter ->
-                    CounterCard(today, counter, onPin, onOpenAll)
+                    CounterCard(today, counter, { onPin(counter.id) }, onOpenAll)
                 }
             }
         }

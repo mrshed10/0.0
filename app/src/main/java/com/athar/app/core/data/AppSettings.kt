@@ -9,6 +9,8 @@ import com.athar.app.feature.prayer.Prayer
 import com.athar.app.feature.prayer.PrayerCalculator
 import com.athar.app.feature.prayer.PrayerMethod
 import com.athar.app.feature.prayer.PrayerTime
+import com.athar.app.widget.WidgetContent
+import com.athar.app.widget.WidgetType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -160,6 +162,24 @@ class AppSettings(context: Context) {
         todayEpochDay = prefs.getLong("tasbih_day", 0),
         lifetime = prefs.getLong("tasbih_lifetime", 0),
     )
+
+    // --- lock-screen card ---
+    private val _lockCard = MutableStateFlow(readLockCard())
+    /** What the lock-screen card shows; null = off. */
+    val lockCard: StateFlow<WidgetContent?> = _lockCard.asStateFlow()
+
+    fun setLockCard(content: WidgetContent?) {
+        prefs.edit()
+            .putString("lock_type", content?.type?.name)
+            .putLong("lock_item", content?.itemId ?: -1)
+            .apply()
+        _lockCard.value = content
+    }
+
+    private fun readLockCard(): WidgetContent? {
+        val type = WidgetType.entries.firstOrNull { it.name == prefs.getString("lock_type", null) } ?: return null
+        return WidgetContent(type, prefs.getLong("lock_item", -1))
+    }
 
     // --- one-off flags ---
     var salariesSeeded: Boolean

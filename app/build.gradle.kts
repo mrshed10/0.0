@@ -65,6 +65,9 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // Home-screen widgets
+    implementation(libs.glance.appwidget)
+
     // Prayer times (offline astronomical calculation)
     implementation(libs.adhan)
 
