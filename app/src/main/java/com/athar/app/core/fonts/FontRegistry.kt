@@ -50,6 +50,10 @@ object FontRegistry {
         FontInfo("lalezar", "لاله‌زار", "Lalezar", FontScript.Arabic, R.font.lalezar_regular),
         FontInfo("rakkas", "ركاس", "Rakkas", FontScript.Arabic, R.font.rakkas_regular),
         FontInfo("poppins", "Poppins", "Poppins", FontScript.Latin, R.font.poppins_regular, R.font.poppins_medium, R.font.poppins_bold),
+        FontInfo("cinzel", "Cinzel", "Cinzel", FontScript.Latin, R.font.cinzel_regular),
+        FontInfo("bebasneue", "Bebas Neue", "Bebas Neue", FontScript.Latin, R.font.bebasneue_regular),
+        FontInfo("abrilfatface", "Abril Fatface", "Abril Fatface", FontScript.Latin, R.font.abrilfatface_regular),
+        FontInfo("anton", "Anton", "Anton", FontScript.Latin, R.font.anton_regular),
     )
 
     private const val PREFS = "athar_fonts"

@@ -58,6 +58,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.athar.app.R
+import com.athar.app.core.designsystem.component.AnimatedCountdown
+import com.athar.app.core.designsystem.component.AnimatedRing
 import com.athar.app.core.designsystem.component.CardHeader
 import com.athar.app.core.designsystem.component.FieldLabel
 import com.athar.app.core.designsystem.component.GlassButton
@@ -133,7 +135,15 @@ fun PrayerTabRoute(viewModel: PrayerViewModel = viewModel(factory = PrayerViewMo
                         onCustom = viewModel::tasbihCustom,
                     )
                 }
-                else -> item(key = "adhkar") { AdhkarPanel() }
+                else -> item(key = "adhkar") {
+                    AdhkarPanel(
+                        lists = state.adhkar,
+                        onSave = viewModel::saveDhikr,
+                        onDelete = viewModel::deleteDhikr,
+                        onMove = viewModel::moveDhikr,
+                        onReset = viewModel::resetAdhkar,
+                    )
+                }
             }
         }
 
@@ -211,12 +221,23 @@ private fun NextPrayerHero(state: PrayerUiState) {
     val left = Duration.between(state.now, state.next.at).coerceAtLeast(Duration.ZERO)
     val seconds = left.seconds
     val hms = String.format(java.util.Locale.ENGLISH, "%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+    val total = Duration.between(state.previousAt, state.next.at).seconds.coerceAtLeast(1)
+    val progress = 1f - seconds.toFloat() / total
     GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Gold, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.next_prayer), style = MaterialTheme.typography.labelLarge, color = AtharColors.Gold)
-        Text(stringResource(state.next.prayer.label), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
-        Text(hms, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = AtharColors.Gold)
-        Text(state.next.at.toLocalTime().formatClock(locale), style = MaterialTheme.typography.titleMedium, color = AtharColors.TextSecondary)
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.size(210.dp), contentAlignment = Alignment.Center) {
+            AnimatedRing(progress, Modifier.fillMaxSize())
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(stringResource(state.next.prayer.label), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                AnimatedCountdown(
+                    hms,
+                    MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = AtharColors.Gold),
+                )
+                Text(state.next.at.toLocalTime().formatClock(locale), style = MaterialTheme.typography.titleSmall, color = AtharColors.TextSecondary)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Text(
             state.now.toLocalDate().formatGregorian(locale, "EEEE d MMMM") + " · " + state.now.toLocalDate().formatHijri(),
             style = MaterialTheme.typography.labelMedium,

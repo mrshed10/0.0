@@ -22,7 +22,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /** What happens when an alarm fires. */
-enum class AlarmAction { Notify, Adhan, SilentOn, SilentOff, Refresh }
+enum class AlarmAction { Notify, Adhan, SilentOn, SilentOff, Refresh, Tick }
 
 /** One scheduled alarm. */
 data class Alarm(
@@ -34,6 +34,8 @@ data class Alarm(
     val title: String,
     val text: String,
     val action: AlarmAction = if (kind == null) AlarmAction.Refresh else AlarmAction.Notify,
+    /** false = fires only while the phone is awake (no battery cost when idle). */
+    val wakeup: Boolean = true,
 )
 
 /**
@@ -52,7 +54,7 @@ class AlarmScheduler(
     suspend fun rescheduleAll(now: LocalDateTime = LocalDateTime.now()) {
         // Silent mode turned off while a window was running: give the phone its sound back.
         if (!settings.prayer.value.silent.enabled) RingerControl.restore(context)
-        val alarms = prayerAlarms(now) + salaryAlarms(now) + reminderAlarms(now) + refreshAlarms(now)
+        val alarms = prayerAlarms(now) + salaryAlarms(now) + reminderAlarms(now) + refreshAlarms(now) + listOfNotNull(clockTick(now))
         val codes = alarms.map { it.code }.toSet()
         (settings.scheduledAlarmCodes - codes).forEach { cancel(it) }
         alarms.forEach { schedule(it) }
@@ -157,6 +159,21 @@ class AlarmScheduler(
         )
     }
 
+    /** Next-minute tick, only while a bitmap clock widget is on the home screen. */
+    private fun clockTick(now: LocalDateTime): Alarm? {
+        val store = com.athar.app.widget.WidgetStore(context)
+        val needed = com.athar.app.widget.WidgetUpdater.placedWidgetIds(context)
+            .any { store.get(it)?.content?.type?.minuteClock == true }
+        if (!needed) return null
+        val next = now.withSecond(0).withNano(0).plusMinutes(1).plusSeconds(1)
+        return Alarm(CLOCK_TICK, next, null, null, "", "", AlarmAction.Tick, wakeup = false)
+    }
+
+    /** Called on every tick: schedule only the next one (cheap). */
+    fun scheduleClockTick(now: LocalDateTime = LocalDateTime.now()) {
+        clockTick(now)?.let { schedule(it) } ?: cancel(CLOCK_TICK)
+    }
+
     private suspend fun salaryAlarms(now: LocalDateTime): List<Alarm> {
         val general = settings.general.value
         return planner.salaries.first().filter { it.remindDaysBefore >= 0 }.mapNotNull { source ->
@@ -223,12 +240,17 @@ class AlarmScheduler(
     private fun schedule(alarm: Alarm) {
         val millis = alarm.at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val pi = pendingIntent(alarm.code, alarm)
-        if (canScheduleExact()) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi)
-        } else {
-            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi)
+        when {
+            !alarm.wakeup && canScheduleExact() -> alarmManager.setExact(AlarmManager.RTC, millis, pi)
+            !alarm.wakeup -> alarmManager.set(AlarmManager.RTC, millis, pi)
+            canScheduleExact() -> alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi)
+            else -> alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, pi)
         }
     }
 
     private fun cancel(code: Int) = alarmManager.cancel(pendingIntent(code, null))
+
+    private companion object {
+        const val CLOCK_TICK = 9_002
+    }
 }

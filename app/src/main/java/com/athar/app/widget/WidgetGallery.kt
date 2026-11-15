@@ -59,6 +59,7 @@ enum class GalleryTab(@StringRes val label: Int) {
     Clock(R.string.gallery_clock),
     Digital(R.string.gallery_digital),
     Date(R.string.gallery_date),
+    Calligraphy(R.string.gallery_calligraphy),
     Prayer(R.string.gallery_prayer),
     Counters(R.string.gallery_counters),
     Habits(R.string.gallery_habits),
@@ -94,7 +95,39 @@ object WidgetTemplates {
     private val aurora = WidgetPresets.aurora
     private val clear = WidgetPresets.glassClear
 
+    private val dark = WidgetStyle(kind = BackgroundKind.Gradient, color1 = 0xFF1C1C1E.toInt(), color2 = 0xFF2C2C2E.toInt(), opacity = 92, accentColor = 0xFFE6C27A.toInt())
+
     val all = listOf(
+        // From the design file: clocks & world time
+        t("wide_clock", GalleryTab.Clock, R.string.widget_type_wide_clock, WidgetType.WideClock, dark, wide = true, isNew = true),
+        t("wide_clock_frost", GalleryTab.Clock, R.string.tpl_wide_frost, WidgetType.WideClock, frost.copy(variant = 1), wide = true),
+        t("world_side", GalleryTab.Clock, R.string.widget_type_world_clock, WidgetType.WorldClock, dark, wide = true, isNew = true),
+        t("world_stacked", GalleryTab.Clock, R.string.tpl_world_stacked, WidgetType.WorldClock, dark.copy(variant = 1), wide = false),
+        t("big_bebas", GalleryTab.Digital, R.string.tpl_big_condensed, WidgetType.BigClock, dark.copy(fontId = "bebasneue"), wide = false, isNew = true),
+        t("big_serif", GalleryTab.Digital, R.string.tpl_big_serif, WidgetType.BigClock, dark.copy(fontId = "abrilfatface"), wide = true),
+        t("big_arabic", GalleryTab.Digital, R.string.tpl_big_arabic, WidgetType.BigClock, dark.copy(fontId = "rakkas", arabicDigits = true), wide = true),
+        t("big_vertical", GalleryTab.Digital, R.string.tpl_big_vertical, WidgetType.BigClock, dark.copy(fontId = "anton", variant = 1), wide = false, isNew = true),
+        // Calendar & percentage
+        t("year_dots", GalleryTab.Date, R.string.widget_type_year_dots, WidgetType.YearDots, dark, wide = true, isNew = true),
+        t("month_dots", GalleryTab.Date, R.string.tpl_month_dots, WidgetType.YearDots, dark.copy(variant = 1), wide = false),
+        t("calendar", GalleryTab.Date, R.string.widget_type_calendar, WidgetType.MonthCalendar, dark, wide = false, isNew = true),
+        t("calendar_wide", GalleryTab.Date, R.string.tpl_calendar_wide, WidgetType.MonthCalendar, dark, wide = true),
+        t("date_simple", GalleryTab.Date, R.string.tpl_date_simple, WidgetType.Date, dark.copy(variant = 1), wide = false, isNew = true),
+        t("date_strip", GalleryTab.Date, R.string.tpl_date_strip, WidgetType.Date, dark.copy(variant = 2), wide = true),
+        t("date_hijri_greg", GalleryTab.Date, R.string.tpl_date_hijri_greg, WidgetType.Date, dark.copy(variant = 3), wide = true),
+        t("date_dual", GalleryTab.Date, R.string.tpl_date_dual, WidgetType.Date, dark.copy(variant = 4, fontId = "arefruqaa"), wide = true, isNew = true),
+        // Arabic calligraphy
+        t("cal_day_ar", GalleryTab.Calligraphy, R.string.tpl_cal_day_ar, WidgetType.CalligraphyDay, dark.copy(fontId = "arefruqaa"), wide = true, isNew = true),
+        t("cal_day_en", GalleryTab.Calligraphy, R.string.tpl_cal_day_en, WidgetType.CalligraphyDay, dark.copy(fontId = "cinzel", variant = 1), wide = true),
+        t("cal_day_ar_sq", GalleryTab.Calligraphy, R.string.tpl_cal_day_ar, WidgetType.CalligraphyDay, dark.copy(fontId = "arefruqaa"), wide = false),
+        t("cal_day_en_sq", GalleryTab.Calligraphy, R.string.tpl_cal_day_en_short, WidgetType.CalligraphyDay, dark.copy(fontId = "cinzel", variant = 2), wide = false),
+        t("cal_month_g_ar", GalleryTab.Calligraphy, R.string.tpl_cal_month_g_ar, WidgetType.CalligraphyMonth, dark.copy(fontId = "arefruqaa"), wide = true, isNew = true),
+        t("cal_month_h_ar", GalleryTab.Calligraphy, R.string.tpl_cal_month_h_ar, WidgetType.CalligraphyMonth, dark.copy(fontId = "arefruqaa", variant = 1), wide = true),
+        t("cal_month_g_en", GalleryTab.Calligraphy, R.string.tpl_cal_month_g_en, WidgetType.CalligraphyMonth, dark.copy(fontId = "cinzel", variant = 2), wide = true),
+        t("cal_month_h_en", GalleryTab.Calligraphy, R.string.tpl_cal_month_h_en, WidgetType.CalligraphyMonth, dark.copy(fontId = "cinzel", variant = 3), wide = true),
+        t("cal_month_g_ar_sq", GalleryTab.Calligraphy, R.string.tpl_cal_month_g_ar, WidgetType.CalligraphyMonth, dark.copy(fontId = "arefruqaa"), wide = false),
+        t("cal_month_h_ar_sq", GalleryTab.Calligraphy, R.string.tpl_cal_month_h_ar, WidgetType.CalligraphyMonth, dark.copy(fontId = "arefruqaa", variant = 1), wide = false),
+
         // Clocks
         t("analog_light", GalleryTab.Clock, R.string.tpl_analog_glass, WidgetType.AnalogClock, night.copy(cornerDp = 40), wide = false, isNew = true),
         t("analog_frost", GalleryTab.Clock, R.string.tpl_analog_frost, WidgetType.AnalogClock, frost.copy(variant = 1, cornerDp = 40), wide = false),
@@ -171,7 +204,7 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
             saveLabel = stringResource(R.string.add_to_home_screen),
             onCancel = { customizing = null },
             onSave = { config ->
-                val ok = WidgetPinner.pin(context, config)
+                val ok = WidgetPinner.pin(context, config, small = !template.wide)
                 Toast.makeText(context, if (ok) pinRequested else pinUnsupported, Toast.LENGTH_LONG).show()
                 if (ok) customizing = null
             },

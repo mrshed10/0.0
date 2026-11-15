@@ -6,6 +6,8 @@ import com.athar.app.core.fonts.FontRegistry
 import com.athar.app.core.region.Cities
 import com.athar.app.core.region.Country
 import com.athar.app.feature.prayer.AdhanVolume
+import com.athar.app.feature.prayer.AdhkarJson
+import com.athar.app.feature.prayer.AdhkarLists
 import com.athar.app.feature.prayer.AsrMadhab
 import com.athar.app.feature.prayer.PrayerAlert
 import com.athar.app.feature.prayer.PrayerAlertsJson
@@ -234,6 +236,18 @@ class AppSettings(context: Context) {
             .apply()
         _fonts.value = value
     }
+
+    // --- adhkar (editable) ---
+    private val _adhkar = MutableStateFlow(AdhkarJson.decode(prefs.getString("adhkar", null)) ?: AdhkarLists.defaults())
+    val adhkar: StateFlow<AdhkarLists> = _adhkar.asStateFlow()
+
+    fun updateAdhkar(transform: (AdhkarLists) -> AdhkarLists) {
+        val value = transform(_adhkar.value)
+        prefs.edit().putString("adhkar", AdhkarJson.encode(value)).apply()
+        _adhkar.value = value
+    }
+
+    fun resetAdhkar() = updateAdhkar { AdhkarLists.defaults() }
 
     // --- lock-screen card ---
     private val _lockCard = MutableStateFlow(readLockCard())

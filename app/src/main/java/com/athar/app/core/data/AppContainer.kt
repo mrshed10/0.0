@@ -25,7 +25,7 @@ class AppContainer(context: Context) {
     val habitRepository = HabitRepository(database.habitDao())
     val debtRepository = DebtRepository(database.debtDao())
     val plannerRepository = PlannerRepository(database.plannerDao())
-    val backupManager = BackupManager(database)
+    val backupManager = BackupManager(database, settings)
     val debtsSession = DebtsSession()
     val alarmScheduler = AlarmScheduler(context, settings, plannerRepository)
 
@@ -37,7 +37,8 @@ class AppContainer(context: Context) {
                 settings.general,
                 plannerRepository.salaries,
                 plannerRepository.reminders,
-            ) { a, b, c, d -> listOf(a, b, c, d) }
+                com.athar.app.widget.WidgetStore.changes, // minute tick for new clock widgets
+            ) { a, b, c, d, e -> listOf(a, b, c, d, e) }
                 .collectLatest {
                     delay(300) // coalesce bursts of edits
                     runCatching { alarmScheduler.rescheduleAll() }

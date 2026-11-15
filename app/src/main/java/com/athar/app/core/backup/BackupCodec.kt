@@ -30,6 +30,8 @@ data class BackupData(
     val debtEntries: List<DebtEntryEntity> = emptyList(),
     val salaries: List<SalarySourceEntity> = emptyList(),
     val reminders: List<ReminderEntity> = emptyList(),
+    /** Edited adhkar lists (JSON), null if not included. */
+    val adhkar: String? = null,
 ) {
     val itemCount: Int
         get() = counters.size + tasks.size + habits.size + people.size + debtEntries.size + salaries.size + reminders.size
@@ -129,6 +131,7 @@ object BackupCodec {
     // --- rows <-> JSON ---
 
     private fun toJson(d: BackupData) = JSONObject()
+        .put("adhkar", d.adhkar ?: JSONObject.NULL)
         .put("counters", array(d.counters) {
             JSONObject().put("id", it.id).put("title", it.title).put("date", it.dateEpochDay)
                 .put("direction", it.direction).put("tone", it.tone).put("calendar", it.calendar)
@@ -166,6 +169,7 @@ object BackupCodec {
         })
 
     private fun fromJson(o: JSONObject) = BackupData(
+        adhkar = if (o.has("adhkar") && !o.isNull("adhkar")) o.getString("adhkar") else null,
         counters = list(o, "counters") {
             CounterEntity(
                 it.getLong("id"), it.getString("title"), it.getLong("date"), it.getString("direction"),

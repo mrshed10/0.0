@@ -202,10 +202,33 @@ private fun PreviewContent(d: WidgetData, style: WidgetStyle, small: Boolean) {
             Spacer(Modifier.height(4.dp))
             PText(d.ref, accent, 11.sp, center = true)
         }
-        is WidgetData.DateInfo -> Column(centered, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            PText(d.day, text, if (small) 22.sp else 28.sp, bold = true, center = true)
-            PText(d.gregorian, text.copy(alpha = 0.8f), 13.sp, center = true)
-            PText(d.hijri, accent, 14.sp, bold = true, center = true)
+        is WidgetData.DateInfo -> when (style.variant) {
+            1 -> Column(centered, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                PText(d.day, text.copy(alpha = 0.75f), 15.sp, center = true)
+                PText(d.dayNum.toString(), text, if (small) 44.sp else 56.sp, bold = true, center = true)
+                PText(d.month, accent, 15.sp, center = true)
+            }
+            2 -> Box(centered, contentAlignment = Alignment.Center) {
+                PText("${d.day}، ${d.dayNum} ${d.month}، ${d.year}", text, 16.sp, bold = true, center = true)
+            }
+            3 -> Column(centered, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                PText("${d.day} ${d.hDay} ${d.hMonth} (${d.hMonthNum})، ${d.hYear}", text, 13.sp, bold = true, center = true)
+                PText("${d.dayNum} ${d.month} (${d.monthNum})، ${d.year}", text.copy(alpha = 0.8f), 13.sp, center = true)
+            }
+            4 -> Row(centered, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                PText(d.dayNum.toString(), text, 26.sp, bold = true)
+                Spacer(Modifier.width(6.dp))
+                PText(d.monthCal, text, 24.sp)
+                PText("  |  ", text.copy(alpha = 0.3f), 22.sp)
+                PText(d.hDay.toString(), accent, 26.sp, bold = true)
+                Spacer(Modifier.width(6.dp))
+                PText(d.hMonthCal, accent, 24.sp)
+            }
+            else -> Column(centered, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                PText(d.day, text, if (small) 22.sp else 28.sp, bold = true, center = true)
+                PText(d.gregorian, text.copy(alpha = 0.8f), 13.sp, center = true)
+                PText(d.hijri, accent, 14.sp, bold = true, center = true)
+            }
         }
         is WidgetData.Schedule -> Column {
             PText("🗓️ " + context.getString(R.string.widget_type_schedule), accent, 12.sp, bold = true)
@@ -229,6 +252,33 @@ private fun PreviewContent(d: WidgetData, style: WidgetStyle, small: Boolean) {
                 }
             }
         }
+        is WidgetData.BigClock -> RenderedPreview(style) { w, h, tf ->
+            WidgetRenderers.bigClock(w, h, d.lines, tf ?: FontRegistry.typeface(context, "bebasneue"), style.textColor, style.accentColor)
+        }
+        is WidgetData.MonthGrid -> RenderedPreview(style) { w, h, tf ->
+            WidgetRenderers.calendar(
+                w, h, d.month, d.today, d.startSunday, d.weekdays, tf, style.textColor, style.accentColor,
+                context.resources.configuration.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL,
+            )
+        }
+        is WidgetData.Calligraphy -> RenderedPreview(style) { w, h, tf ->
+            WidgetRenderers.calligraphy(
+                w, h, d.main, d.number, d.sub, tf ?: FontRegistry.typeface(context, if (d.latin) "cinzel" else "arefruqaa"),
+                style.textColor, style.accentColor, d.latin,
+            )
+        }
+        is WidgetData.Dots -> Column {
+            Row {
+                PText(d.title, text.copy(alpha = 0.8f), 13.sp, modifier = Modifier.weight(1f))
+                PText("${d.percent}%", accent, 14.sp, bold = true)
+            }
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.weight(1f)) {
+                RenderedPreview(style) { w, h, _ -> WidgetRenderers.dots(w, h, d.filled, d.total, style.textColor) }
+            }
+        }
+        is WidgetData.WorldClock -> WorldPreview(d, style, text, accent)
+        is WidgetData.WideClock -> WidePreview(style.variant == 1, text)
         is WidgetData.Clock -> if (d.analog) {
             AnalogPreview(dark = style.variant == 1, accent = accent)
         } else {
@@ -284,5 +334,94 @@ private fun AnalogPreview(dark: Boolean, accent: Color) {
         rotate(hourAngle, c) { drawLine(ink, Offset(c.x, c.y + r * 0.08f), Offset(c.x, c.y - r * 0.48f), r * 0.07f, StrokeCap.Round) }
         rotate(minuteAngle, c) { drawLine(ink, Offset(c.x, c.y + r * 0.12f), Offset(c.x, c.y - r * 0.78f), r * 0.04f, StrokeCap.Round) }
         drawCircle(accent, radius = r * 0.06f, center = c)
+    }
+}
+
+/** Uses the widget's own bitmap renderer so the preview matches exactly. */
+@Composable
+private fun RenderedPreview(style: WidgetStyle, draw: (Int, Int, android.graphics.Typeface?) -> Bitmap) {
+    val context = LocalContext.current
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val density = LocalDensity.current
+        val w = with(density) { maxWidth.roundToPx() }.coerceAtLeast(8)
+        val h = with(density) { maxHeight.roundToPx() }.coerceAtLeast(8)
+        val bitmap by produceState<Bitmap?>(null, style, w, h) {
+            value = withContext(Dispatchers.Default) { draw(w, h, FontRegistry.typeface(context, style.fontId)) }
+        }
+        bitmap?.let { Image(it.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize()) }
+    }
+}
+
+@Composable
+private fun WorldPreview(d: WidgetData.WorldClock, style: WidgetStyle, text: Color, accent: Color) {
+    val now by produceState(java.time.Instant.now()) {
+        while (true) {
+            value = java.time.Instant.now()
+            delay(1_000)
+        }
+    }
+    val fmt = DateTimeFormatter.ofPattern("hh:mm", java.util.Locale.ENGLISH)
+    val ampm = DateTimeFormatter.ofPattern("a")
+    @Composable
+    fun city(c: WorldCity, modifier: Modifier) {
+        val t = now.atZone(java.time.ZoneId.of(c.zone))
+        Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+            PText(c.name(d.arabic), accent, 12.sp, center = true)
+            PText(fmt.format(t), text, 30.sp, bold = true, center = true)
+            PText(ampm.format(t), text.copy(alpha = 0.7f), 11.sp, center = true)
+        }
+    }
+    if (style.variant == 1) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceEvenly) {
+            city(d.a, Modifier.fillMaxWidth())
+            city(d.b, Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            city(d.a, Modifier.weight(1f))
+            Box(Modifier.width(1.dp).height(60.dp).background(text.copy(alpha = 0.2f)))
+            city(d.b, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun WidePreview(dark: Boolean, text: Color) {
+    val now by produceState(LocalTime.now()) {
+        while (true) {
+            value = LocalTime.now()
+            delay(1_000)
+        }
+    }
+    val ink = if (dark) Color(0xFF0B1026) else Color.White
+    Box(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize()) {
+            val c = Offset(size.width / 2, size.height / 2)
+            for (i in 0 until 60) {
+                val a = Math.toRadians(i * 6.0)
+                val dx = sin(a).toFloat()
+                val dy = -cos(a).toFloat()
+                val tx = if (kotlin.math.abs(dx) > 1e-4f) (c.x - 4f) / kotlin.math.abs(dx) else Float.MAX_VALUE
+                val ty = if (kotlin.math.abs(dy) > 1e-4f) (c.y - 4f) / kotlin.math.abs(dy) else Float.MAX_VALUE
+                val t = minOf(tx, ty)
+                val len = if (i % 5 == 0) 14f else 7f
+                drawLine(
+                    if (i == 0) Color(0xFFE6C27A) else ink.copy(alpha = 0.7f),
+                    Offset(c.x + dx * (t - len), c.y + dy * (t - len)),
+                    Offset(c.x + dx * t, c.y + dy * t),
+                    strokeWidth = if (i % 5 == 0) 3f else 1.5f,
+                    cap = StrokeCap.Round,
+                )
+            }
+            val r = size.height * 0.4f
+            rotate((now.hour % 12 + now.minute / 60f) * 30f, c) { drawLine(ink, c, Offset(c.x, c.y - r * 0.6f), r * 0.08f, StrokeCap.Round) }
+            rotate((now.minute + now.second / 60f) * 6f, c) { drawLine(ink, c, Offset(c.x, c.y - r * 0.95f), r * 0.05f, StrokeCap.Round) }
+            rotate(now.second * 6f, c) { drawLine(Color(0xFFE53935), Offset(c.x, c.y + r * 0.15f), Offset(c.x, c.y - r), 2f, StrokeCap.Round) }
+        }
+        Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            PText(DateTimeFormatter.ofPattern("h").format(now), text, 34.sp, bold = true)
+            Spacer(Modifier.weight(1f))
+            PText(DateTimeFormatter.ofPattern("mm").format(now), text, 34.sp, bold = true)
+        }
     }
 }

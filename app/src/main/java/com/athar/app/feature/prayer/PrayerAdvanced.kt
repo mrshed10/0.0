@@ -47,6 +47,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.athar.app.R
 import com.athar.app.core.data.PrayerPrefs
+import com.athar.app.core.designsystem.component.AnimatedCountdown
+import com.athar.app.core.designsystem.component.AnimatedGlassProgress
 import com.athar.app.core.designsystem.component.CardHeader
 import com.athar.app.core.designsystem.component.ConfirmButton
 import com.athar.app.core.designsystem.component.FieldLabel
@@ -96,38 +98,54 @@ private fun MinutesStepper(label: String, value: Int, range: IntRange, onChange:
     )
 }
 
-/** Elapsed time since the adhan, time left until the prayer time ends, and iqama countdown. */
+/** Elapsed time since the adhan, time left until the prayer time ends, and iqama countdown — animated. */
 @Composable
 fun CurrentPrayerCard(state: PrayerUiState, current: CurrentPrayer) {
     val locale = currentLocale()
     val now = state.now
+    val total = Duration.between(current.start, current.end).seconds.coerceAtLeast(1)
+    val progress = current.elapsed(now).seconds.toFloat() / total
+    val numbers = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = AtharColors.TextPrimary)
     GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Teal) {
         CardHeader(
             stringResource(R.string.current_prayer, stringResource(current.prayer.label)),
             Icons.Rounded.Timer,
             tint = AtharColors.Teal,
+            trailing = { GlassChip("${(progress * 100).toInt().coerceIn(0, 100)}%", AtharColors.Teal) },
         )
+        Spacer(Modifier.height(12.dp))
+        AnimatedGlassProgress(progress, colors = listOf(AtharColors.Teal, AtharColors.Gold, AtharColors.Rose))
+        Spacer(Modifier.height(6.dp))
+        Row {
+            Text(current.start.toLocalTime().formatClock(locale), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary, modifier = Modifier.weight(1f))
+            Text(current.end.toLocalTime().formatClock(locale), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+        }
         Spacer(Modifier.height(10.dp))
         Row {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.elapsed_since_adhan), style = MaterialTheme.typography.labelMedium, color = AtharColors.TextSecondary)
-                Text(hms(current.elapsed(now)), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                AnimatedCountdown(hms(current.elapsed(now)), numbers)
             }
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.time_left_to_end), style = MaterialTheme.typography.labelMedium, color = AtharColors.TextSecondary)
-                Text(hms(current.left(now)), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = AtharColors.Rose)
-                Text(
-                    stringResource(R.string.ends_at, current.end.toLocalTime().formatClock(locale)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AtharColors.TextTertiary,
-                )
+                AnimatedCountdown(hms(current.left(now)), numbers.copy(color = AtharColors.Rose))
             }
         }
         current.iqamaAt?.let { iqama ->
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(12.dp))
             val toIqama = Duration.between(now, iqama)
             if (!toIqama.isNegative) {
-                GlassChip(stringResource(R.string.iqama_in, hms(toIqama).substring(3)), AtharColors.Gold)
+                val iqamaTotal = Duration.between(current.start, iqama).seconds.coerceAtLeast(1)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.iqama_in, ""), style = MaterialTheme.typography.labelLarge, color = AtharColors.Gold)
+                    AnimatedCountdown(hms(toIqama).substring(3), MaterialTheme.typography.labelLarge.copy(color = AtharColors.Gold, fontWeight = FontWeight.Bold))
+                }
+                Spacer(Modifier.height(6.dp))
+                AnimatedGlassProgress(
+                    1f - toIqama.seconds.toFloat() / iqamaTotal,
+                    colors = listOf(AtharColors.Violet, AtharColors.Gold),
+                    height = 6.dp,
+                )
             } else {
                 GlassChip(stringResource(R.string.iqama_done, iqama.toLocalTime().formatClock(locale)), AtharColors.Teal)
             }

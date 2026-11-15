@@ -34,6 +34,21 @@ object WidgetUpdater {
     /** Bumped on every refresh; live widgets collect it and reload their data. */
     val version: StateFlow<Long> = _version.asStateFlow()
 
+    private val _tick = MutableStateFlow(0L)
+
+    /** Bumped each minute for bitmap clocks only. */
+    val tick: StateFlow<Long> = _tick.asStateFlow()
+
+    /** Redraws only the minute-clock widgets. */
+    suspend fun refreshClocks(context: Context) {
+        _tick.update { it + 1 }
+        val store = WidgetStore(context)
+        val manager = GlanceAppWidgetManager(context)
+        placedWidgetIds(context)
+            .filter { store.get(it)?.content?.type?.minuteClock == true }
+            .forEach { id -> runCatching { AtharWidget().update(context, manager.getGlanceIdBy(id)) } }
+    }
+
     /** Reloads every placed widget (live or not) and the lock-screen card. */
     suspend fun refreshAll(context: Context) {
         _version.update { it + 1 }
@@ -60,15 +75,15 @@ object WidgetUpdater {
 object WidgetPinner {
     fun pin(context: Context, content: WidgetContent): Boolean = pin(context, WidgetConfig(content))
 
-    /** Places a widget with a fully customized [config] (from the gallery). */
-    fun pin(context: Context, config: WidgetConfig): Boolean {
+    /** Places a widget with a fully customized [config] (from the gallery); [small] picks the 2×2 size. */
+    fun pin(context: Context, config: WidgetConfig, small: Boolean? = null): Boolean {
         val content = config.content
         val awm = AppWidgetManager.getInstance(context)
         if (!awm.isRequestPinAppWidgetSupported) return false
         WidgetStore(context).pending = config
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
         val callback = PendingIntent.getBroadcast(context, 1, Intent(context, WidgetPinnedReceiver::class.java), flags)
-        val provider = if (content.type.prefersSmall) AtharSmallWidgetReceiver::class.java else AtharWidgetReceiver::class.java
+        val provider = if (small ?: content.type.prefersSmall) AtharSmallWidgetReceiver::class.java else AtharWidgetReceiver::class.java
         return awm.requestPinAppWidget(ComponentName(context, provider), null, callback)
     }
 }
@@ -157,6 +172,13 @@ object LockCard {
             is WidgetData.Schedule -> builder.setContentTitle("🗓️ " + context.getString(R.string.widget_type_schedule))
                 .setContentText(data.rows.take(3).joinToString(" • ") { "${it.name}: ${it.daysText}" })
             is WidgetData.Clock -> builder.setContentTitle(data.day).setContentText(data.hijri)
+            is WidgetData.Dots -> builder.setContentTitle("${data.title} · ${data.percent}%")
+            is WidgetData.Calligraphy -> builder.setContentTitle(data.main).setContentText(data.sub.orEmpty())
+            is WidgetData.WorldClock, is WidgetData.WideClock, is WidgetData.BigClock, is WidgetData.MonthGrid -> {
+                val today = java.time.LocalDate.now()
+                builder.setContentTitle(today.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, context.resources.configuration.locales[0]))
+                    .setContentText(today.toString())
+            }
             WidgetData.Missing, WidgetData.Unconfigured -> {
                 nm.cancel(NOTIFICATION_ID)
                 return

@@ -51,18 +51,20 @@ fun GlassTextField(
     onDone: (() -> Unit)? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
     isPassword: Boolean = false,
+    singleLine: Boolean = true,
 ) {
     val shape = RoundedCornerShape(16.dp)
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        singleLine = true,
+        singleLine = singleLine,
+        minLines = if (singleLine) 1 else 3,
         textStyle = MaterialTheme.typography.bodyLarge.copy(color = AtharColors.TextPrimary),
         cursorBrush = SolidColor(AtharColors.Gold),
         keyboardOptions = KeyboardOptions(
             capitalization = if (keyboardType == KeyboardType.Text) KeyboardCapitalization.Sentences else KeyboardCapitalization.None,
             keyboardType = if (isPassword) KeyboardType.Password else keyboardType,
-            imeAction = ImeAction.Done,
+            imeAction = if (singleLine) ImeAction.Done else ImeAction.Default,
         ),
         visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),

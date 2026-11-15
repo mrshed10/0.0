@@ -1,12 +1,14 @@
 package com.athar.app.core.backup
 
 import androidx.room.withTransaction
+import com.athar.app.core.data.AppSettings
 import com.athar.app.core.database.AtharDatabase
+import com.athar.app.feature.prayer.AdhkarJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Reads all tables into a [BackupData] and restores one (replacing everything). */
-class BackupManager(private val db: AtharDatabase) {
+class BackupManager(private val db: AtharDatabase, private val settings: AppSettings) {
 
     suspend fun snapshot(): BackupData = withContext(Dispatchers.IO) {
         db.withTransaction {
@@ -19,6 +21,7 @@ class BackupManager(private val db: AtharDatabase) {
                 debtEntries = db.debtDao().allEntries(),
                 salaries = db.plannerDao().allSalaries(),
                 reminders = db.plannerDao().allReminders(),
+                adhkar = AdhkarJson.encode(settings.adhkar.value),
             )
         }
     }
@@ -43,5 +46,6 @@ class BackupManager(private val db: AtharDatabase) {
             db.plannerDao().insertSalaries(data.salaries)
             db.plannerDao().insertReminders(data.reminders)
         }
+        AdhkarJson.decode(data.adhkar)?.let { lists -> settings.updateAdhkar { lists } }
     }
 }

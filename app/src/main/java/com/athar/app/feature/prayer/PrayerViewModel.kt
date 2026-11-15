@@ -30,6 +30,9 @@ data class PrayerUiState(
     val tasbih: TasbihState,
     /** The prayer whose time we are in (elapsed, time left, iqama). */
     val current: CurrentPrayer?,
+    /** Start of the interval leading to [next] (previous prayer), for the progress ring. */
+    val previousAt: LocalDateTime,
+    val adhkar: AdhkarLists,
 )
 
 class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
@@ -42,14 +45,14 @@ class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
     }
 
     val uiState: StateFlow<PrayerUiState> =
-        combine(clock, settings.prayer, settings.tasbih) { now, prefs, tasbih -> build(now, prefs, tasbih) }
+        combine(clock, settings.prayer, settings.tasbih, settings.adhkar) { now, prefs, tasbih, adhkar -> build(now, prefs, tasbih, adhkar) }
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(5_000),
-                build(LocalDateTime.now(), settings.prayer.value, settings.tasbih.value),
+                build(LocalDateTime.now(), settings.prayer.value, settings.tasbih.value, settings.adhkar.value),
             )
 
-    private fun build(now: LocalDateTime, prefs: PrayerPrefs, tasbih: TasbihState): PrayerUiState {
+    private fun build(now: LocalDateTime, prefs: PrayerPrefs, tasbih: TasbihState, adhkar: AdhkarLists): PrayerUiState {
         val today = prefs.timesFor(now.toLocalDate())
         val tomorrow = prefs.timesFor(now.toLocalDate().plusDays(1))
         val yesterday = prefs.timesFor(now.toLocalDate().minusDays(1))
@@ -64,8 +67,43 @@ class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
             current = PrayerWindow.current(now, yesterday, today, tomorrow) { p ->
                 prefs.alert(p).takeIf { it.iqamaEnabled }?.iqamaMinutes
             },
+            previousAt = previousPrayer(now, yesterday, today),
+            adhkar = adhkar,
         )
     }
+
+    /** The last obligatory prayer time before [now] (yesterday's Isha before Fajr). */
+    private fun previousPrayer(now: LocalDateTime, yesterday: List<PrayerTime>, today: List<PrayerTime>): LocalDateTime {
+        val d = now.toLocalDate()
+        val todays = today.filter { it.prayer.isObligatory }.map { d.atTime(it.time) }.filter { !it.isAfter(now) }
+        return todays.maxOrNull()
+            ?: yesterday.firstOrNull { it.prayer == Prayer.Isha }?.let { d.minusDays(1).atTime(it.time) }
+            ?: now.minusHours(1)
+    }
+
+    // --- adhkar ---
+    fun saveDhikr(evening: Boolean, dhikr: UserDhikr) = settings.updateAdhkar { lists ->
+        val list = lists.list(evening)
+        val updated = if (list.any { it.id == dhikr.id }) {
+            list.map { if (it.id == dhikr.id) dhikr else it }
+        } else {
+            list + dhikr.copy(id = lists.nextId)
+        }
+        lists.replace(evening, updated)
+    }
+
+    fun deleteDhikr(evening: Boolean, id: Long) = settings.updateAdhkar { it.replace(evening, it.list(evening).filterNot { d -> d.id == id }) }
+
+    fun moveDhikr(evening: Boolean, id: Long, up: Boolean) = settings.updateAdhkar { lists ->
+        val list = lists.list(evening).toMutableList()
+        val i = list.indexOfFirst { it.id == id }
+        val j = if (up) i - 1 else i + 1
+        if (i < 0 || j !in list.indices) return@updateAdhkar lists
+        list[i] = list[j].also { list[j] = list[i] }
+        lists.replace(evening, list)
+    }
+
+    fun resetAdhkar() = settings.resetAdhkar()
 
     fun selectCity(city: City) = settings.updatePrayer {
         it.copy(latitude = city.latitude, longitude = city.longitude, cityId = city.id)

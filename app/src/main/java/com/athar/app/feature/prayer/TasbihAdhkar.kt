@@ -19,7 +19,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableStateMapOf
+import com.athar.app.core.ui.Stepper
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -204,30 +212,65 @@ fun TasbihPanel(
     }
 }
 
-/** Morning/evening adhkar; tap a card to count down its repetitions. */
+/**
+ * Morning/evening adhkar. Tap a card to count down its repetitions; in edit
+ * mode add, edit (text and count), reorder, delete, or restore the defaults.
+ */
 @Composable
-fun AdhkarPanel() {
-    val locale = currentLocale()
-    var evening by rememberSaveable { mutableIntStateOf(0) }
-    val list = if (evening == 0) SpiritualContent.morning else SpiritualContent.evening
-    val remaining = remember(evening) { mutableStateListOf(*list.map { it.count }.toTypedArray()) }
+fun AdhkarPanel(
+    lists: AdhkarLists,
+    onSave: (Boolean, UserDhikr) -> Unit,
+    onDelete: (Boolean, Long) -> Unit,
+    onMove: (Boolean, Long, Boolean) -> Unit,
+    onReset: () -> Unit,
+) {
+    var page by rememberSaveable { mutableIntStateOf(0) }
+    var editMode by rememberSaveable { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<UserDhikr?>(null) }
+    val evening = page == 1
+    val list = lists.list(evening)
+    // Remaining repetitions per dhikr id (resets when the list changes page).
+    val remaining = remember(page) { mutableStateMapOf<Long, Int>() }
     val haptics = LocalHapticFeedback.current
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         GlassSegmented(
             options = listOf(stringResource(R.string.adhkar_morning), stringResource(R.string.adhkar_evening)),
-            selectedIndex = evening,
-            onSelect = { evening = it },
+            selectedIndex = page,
+            onSelect = { page = it },
         )
-        list.forEachIndexed { i, dhikr ->
-            val left = remaining.getOrElse(i) { 0 }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.adhkar_count_label, list.size.formatNumber()),
+                style = MaterialTheme.typography.labelLarge,
+                color = AtharColors.TextSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            GlassChip(
+                stringResource(if (editMode) R.string.done else R.string.edit),
+                if (editMode) AtharColors.Gold else AtharColors.Violet,
+                Modifier.clickable { editMode = !editMode },
+            )
+        }
+        if (editMode) {
+            GlassButton(
+                stringResource(R.string.add_dhikr),
+                { editing = UserDhikr(0, "", 1) },
+                icon = Icons.Rounded.Add,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        list.forEachIndexed { index, dhikr ->
+            val left = remaining[dhikr.id] ?: dhikr.count
             val done = left == 0
             GlassCard(
                 Modifier.fillMaxWidth(),
-                accent = if (done) AtharColors.Teal else null,
+                accent = if (done && !editMode) AtharColors.Teal else null,
                 onClick = {
-                    if (left > 0) {
-                        remaining[i] = left - 1
+                    if (editMode) {
+                        editing = dhikr
+                    } else if (left > 0) {
+                        remaining[dhikr.id] = left - 1
                         haptics.performHapticFeedback(
                             if (left == 1) HapticFeedbackType.LongPress else HapticFeedbackType.TextHandleMove,
                         )
@@ -235,17 +278,25 @@ fun AdhkarPanel() {
                 },
             ) {
                 Text(
-                    dhikr.ar,
+                    dhikr.text,
                     style = MaterialTheme.typography.titleMedium.copy(fontFamily = LocalDecorativeFont.current),
-                    color = if (done) AtharColors.TextTertiary else AtharColors.TextPrimary,
+                    color = if (done && !editMode) AtharColors.TextTertiary else AtharColors.TextPrimary,
                 )
-                if (locale.language != "ar") {
-                    Spacer(Modifier.height(4.dp))
-                    Text(dhikr.en, style = MaterialTheme.typography.bodySmall, color = AtharColors.TextSecondary)
-                }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (done) {
+                    if (editMode) {
+                        GlassChip(stringResource(R.string.dhikr_repeat, dhikr.count.formatNumber()), AtharColors.Gold)
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = { onMove(evening, dhikr.id, true) }, enabled = index > 0) {
+                            Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = stringResource(R.string.move_up), tint = AtharColors.TextSecondary)
+                        }
+                        IconButton(onClick = { onMove(evening, dhikr.id, false) }, enabled = index < list.lastIndex) {
+                            Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = stringResource(R.string.move_down), tint = AtharColors.TextSecondary)
+                        }
+                        IconButton(onClick = { editing = dhikr }) {
+                            Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.edit), tint = AtharColors.Gold)
+                        }
+                    } else if (done) {
                         Icon(Icons.Rounded.Check, contentDescription = null, tint = AtharColors.Teal, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(stringResource(R.string.done), style = MaterialTheme.typography.labelLarge, color = AtharColors.Teal)
@@ -253,6 +304,62 @@ fun AdhkarPanel() {
                         GlassChip(stringResource(R.string.times_left, left.formatNumber()), AtharColors.Gold)
                     }
                 }
+            }
+        }
+        if (editMode) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                ConfirmButton(
+                    text = stringResource(R.string.restore_default_adhkar),
+                    confirmText = stringResource(R.string.tap_to_confirm),
+                    onConfirm = onReset,
+                    color = AtharColors.Rose,
+                    icon = Icons.Rounded.Refresh,
+                )
+            }
+        }
+    }
+
+    editing?.let { dhikr ->
+        var text by remember(dhikr.id) { mutableStateOf(dhikr.text) }
+        var count by remember(dhikr.id) { mutableIntStateOf(dhikr.count) }
+        GlassSheet(onDismiss = { editing = null }) {
+            Text(
+                stringResource(if (dhikr.id == 0L) R.string.add_dhikr else R.string.edit_dhikr),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            GlassTextField(text, { text = it }, stringResource(R.string.dhikr_text_hint), Modifier.fillMaxWidth(), singleLine = false)
+            Stepper(
+                stringResource(R.string.dhikr_count),
+                count.formatNumber(),
+                { n -> count = (count + n.toInt()).coerceIn(1, 1000) },
+                Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1, 3, 7, 10, 33, 100).forEach { preset ->
+                    GlassChip(
+                        preset.formatNumber(),
+                        if (preset == count) AtharColors.Gold else AtharColors.TextSecondary,
+                        Modifier.clickable { count = preset },
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (dhikr.id != 0L) {
+                    ConfirmButton(
+                        text = stringResource(R.string.delete),
+                        confirmText = stringResource(R.string.tap_to_confirm),
+                        onConfirm = { onDelete(evening, dhikr.id); editing = null },
+                        icon = Icons.Rounded.DeleteOutline,
+                    )
+                }
+                GlassButton(
+                    stringResource(R.string.save),
+                    { onSave(evening, dhikr.copy(text = text.trim(), count = count)); editing = null },
+                    enabled = text.isNotBlank(),
+                    icon = Icons.Rounded.Check,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }

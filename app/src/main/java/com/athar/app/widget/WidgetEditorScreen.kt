@@ -118,7 +118,13 @@ fun WidgetEditorScreen(
             else -> emptyList()
         }
     }
-    val data by produceState<WidgetData>(WidgetData.Unconfigured, config.content, config.style.dateStyle) {
+    val data by produceState<WidgetData>(
+        WidgetData.Unconfigured,
+        config.content,
+        config.style.dateStyle,
+        config.style.variant,
+        config.style.arabicDigits,
+    ) {
         value = WidgetDataLoader.load(context, config)
     }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -192,22 +198,54 @@ fun WidgetEditorScreen(
                         )
                     }
                 }
-                if (config.content.type == WidgetType.AnalogClock || config.content.type == WidgetType.DigitalClock) {
+                val variants = variantLabels(config.content.type)
+                if (variants.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
                     FieldLabel(stringResource(R.string.clock_design))
                     Spacer(Modifier.height(6.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        variants.forEachIndexed { i, label ->
+                            GlassChip(
+                                stringResource(label),
+                                if (style.variant == i) AtharColors.Gold else AtharColors.TextSecondary,
+                                Modifier.clickable { setStyle(style.copy(variant = i)) },
+                            )
+                        }
+                    }
+                }
+                if (config.content.type == WidgetType.DigitalClock && !ClockLayouts.supportsFont(style.fontId)) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.clock_font_note), style = MaterialTheme.typography.labelSmall, color = AtharColors.Rose)
+                }
+                if (config.content.type == WidgetType.BigClock) {
+                    Spacer(Modifier.height(12.dp))
+                    FieldLabel(stringResource(R.string.digits_label))
+                    Spacer(Modifier.height(6.dp))
                     GlassSegmented(
-                        options = if (config.content.type == WidgetType.AnalogClock) {
-                            listOf(stringResource(R.string.clock_light_hands), stringResource(R.string.clock_dark_hands))
-                        } else {
-                            listOf(stringResource(R.string.clock_with_date), stringResource(R.string.clock_time_only))
-                        },
-                        selectedIndex = style.variant.coerceIn(0, 1),
-                        onSelect = { setStyle(style.copy(variant = it)) },
+                        options = listOf("12:34", "١٢:٣٤"),
+                        selectedIndex = if (style.arabicDigits) 1 else 0,
+                        onSelect = { setStyle(style.copy(arabicDigits = it == 1)) },
                     )
-                    if (config.content.type == WidgetType.DigitalClock && !ClockLayouts.supportsFont(style.fontId)) {
+                }
+                if (config.content.type == WidgetType.WorldClock) {
+                    val (a, b) = WorldCities.pair(config.content.extra)
+                    val arabic = currentLocale().language == "ar"
+                    listOf(R.string.world_city_1 to a, R.string.world_city_2 to b).forEachIndexed { slot, (label, chosen) ->
+                        Spacer(Modifier.height(12.dp))
+                        FieldLabel(stringResource(label))
                         Spacer(Modifier.height(6.dp))
-                        Text(stringResource(R.string.clock_font_note), style = MaterialTheme.typography.labelSmall, color = AtharColors.Rose)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            WorldCities.all.forEach { city ->
+                                GlassChip(
+                                    city.name(arabic),
+                                    if (city.id == chosen.id) AtharColors.Gold else AtharColors.TextSecondary,
+                                    Modifier.clickable {
+                                        val ids = if (slot == 0) "${city.id},${b.id}" else "${a.id},${city.id}"
+                                        config = config.copy(content = config.content.copy(extra = ids))
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
                 if (config.content.type.needsItem || config.content.type == WidgetType.Salary) {
@@ -384,6 +422,24 @@ fun WidgetEditorScreen(
             )
         }
     }
+}
+
+/** Design options shown for a widget type (index = [WidgetStyle.variant]). */
+private fun variantLabels(type: WidgetType): List<Int> = when (type) {
+    WidgetType.AnalogClock, WidgetType.WideClock -> listOf(R.string.clock_light_hands, R.string.clock_dark_hands)
+    WidgetType.DigitalClock -> listOf(R.string.clock_with_date, R.string.clock_time_only)
+    WidgetType.WorldClock -> listOf(R.string.variant_side_by_side, R.string.variant_stacked)
+    WidgetType.BigClock -> listOf(R.string.variant_horizontal, R.string.variant_vertical)
+    WidgetType.YearDots -> listOf(R.string.variant_year, R.string.variant_month)
+    WidgetType.MonthCalendar -> listOf(R.string.variant_week_sunday, R.string.variant_week_saturday)
+    WidgetType.CalligraphyDay -> listOf(R.string.variant_arabic, R.string.variant_english, R.string.variant_english_short)
+    WidgetType.CalligraphyMonth -> listOf(
+        R.string.variant_gregorian_ar, R.string.variant_hijri_ar, R.string.variant_gregorian_en, R.string.variant_hijri_en,
+    )
+    WidgetType.Date -> listOf(
+        R.string.variant_classic, R.string.variant_simple, R.string.variant_strip, R.string.variant_hijri_greg, R.string.variant_dual,
+    )
+    else -> emptyList()
 }
 
 @Composable

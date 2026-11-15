@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.TextUnit
@@ -78,7 +79,11 @@ class AtharWidget : GlanceAppWidget() {
         val store = WidgetStore(context)
         val firstConfig = store.get(appWidgetId)
         val first = firstConfig to WidgetDataLoader.load(context, firstConfig)
-        val live = combine(WidgetStore.changes, WidgetUpdater.version) { a, b -> a to b }
+        val live = combine(WidgetStore.changes, WidgetUpdater.version, WidgetUpdater.tick) { a, b, t ->
+            // Clock ticks only matter to minute clocks.
+            Triple(a, b, if (store.get(appWidgetId)?.content?.type?.minuteClock == true) t else 0L)
+        }
+            .distinctUntilChanged()
             .map {
                 val config = store.get(appWidgetId)
                 config to WidgetDataLoader.load(context, config)
@@ -139,7 +144,9 @@ private fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
     }
     val padPx = ((if (small) 10 else 14) * 2 * density).toInt()
 
+    val contentH = (heightPx - padPx).coerceAtLeast(40)
     CompositionLocalProvider(
+        LocalContentHeight provides contentH,
         LocalWidgetFont provides font,
         LocalTextWidth provides (widthPx - padPx).coerceAtLeast(40),
         LocalClick provides style.click,
@@ -173,9 +180,25 @@ private fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
                 is WidgetData.Debts -> DebtsContent(data, small, text, accent)
                 is WidgetData.Tasbih -> TasbihContent(data, small, text, accent)
                 is WidgetData.Verse -> VerseContent(data, small, text, accent)
-                is WidgetData.DateInfo -> DateContent(data, small, text, accent)
+                is WidgetData.DateInfo -> DateContent(data, style, small, text, accent)
                 is WidgetData.Schedule -> ScheduleContent(data, small, text, accent)
                 is WidgetData.Clock -> ClockContent(data, style, small, text)
+                is WidgetData.WideClock -> WideClockContent(style)
+                is WidgetData.WorldClock -> WorldClockContent(data, style)
+                is WidgetData.BigClock -> BitmapContent("home") { w, h ->
+                    WidgetRenderers.bigClock(w, h, data.lines, font?.first ?: FontRegistry.typeface(context, "bebasneue"), style.textColor, style.accentColor)
+                }
+                is WidgetData.Dots -> DotsContent(data, style, text, accent)
+                is WidgetData.MonthGrid -> BitmapContent("dates") { w, h ->
+                    WidgetRenderers.calendar(
+                        w, h, data.month, data.today, data.startSunday, data.weekdays, font?.first,
+                        style.textColor, style.accentColor, context.resources.configuration.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL,
+                    )
+                }
+                is WidgetData.Calligraphy -> BitmapContent("home") { w, h ->
+                    val tf = font?.first ?: FontRegistry.typeface(context, if (data.latin) "cinzel" else "arefruqaa")
+                    WidgetRenderers.calligraphy(w, h, data.main, data.number, data.sub, tf, style.textColor, style.accentColor, data.latin)
+                }
             }
         }
     }
@@ -214,6 +237,20 @@ private val LocalWidgetFont = compositionLocalOf<Pair<Typeface, Typeface>?> { nu
 
 /** Width available for text, in px. */
 private val LocalTextWidth = compositionLocalOf { 600 }
+
+/** Height available for content, in px. */
+private val LocalContentHeight = compositionLocalOf { 300 }
+
+/** Content drawn as one bitmap sized to the widget's content area. */
+@Composable
+private fun BitmapContent(tab: String, draw: (Int, Int) -> android.graphics.Bitmap) {
+    val w = LocalTextWidth.current
+    val h = LocalContentHeight.current
+    val bitmap = remember(w, h, draw) { draw(w, h) }
+    Box(GlanceModifier.fillMaxSize().tapOpen(tab), contentAlignment = Alignment.Center) {
+        Image(ImageProvider(bitmap), contentDescription = null, modifier = GlanceModifier.fillMaxSize(), contentScale = ContentScale.Fit)
+    }
+}
 
 /**
  * Widget text. With a custom font it is drawn into a bitmap (widgets can only
@@ -438,16 +475,96 @@ private fun VerseContent(d: WidgetData.Verse, small: Boolean, text: Color, accen
 }
 
 @Composable
-private fun DateContent(d: WidgetData.DateInfo, small: Boolean, text: Color, accent: Color) {
+private fun DateContent(d: WidgetData.DateInfo, ws: WidgetStyle, small: Boolean, text: Color, accent: Color) {
+    val center = GlanceModifier.fillMaxSize().tapOpen("home")
+    when (ws.variant) {
+        // Simple square: day / big number / month
+        1 -> Column(center, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+            WText(d.day, style = style(text.copy(alpha = 0.75f), 15.sp, align = TextAlign.Center), maxLines = 1)
+            WText(d.dayNum.toString(), style = style(text, if (small) 44.sp else 56.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+            WText(d.month, style = style(accent, 15.sp, align = TextAlign.Center), maxLines = 1)
+        }
+        // One-line strip: "Saturday, 15 March, 2026"
+        2 -> Box(center, contentAlignment = Alignment.Center) {
+            WText("${d.day}، ${d.dayNum} ${d.month}، ${d.year}", style = style(text, 16.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+        }
+        // Hijri and Gregorian lines with month numbers
+        3 -> Column(center, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+            WText("${d.day} ${d.hDay} ${d.hMonth} (${d.hMonthNum})، ${d.hYear}", style = style(text, 13.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+            WText("${d.dayNum} ${d.month} (${d.monthNum})، ${d.year}", style = style(text.copy(alpha = 0.8f), 13.sp, align = TextAlign.Center), maxLines = 1)
+        }
+        // Dual calendar: "19 March | 10 Sha'ban" with calligraphy month names
+        4 -> Row(center, verticalAlignment = Alignment.CenterVertically, horizontalAlignment = Alignment.CenterHorizontally) {
+            WText(d.dayNum.toString(), style = style(text, 26.sp, bold = true), maxLines = 1)
+            Spacer(GlanceModifier.width(6.dp))
+            WText(d.monthCal, style = style(text, 24.sp), maxLines = 1, widthFraction = 0.35f)
+            Spacer(GlanceModifier.width(10.dp))
+            WText("|", style = style(text.copy(alpha = 0.3f), 22.sp), maxLines = 1)
+            Spacer(GlanceModifier.width(10.dp))
+            WText(d.hDay.toString(), style = style(accent, 26.sp, bold = true), maxLines = 1)
+            Spacer(GlanceModifier.width(6.dp))
+            WText(d.hMonthCal, style = style(accent, 24.sp), maxLines = 1, widthFraction = 0.35f)
+        }
+        else -> Column(center, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+            WText(d.day, style = style(text, if (small) 22.sp else 28.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+            WText(d.gregorian, style = style(text.copy(alpha = 0.8f), 13.sp, align = TextAlign.Center), maxLines = 1)
+            WText(d.hijri, style = style(accent, 14.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun DotsContent(d: WidgetData.Dots, ws: WidgetStyle, text: Color, accent: Color) {
+    val w = LocalTextWidth.current
+    val density = LocalContext.current.resources.displayMetrics.density
+    val h = (LocalContentHeight.current - 26 * density).toInt().coerceAtLeast(20)
+    val dots = remember(d, w, h, ws.textColor) { WidgetRenderers.dots(w, h, d.filled, d.total, ws.textColor) }
+    Column(GlanceModifier.fillMaxSize().tapOpen("home")) {
+        Row(GlanceModifier.fillMaxWidth()) {
+            WText(d.title, style = style(text.copy(alpha = 0.8f), 13.sp), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+            WText("${d.percent}%", style = style(accent, 14.sp, bold = true), maxLines = 1)
+        }
+        Spacer(GlanceModifier.height(6.dp))
+        Image(ImageProvider(dots), contentDescription = null, modifier = GlanceModifier.fillMaxSize(), contentScale = ContentScale.Fit)
+    }
+}
+
+/** Wide analog: tick border, hour/minute digits on the sides, live hands (second hand on Android 12+). */
+@Composable
+private fun WideClockContent(ws: WidgetStyle) {
     val context = LocalContext.current
-    Column(
-        GlanceModifier.fillMaxSize().tapOpen("home"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        WText(d.day, style = style(text, if (small) 22.sp else 28.sp, bold = true, align = TextAlign.Center), maxLines = 1)
-        WText(d.gregorian, style = style(text.copy(alpha = 0.8f), 13.sp, align = TextAlign.Center), maxLines = 1)
-        WText(d.hijri, style = style(accent, 14.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+    val views = remember(ws.variant, ws.textColor) {
+        RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_wide_clock_dark else R.layout.widget_wide_clock_light).apply {
+            setTextColor(R.id.wide_hour, ws.textColor)
+            setTextColor(R.id.wide_minute, ws.textColor)
+        }
+    }
+    Box(GlanceModifier.fillMaxSize().tapOpen("home")) {
+        AndroidRemoteViews(views, GlanceModifier.fillMaxSize())
+    }
+}
+
+/** Two cities, each a live TextClock in its own time zone. */
+@Composable
+private fun WorldClockContent(d: WidgetData.WorldClock, ws: WidgetStyle) {
+    val context = LocalContext.current
+    val views = remember(d, ws.variant, ws.textColor, ws.accentColor) {
+        RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_world_clock_stacked else R.layout.widget_world_clock).apply {
+            listOf(
+                Triple(R.id.city1_name, R.id.city1_time, R.id.city1_ampm) to d.a,
+                Triple(R.id.city2_name, R.id.city2_time, R.id.city2_ampm) to d.b,
+            ).forEach { (ids, city) ->
+                setTextViewText(ids.first, city.name(d.arabic))
+                setTextColor(ids.first, ws.accentColor)
+                setTextColor(ids.second, ws.textColor)
+                setTextColor(ids.third, ws.textColor)
+                setString(ids.second, "setTimeZone", city.zone)
+                setString(ids.third, "setTimeZone", city.zone)
+            }
+        }
+    }
+    Box(GlanceModifier.fillMaxSize().tapOpen("home")) {
+        AndroidRemoteViews(views, GlanceModifier.fillMaxSize())
     }
 }
 

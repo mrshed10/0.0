@@ -39,11 +39,33 @@ sealed interface WidgetData {
     data class Debts(val owed: String, val owe: String, val owedLabel: String, val oweLabel: String, val currency: String) : WidgetData
     data class Tasbih(val count: Int, val target: Int, val dhikr: String, val today: String) : WidgetData
     data class Verse(val text: String, val ref: String) : WidgetData
-    data class DateInfo(val day: String, val gregorian: String, val hijri: String) : WidgetData
+    data class DateInfo(
+        val day: String,
+        val gregorian: String,
+        val hijri: String,
+        val dayNum: Int = 0,
+        val month: String = "",
+        val monthNum: Int = 0,
+        val year: Int = 0,
+        val hDay: Int = 0,
+        val hMonth: String = "",
+        val hMonthNum: Int = 0,
+        val hYear: Int = 0,
+        /** Month names with diacritics, for calligraphy. */
+        val monthCal: String = "",
+        val hMonthCal: String = "",
+    ) : WidgetData
     data class ScheduleRow(val name: String, val date: String, val days: Long, val daysText: String, val salary: Boolean)
     data class Schedule(val rows: List<ScheduleRow>) : WidgetData
     /** Live clock; [hijri] and [day] are drawn under digital clocks. */
     data class Clock(val analog: Boolean, val hijri: String, val day: String) : WidgetData
+    data object WideClock : WidgetData
+    data class WorldClock(val a: WorldCity, val b: WorldCity, val arabic: Boolean) : WidgetData
+    /** Bitmap clock; [lines] are "12:34" or ["12", "34"]. */
+    data class BigClock(val lines: List<String>) : WidgetData
+    data class Dots(val title: String, val percent: Int, val filled: Int, val total: Int) : WidgetData
+    data class MonthGrid(val month: java.time.YearMonth, val today: LocalDate, val startSunday: Boolean, val weekdays: List<String>) : WidgetData
+    data class Calligraphy(val main: String, val number: String?, val sub: String?, val latin: Boolean) : WidgetData
 }
 
 object WidgetDataLoader {
@@ -220,14 +242,84 @@ object WidgetDataLoader {
                 day = today.dayOfWeek.getDisplayName(TextStyle.FULL, locale),
             )
             WidgetType.Dhikr -> {
-                val d = SpiritualContent.dhikrFor(today)
-                WidgetData.Verse(d.ar, s(R.string.dhikr_repeat, d.count.toString()))
+                val lists = c.settings.adhkar.value
+                val all = (lists.morning + lists.evening).distinctBy { it.text }
+                if (all.isEmpty()) return WidgetData.Missing
+                val d = all[Math.floorMod(today.toEpochDay(), all.size.toLong()).toInt()]
+                WidgetData.Verse(d.text, s(R.string.dhikr_repeat, d.count.toString()))
             }
-            WidgetType.Date -> WidgetData.DateInfo(
-                day = today.dayOfWeek.getDisplayName(TextStyle.FULL, locale),
-                gregorian = greg(today, "d MMMM yyyy"),
-                hijri = hijri(today) + " " + s(R.string.hijri_suffix),
-            )
+            WidgetType.Date -> {
+                val h = HijriCalendar.fromGregorian(today)
+                WidgetData.DateInfo(
+                    day = today.dayOfWeek.getDisplayName(TextStyle.FULL, locale),
+                    gregorian = greg(today, "d MMMM yyyy"),
+                    hijri = hijri(today) + " " + s(R.string.hijri_suffix),
+                    dayNum = today.dayOfMonth,
+                    month = today.month.getDisplayName(TextStyle.FULL_STANDALONE, locale),
+                    monthNum = today.monthValue,
+                    year = today.year,
+                    hDay = h.day,
+                    hMonth = res.getStringArray(R.array.hijri_months)[h.month - 1],
+                    hMonthNum = h.month,
+                    hYear = h.year,
+                    monthCal = CalendarNames.monthsAr[today.monthValue - 1],
+                    hMonthCal = CalendarNames.hijriAr[h.month - 1],
+                )
+            }
+            WidgetType.WideClock -> WidgetData.WideClock
+            WidgetType.WorldClock -> {
+                val (a, b) = WorldCities.pair(config.content.extra)
+                WidgetData.WorldClock(a, b, locale.language == "ar")
+            }
+            WidgetType.BigClock -> {
+                val t = java.time.LocalTime.now()
+                val use24 = android.text.format.DateFormat.is24HourFormat(context)
+                val hh = String.format(java.util.Locale.ENGLISH, "%02d", if (use24) t.hour else (t.hour % 12).let { if (it == 0) 12 else it })
+                val mm = String.format(java.util.Locale.ENGLISH, "%02d", t.minute)
+                fun d(x: String) = if (config.style.arabicDigits) CalendarNames.arabicDigits(x) else x
+                WidgetData.BigClock(if (config.style.variant == 1) listOf(d(hh), d(mm)) else listOf(d("$hh:$mm")))
+            }
+            WidgetType.YearDots -> if (config.style.variant == 1) {
+                val len = today.lengthOfMonth()
+                WidgetData.Dots(
+                    title = today.month.getDisplayName(TextStyle.FULL_STANDALONE, locale),
+                    percent = today.dayOfMonth * 100 / len,
+                    filled = today.dayOfMonth - 1,
+                    total = len,
+                )
+            } else {
+                val len = today.lengthOfYear()
+                WidgetData.Dots(
+                    title = today.year.toString(),
+                    percent = (today.dayOfYear - 1) * 100 / len,
+                    filled = today.dayOfYear - 1,
+                    total = len,
+                )
+            }
+            WidgetType.MonthCalendar -> {
+                val startSunday = config.style.variant != 1
+                val days = (0 until 7).map { i ->
+                    val dow = if (startSunday) java.time.DayOfWeek.SUNDAY.plus(i.toLong()) else java.time.DayOfWeek.SATURDAY.plus(i.toLong())
+                    dow.getDisplayName(if (locale.language == "ar") TextStyle.SHORT else TextStyle.NARROW, locale)
+                }
+                WidgetData.MonthGrid(java.time.YearMonth.from(today), today, startSunday, days)
+            }
+            WidgetType.CalligraphyDay -> when (config.style.variant) {
+                1 -> WidgetData.Calligraphy(CalendarNames.dayEn(today.dayOfWeek), null, null, latin = true)
+                2 -> WidgetData.Calligraphy(CalendarNames.dayEnShort(today.dayOfWeek), today.dayOfMonth.toString(), null, latin = true)
+                else -> WidgetData.Calligraphy(CalendarNames.dayAr(today.dayOfWeek), null, null, latin = false)
+            }
+            WidgetType.CalligraphyMonth -> {
+                val h = HijriCalendar.fromGregorian(today)
+                val gSub = "${today.dayOfMonth} ${today.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)}"
+                val hSub = "${h.day} ${res.getStringArray(R.array.hijri_months)[h.month - 1]}"
+                when (config.style.variant) {
+                    1 -> WidgetData.Calligraphy(CalendarNames.hijriAr[h.month - 1], h.day.toString(), hSub, latin = false)
+                    2 -> WidgetData.Calligraphy(CalendarNames.monthsEn[today.monthValue - 1], today.dayOfMonth.toString(), null, latin = true)
+                    3 -> WidgetData.Calligraphy(CalendarNames.hijriEn[h.month - 1], h.day.toString(), null, latin = true)
+                    else -> WidgetData.Calligraphy(CalendarNames.monthsAr[today.monthValue - 1], today.dayOfMonth.toString(), gSub, latin = false)
+                }
+            }
         }
     }
 }

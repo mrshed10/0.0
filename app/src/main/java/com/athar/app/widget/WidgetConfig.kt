@@ -21,10 +21,24 @@ enum class WidgetType(@StringRes val label: Int, val emoji: String, val needsIte
     AnalogClock(R.string.widget_type_analog, "🕰️"),
     DigitalClock(R.string.widget_type_digital, "⌚"),
     Dhikr(R.string.widget_type_dhikr, "📿"),
+    WideClock(R.string.widget_type_wide_clock, "🕰️"),
+    WorldClock(R.string.widget_type_world_clock, "🌍"),
+    BigClock(R.string.widget_type_big_clock, "🔢"),
+    YearDots(R.string.widget_type_year_dots, "⚪"),
+    MonthCalendar(R.string.widget_type_calendar, "📆"),
+    CalligraphyDay(R.string.widget_type_calligraphy_day, "🖋️"),
+    CalligraphyMonth(R.string.widget_type_calligraphy_month, "🖋️"),
+    ;
+
+    /** Redrawn every minute (bitmap clocks). */
+    val minuteClock: Boolean get() = this == BigClock
 }
 
-/** [itemId] = -1 means "automatic" (e.g. the nearest salary). */
-data class WidgetContent(val type: WidgetType, val itemId: Long = -1)
+/**
+ * [itemId] = -1 means "automatic" (e.g. the nearest salary).
+ * [extra] holds type-specific settings, e.g. world-clock city ids "brussels,dubai".
+ */
+data class WidgetContent(val type: WidgetType, val itemId: Long = -1, val extra: String = "")
 
 enum class BackgroundKind { Color, Gradient, Image }
 
@@ -56,8 +70,10 @@ data class WidgetStyle(
     val fontId: String? = null,
     val dateStyle: DateStyle = DateStyle.Words,
     val click: ClickBehavior = ClickBehavior.Quick,
-    /** Design variant for clocks (e.g. light/dark dial, with/without date). */
+    /** Design variant (e.g. light/dark dial, year/month dots, Arabic/English calligraphy). */
     val variant: Int = 0,
+    /** Use Arabic-Indic digits (١٢٣) in bitmap clocks. */
+    val arabicDigits: Boolean = false,
 )
 
 data class WidgetConfig(val content: WidgetContent, val style: WidgetStyle = WidgetStyle())
@@ -83,13 +99,14 @@ object WidgetJson {
     fun encode(config: WidgetConfig): String = JSONObject()
         .put("type", config.content.type.name)
         .put("item", config.content.itemId)
+        .put("extra", config.content.extra)
         .put("style", encodeStyle(config.style))
         .toString()
 
     fun decode(raw: String?): WidgetConfig? = runCatching {
         val o = JSONObject(raw ?: return null)
         val type = WidgetType.entries.firstOrNull { it.name == o.getString("type") } ?: return null
-        WidgetConfig(WidgetContent(type, o.optLong("item", -1)), decodeStyle(o.optJSONObject("style")))
+        WidgetConfig(WidgetContent(type, o.optLong("item", -1), o.optString("extra", "")), decodeStyle(o.optJSONObject("style")))
     }.getOrNull()
 
     private fun encodeStyle(s: WidgetStyle) = JSONObject()
@@ -104,6 +121,7 @@ object WidgetJson {
         .put("date", s.dateStyle.name)
         .put("click", s.click.name)
         .put("variant", s.variant)
+        .put("arabicDigits", s.arabicDigits)
 
     private fun decodeStyle(o: JSONObject?): WidgetStyle {
         val d = WidgetStyle()
@@ -124,7 +142,8 @@ object WidgetJson {
             fontId = if (o.isNull("font")) null else o.optString("font"),
             dateStyle = DateStyle.entries.firstOrNull { it.name == o.optString("date") } ?: d.dateStyle,
             click = ClickBehavior.entries.firstOrNull { it.name == o.optString("click") } ?: d.click,
-            variant = o.optInt("variant", d.variant).coerceIn(0, 3),
+            variant = o.optInt("variant", d.variant).coerceIn(0, 5),
+            arabicDigits = o.optBoolean("arabicDigits", d.arabicDigits),
         )
     }
 }

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wide analog clock: dial ticks around the card, hour and minute digits on the sides, live hands. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/wide_dial"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/clock_wide_dial_light" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingStart="34dp"
+        android:paddingEnd="34dp">
+
+        <TextClock
+            android:id="@+id/wide_hour"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:format12Hour="h"
+            android:format24Hour="H"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="#FFFFFFFF"
+            android:textSize="40sp" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextClock
+            android:id="@+id/wide_minute"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:format12Hour="mm"
+            android:format24Hour="mm"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="#FFFFFFFF"
+            android:textSize="40sp" />
+    </LinearLayout>
+
+    <AnalogClock
+        android:id="@+id/wide_analog"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="18dp"
+        android:dial="@drawable/clock_dial_none"
+        android:hand_hour="@drawable/clock_hour_light"
+        android:hand_minute="@drawable/clock_minute_light"
+        android:hand_second="@drawable/clock_second_red" />
+</FrameLayout>
