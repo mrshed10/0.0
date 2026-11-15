@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- أيقونة بسيطة: لوحة مفاتيح على خلفية زرقاء -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#FF1E88E5" android:pathData="M8,2h32a6,6 0,0 1,6 6v32a6,6 0,0 1,-6 6h-32a6,6 0,0 1,-6 -6v-32a6,6 0,0 1,6 -6z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M9,15h30a2,2 0,0 1,2 2v14a2,2 0,0 1,-2 2h-30a2,2 0,0 1,-2 -2v-14a2,2 0,0 1,2 -2z" />
+    <path android:fillColor="#FF1E88E5" android:pathData="M11,18h4v3h-4zM17,18h4v3h-4zM23,18h4v3h-4zM29,18h4v3h-4zM35,18h2v3h-2zM11,23h4v3h-4zM17,23h4v3h-4zM23,23h4v3h-4zM29,23h8v3h-8zM15,28h18v3h-18z" />
+</vector>

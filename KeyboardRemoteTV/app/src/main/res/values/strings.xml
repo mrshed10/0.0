@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ريموت الكيبورد</string>
+    <string name="subtitle">حوّل لوحة المفاتيح الخارجية إلى ريموت كنترول يعمل في جميع التطبيقات</string>
+
+    <string name="service_label">ريموت الكيبورد</string>
+    <string name="service_description">تلتقط هذه الخدمة أزرار لوحة المفاتيح الخارجية (F1، F2، F10، F11، F12، Esc، Backspace، Home) وتحوّلها إلى أوامر: الصوت، الرئيسية، الرجوع، والتطبيقات الأخيرة. لا تقرأ الخدمة ما تكتبه ولا ترسل أي بيانات.</string>
+
+    <string name="status_enabled">✔ الخدمة مفعّلة</string>
+    <string name="status_disabled">✖ الخدمة غير مفعّلة</string>
+
+    <string name="open_settings">فتح إعدادات إمكانية الوصول</string>
+    <string name="how_to_enable">من الإعدادات اختر «ريموت الكيبورد» ثم فعّل الخدمة واضغط «موافق»، ثم ارجع لهذه الشاشة</string>
+    <string name="settings_fallback">ابحث في الإعدادات عن «إمكانية الوصول» (Accessibility) وفعّل «ريموت الكيبورد»</string>
+    <string name="settings_not_found">تعذّر فتح الإعدادات على هذا الجهاز. فعّل الخدمة عبر ADB (راجع ملف README)</string>
+
+    <string name="table_title">وظائف الأزرار</string>
+    <string name="col_key">زر الكيبورد</string>
+    <string name="col_action">الوظيفة</string>
+    <string name="act_volume_up">رفع مستوى الصوت</string>
+    <string name="act_volume_down">خفض مستوى الصوت</string>
+    <string name="act_mute">كتم / إلغاء كتم الصوت</string>
+    <string name="act_home">الشاشة الرئيسية</string>
+    <string name="act_back">رجوع</string>
+    <string name="act_recents">التطبيقات الأخيرة</string>
+    <string name="note_typing">ملاحظة: عند الكتابة داخل مربع نص يعمل Backspace للحذف و Home لبداية السطر بشكل طبيعي، و Esc يبقى زر رجوع.</string>
+</resources>

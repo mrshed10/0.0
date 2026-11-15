@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF101418</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB0BAC5</color>
+    <color name="accent">#FF1E88E5</color>
+    <color name="accent_focused">#FF42A5F5</color>
+    <color name="enabled_green">#FF2E7D32</color>
+    <color name="disabled_red">#FFC62828</color>
+    <color name="header_bg">#FF263238</color>
+    <color name="row_bg">#FF1A2026</color>
+    <color name="row_focused">#FF37474F</color>
+    <color name="border">#FF37474F</color>
+</resources>
