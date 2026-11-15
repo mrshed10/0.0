@@ -10,6 +10,9 @@ on:
       - "KeyboardRemoteTV/**"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,3 +32,16 @@ jobs:
         with:
           name: keyboard-remote-tv-apk
           path: KeyboardRemoteTV/app/build/outputs/apk/**/*.apk
+      - name: Prepare APK for direct download
+        if: github.event_name != 'pull_request'
+        run: cp app/build/outputs/apk/release/app-release.apk KeyboardRemoteTV.apk
+      - name: Publish direct-download release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: keyboard-remote-tv-latest
+          name: KeyboardRemoteTV (latest build)
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          body: "ريموت الكيبورد لأجهزة Android TV / TV Box — أحدث نسخة مبنية تلقائياً."
+          files: KeyboardRemoteTV/KeyboardRemoteTV.apk
