@@ -283,7 +283,7 @@ private fun TemplateCell(template: WidgetTemplate, config: WidgetConfig, onClick
                 .clip(RoundedCornerShape(config.style.cornerDp.dp))
                 .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(config.style.cornerDp.dp)),
         ) {
-            WidgetPreview(config, data, template.wide)
+            WidgetPreview(config, data, template.wide, onTap = onClick)
         }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {

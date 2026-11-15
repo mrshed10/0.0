@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.athar.app.core.designsystem.glass.AuroraBackground
 import com.athar.app.core.designsystem.glass.LocalHazeState
@@ -40,8 +41,13 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
         val store = WidgetStore(this)
-        val wide = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)
-            ?.provider?.className?.contains("Small") != true
+        val manager = AppWidgetManager.getInstance(this)
+        val wide = manager.getAppWidgetInfo(appWidgetId)?.provider?.className?.contains("Small") != true
+        // Portrait size of the placed widget (dp), so the preview has the same proportions.
+        val options = manager.getAppWidgetOptions(appWidgetId)
+        val w = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
+        val h = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
+        val previewSize = if (w > 0 && h > 0) androidx.compose.ui.unit.DpSize(w.dp, h.dp) else null
         val initial = store.get(appWidgetId) ?: store.pending ?: WidgetConfig(WidgetContent(WidgetType.NextPrayer))
 
         setContent {
@@ -53,6 +59,7 @@ class WidgetConfigActivity : ComponentActivity() {
                         WidgetEditorScreen(
                             initial = initial,
                             wide = wide,
+                            previewSize = previewSize,
                             onCancel = { finish() },
                             onSave = { config ->
                                 store.put(appWidgetId, config)

@@ -2,7 +2,13 @@ package com.athar.app.widget
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
+import android.widget.FrameLayout
+import android.widget.RemoteViews
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,14 +61,55 @@ import kotlin.math.sin
 private val LocalPreviewFont = staticCompositionLocalOf<FontFamily> { FontFamily.Default }
 
 /**
- * In-app preview of a widget design: the same backdrop renderer as the real
- * widget plus a Compose copy of its layout, filled with real data.
+ * In-app preview of a widget design. It is rendered by the real widget code
+ * (Glance → RemoteViews → views), so it looks exactly like the home-screen
+ * widget. Taps go to [onTap], never to the widget's own buttons.
+ * [size] = the real widget size when known (editing a placed widget).
  */
 @Composable
-fun WidgetPreview(config: WidgetConfig, data: WidgetData, wide: Boolean, modifier: Modifier = Modifier) {
+fun WidgetPreview(
+    config: WidgetConfig,
+    data: WidgetData,
+    wide: Boolean,
+    modifier: Modifier = Modifier,
+    size: DpSize? = null,
+    onTap: (() -> Unit)? = null,
+) {
+    val context = LocalContext.current
+    val ratio = size?.let { (it.width.value / it.height.value).coerceIn(0.5f, 4f) } ?: if (wide) 2.1f else 1f
+    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(ratio)) {
+        val target = size ?: DpSize(maxWidth, maxHeight)
+        val views by produceState<RemoteViews?>(null, config, data, target) {
+            value = if (data == WidgetData.Unconfigured) null else WidgetPreviewRenderer.render(context, config, data, target)
+        }
+        val real = views
+        if (real != null) {
+            AndroidView(
+                factory = { FrameLayout(it) },
+                update = { frame ->
+                    frame.removeAllViews()
+                    runCatching { frame.addView(real.apply(frame.context, frame)) }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            ComposePreview(config, data, wide)
+        }
+        // Catch all taps: the preview is not interactive.
+        Box(
+            Modifier
+                .matchParentSize()
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onTap?.invoke() },
+        )
+    }
+}
+
+/** Compose look-alike, used while the real rendering loads or if it is unavailable. */
+@Composable
+private fun ComposePreview(config: WidgetConfig, data: WidgetData, wide: Boolean, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val style = config.style
-    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(if (wide) 2.1f else 1f)) {
+    BoxWithConstraints(modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val wPx = with(density) { maxWidth.roundToPx() }.coerceAtLeast(8)
         val hPx = with(density) { maxHeight.roundToPx() }.coerceAtLeast(8)

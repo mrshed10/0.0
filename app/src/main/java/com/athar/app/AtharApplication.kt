@@ -2,6 +2,7 @@ package com.athar.app
 
 import android.app.Application
 import com.athar.app.core.data.AppContainer
+import com.athar.app.core.data.CrashLog
 import com.athar.app.core.data.keepWidgetsInSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,7 @@ class AtharApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         container.keepAlarmsInSync(appScope)
         container.keepWidgetsInSync(this, appScope)
     }

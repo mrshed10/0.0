@@ -507,6 +507,13 @@
     <string name="variant_hijri_greg">Hijri &amp; Gregorian</string>
     <string name="variant_dual">Dual</string>
 
+    <string name="crash_title">Last error</string>
+    <string name="crash_body">Athar closed unexpectedly. Copy or share these details with the developer so the cause can be fixed.</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_share">Share</string>
+    <string name="crash_clear">Clear</string>
+    <string name="crash_copied">Copied</string>
+
     <string-array name="hijri_months">
         <item>Muharram</item>
         <item>Safar</item>

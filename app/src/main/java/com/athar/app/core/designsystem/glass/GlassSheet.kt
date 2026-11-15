@@ -22,7 +22,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,8 +38,50 @@ import com.athar.app.core.designsystem.theme.AtharColors
  * real frosted glass (a Material ModalBottomSheet opens its own window and
  * could not blur the background). Show it by composing it; remove to dismiss.
  */
+/**
+ * Draws sheets at the top of the app instead of where they are declared.
+ * A sheet declared inside a scrolling list (e.g. an adhkar card) would
+ * otherwise be measured with infinite height and crash the app.
+ */
+class SheetHost {
+    private val stack = mutableStateListOf<Pair<Any, @Composable () -> Unit>>()
+
+    fun show(token: Any, content: @Composable () -> Unit) {
+        stack.removeAll { it.first === token }
+        stack.add(token to content)
+    }
+
+    fun hide(token: Any) {
+        stack.removeAll { it.first === token }
+    }
+
+    /** Call once, as the last child of the root Box. */
+    @Composable
+    fun Render() {
+        stack.lastOrNull()?.second?.invoke()
+    }
+}
+
+val LocalSheetHost = staticCompositionLocalOf<SheetHost?> { null }
+
 @Composable
 fun GlassSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    val host = LocalSheetHost.current
+    if (host == null) {
+        SheetSurface(onDismiss, content)
+        return
+    }
+    val currentDismiss by rememberUpdatedState(onDismiss)
+    val currentContent by rememberUpdatedState(content)
+    val token = remember { Any() }
+    DisposableEffect(host) {
+        host.show(token) { SheetSurface({ currentDismiss() }, currentContent) }
+        onDispose { host.hide(token) }
+    }
+}
+
+@Composable
+private fun SheetSurface(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     val bar = LocalBottomBarController.current
     DisposableEffect(Unit) {
         bar.hide()

@@ -99,6 +99,8 @@ fun WidgetEditorScreen(
     onSave: (WidgetConfig) -> Unit,
     wide: Boolean = true,
     saveLabel: String? = null,
+    /** The placed widget's real size, so the preview matches it exactly. */
+    previewSize: androidx.compose.ui.unit.DpSize? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -153,7 +155,7 @@ fun WidgetEditorScreen(
         }
         item {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                WidgetPreview(config, data, wide, Modifier.fillMaxWidth(if (wide) 1f else 0.55f))
+                WidgetPreview(config, data, wide, Modifier.fillMaxWidth(if (wide || previewSize != null) 1f else 0.55f), size = previewSize)
             }
         }
 

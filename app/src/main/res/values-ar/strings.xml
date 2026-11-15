@@ -498,6 +498,13 @@
     <string name="variant_hijri_greg">هجري وميلادي</string>
     <string name="variant_dual">مزدوج</string>
 
+    <string name="crash_title">آخر خطأ</string>
+    <string name="crash_body">أُغلق أثر بشكل غير متوقع. انسخ هذه التفاصيل أو شاركها مع المطوّر لإصلاح السبب.</string>
+    <string name="crash_copy">نسخ</string>
+    <string name="crash_share">مشاركة</string>
+    <string name="crash_clear">مسح</string>
+    <string name="crash_copied">تم النسخ</string>
+
     <string-array name="hijri_months">
         <item>محرم</item>
         <item>صفر</item>

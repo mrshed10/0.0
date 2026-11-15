@@ -198,6 +198,8 @@ fun SettingsRoute(onBack: () -> Unit, onOpenGallery: () -> Unit, viewModel: Sett
                 }
             }
 
+            item(key = "crash") { CrashReportCard() }
+
             item(key = "about") {
                 GlassCard(Modifier.fillMaxWidth()) {
                     CardHeader(stringResource(R.string.about_title), Icons.Rounded.Info, tint = AtharColors.Violet)

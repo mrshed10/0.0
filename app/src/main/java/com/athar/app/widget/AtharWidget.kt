@@ -29,6 +29,7 @@ import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.AndroidRemoteViews
+import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -128,7 +129,7 @@ private fun openApp(context: Context, tab: String) = actionStartActivity(
 )
 
 @Composable
-private fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
+internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
     val context = LocalContext.current
     val size = LocalSize.current
     val density = context.resources.displayMetrics.density
@@ -568,36 +569,45 @@ private fun WorldClockContent(d: WidgetData.WorldClock, ws: WidgetStyle) {
     }
 }
 
-/** All upcoming salaries and appointments with the days left for each. */
+/** All upcoming salaries and appointments with the days left for each; the list scrolls. */
 @Composable
 private fun ScheduleContent(d: WidgetData.Schedule, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
-    val size = LocalSize.current
-    val rowHeight = if (small) 30 else 34
-    val maxRows = ((size.height.value - 34) / rowHeight).toInt().coerceIn(1, 10)
-    Column(GlanceModifier.fillMaxSize().tapOpen("salaries")) {
-        Header("🗓️ " + context.getString(R.string.widget_type_schedule), text, accent)
+    Column(GlanceModifier.fillMaxSize()) {
+        Box(GlanceModifier.fillMaxWidth().tapOpen("salaries")) {
+            Header("🗓️ " + context.getString(R.string.widget_type_schedule), text, accent, d.rows.size.toString())
+        }
         Spacer(GlanceModifier.height(4.dp))
-        d.rows.take(maxRows).forEach { row ->
-            Row(GlanceModifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                WText(if (row.salary) "💰" else "⏰", style = style(text, 13.sp))
-                Spacer(GlanceModifier.width(6.dp))
-                Column(GlanceModifier.defaultWeight()) {
-                    WText(row.name, style = style(text, if (small) 12.sp else 13.sp, bold = true), maxLines = 1, widthFraction = 0.6f)
-                    if (!small) WText(row.date, style = style(text.copy(alpha = 0.65f), 10.sp), maxLines = 1, widthFraction = 0.6f)
-                }
-                Spacer(GlanceModifier.width(6.dp))
-                Box(
-                    GlanceModifier
-                        .background(ImageProvider(pill(context, if (row.days == 0L) accent else accent.copy(alpha = 0.25f))))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                    contentAlignment = Alignment.Center,
+        LazyColumn(GlanceModifier.fillMaxWidth().defaultWeight()) {
+            items(d.rows.size, itemId = { it.toLong() }) { index ->
+                val row = d.rows[index]
+                Row(
+                    GlanceModifier.fillMaxWidth().padding(vertical = 3.dp).tapOpen("salaries"),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    WText(row.daysText, style = style(if (row.days == 0L) Color(0xFF0B1026) else text, 11.sp, bold = true), maxLines = 1, widthFraction = 0.3f)
+                    WText(if (row.salary) "💰" else "⏰", style = style(text, 13.sp))
+                    Spacer(GlanceModifier.width(6.dp))
+                    Column(GlanceModifier.defaultWeight()) {
+                        WText(row.name, style = style(text, if (small) 12.sp else 13.sp, bold = true), maxLines = 1, widthFraction = 0.6f)
+                        if (!small) WText(row.date, style = style(text.copy(alpha = 0.65f), 10.sp), maxLines = 1, widthFraction = 0.6f)
+                    }
+                    Spacer(GlanceModifier.width(6.dp))
+                    Box(
+                        GlanceModifier
+                            .background(ImageProvider(pill(context, if (row.days == 0L) accent else accent.copy(alpha = 0.25f))))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        WText(
+                            row.daysText,
+                            style = style(if (row.days == 0L) Color(0xFF0B1026) else text, 11.sp, bold = true),
+                            maxLines = 1,
+                            widthFraction = 0.3f,
+                        )
+                    }
                 }
             }
         }
-        if (d.rows.size > maxRows) WText("+${d.rows.size - maxRows}", style = style(accent, 11.sp, bold = true))
     }
 }
 

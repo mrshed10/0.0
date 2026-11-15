@@ -41,6 +41,8 @@ import com.athar.app.core.designsystem.glass.GlassBottomBar
 import com.athar.app.core.designsystem.glass.BottomBarController
 import com.athar.app.core.designsystem.glass.LocalBottomBarController
 import com.athar.app.core.designsystem.glass.LocalHazeState
+import com.athar.app.core.designsystem.glass.LocalSheetHost
+import com.athar.app.core.designsystem.glass.SheetHost
 import com.athar.app.core.designsystem.component.GlassSegmented
 import com.athar.app.feature.counters.CountersRoute
 import com.athar.app.feature.debts.DebtsRoute
@@ -101,7 +103,10 @@ fun AtharApp(startTab: String? = null) {
     val context = LocalContext.current
     val general by (context.applicationContext as AtharApplication).container.settings.general.collectAsState()
 
+    val sheetHost = remember { SheetHost() }
+
     CompositionLocalProvider(
+        LocalSheetHost provides sheetHost,
         LocalHazeState provides hazeState,
         LocalBottomBarController provides bottomBar,
         LocalCurrency provides stringResource(general.country.currency),
@@ -178,6 +183,9 @@ fun AtharApp(startTab: String? = null) {
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             }
+
+            // Sheets (editors) always on top, outside any scrolling list.
+            sheetHost.Render()
         }
     }
 }
