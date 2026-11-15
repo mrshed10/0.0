@@ -130,7 +130,7 @@ object WidgetRenderers {
         val area = h - subH
         if (!number.isNullOrBlank()) {
             val np = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                this.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 color = withAlpha(text, 0.16f)
                 textAlign = Paint.Align.CENTER
             }
