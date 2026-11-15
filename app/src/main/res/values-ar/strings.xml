@@ -264,9 +264,6 @@
     <string name="reminder_paused">متوقف</string>
     <string name="empty_reminders_title">لا توجد تنبيهات</string>
     <string name="empty_reminders_body">أضف تنبيهاً بنغمتك الخاصة، لمرة واحدة أو بتكرار يومي أو أسبوعي أو شهري أو سنوي.</string>
-
-    <string name="widget_name">أثر</string>
-    <string name="widget_small_name">أثر (صغير)</string>
     <string name="widget_description">أي عنصر من أثر في بطاقة زجاجية</string>
     <string name="widget_small_description">بطاقة زجاجية صغيرة</string>
     <string name="widget_tap_to_setup">اضغط للإعداد</string>
@@ -504,6 +501,35 @@
     <string name="crash_share">مشاركة</string>
     <string name="crash_clear">مسح</string>
     <string name="crash_copied">تم النسخ</string>
+
+    <string name="widget_name_custom">أثر · مخصص</string>
+    <string name="widget_name_custom_small">أثر · مخصص صغير</string>
+    <string name="widget_name_prayer">أثر · مواقيت الصلاة</string>
+    <string name="widget_name_clock">أثر · ساعة</string>
+    <string name="widget_name_calendar">أثر · تقويم</string>
+    <string name="widget_name_schedule">أثر · الرواتب والمواعيد</string>
+    <string name="widget_name_tasks">أثر · مهام اليوم</string>
+    <string name="widget_name_habits">أثر · العادات</string>
+    <string name="widget_name_calligraphy">أثر · خط عربي</string>
+    <string name="widget_prayer_description">الصلاة القادمة مع مواقيت اليوم</string>
+    <string name="widget_clock_description">ساعة عريضة حية، ويمكن تغييرها لأي تصميم ساعة</string>
+    <string name="widget_calendar_description">اليوم والتاريخ والشهر، وتقويم ونقاط</string>
+    <string name="widget_schedule_description">كل الرواتب والتنبيهات القادمة (قابلة للتمرير)</string>
+    <string name="widget_tasks_description">اشطب مهام اليوم من الشاشة الرئيسية</string>
+    <string name="widget_habits_description">سجّل إنجاز عاداتك وحافظ على سلاسلك</string>
+    <string name="widget_calligraphy_description">أسماء الأيام والشهور بالخط العربي</string>
+    <string name="preview_days_12">12 يوم</string>
+    <string name="preview_days_16">16 يوم</string>
+    <string name="preview_days_17">17 يوم</string>
+    <string name="preview_days_20">20 يوم</string>
+    <string name="preview_reminder">صيانة السيارة</string>
+    <string name="preview_task_1">قراءة 10 صفحات</string>
+    <string name="preview_task_2">سداد فاتورة الكهرباء</string>
+    <string name="preview_task_3">الاتصال بالوالدة</string>
+    <string name="preview_habit_1">الورد</string>
+    <string name="preview_habit_2">المشي</string>
+    <string name="preview_habit_3">الماء</string>
+    <string name="preview_habit_4">النوم</string>
 
     <string-array name="hijri_months">
         <item>محرم</item>

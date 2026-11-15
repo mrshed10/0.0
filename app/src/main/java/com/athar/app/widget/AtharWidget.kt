@@ -78,6 +78,10 @@ class AtharWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         val store = WidgetStore(context)
+        // Typed picker entries (Prayer, Clock…) work straight away even without setup.
+        if (store.get(appWidgetId) == null && store.pending == null) {
+            WidgetProviders.defaultConfig(context, appWidgetId)?.let { store.put(appWidgetId, it) }
+        }
         val firstConfig = store.get(appWidgetId)
         val first = firstConfig to WidgetDataLoader.load(context, firstConfig)
         val live = combine(WidgetStore.changes, WidgetUpdater.version, WidgetUpdater.tick) { a, b, t ->
@@ -93,27 +97,6 @@ class AtharWidget : GlanceAppWidget() {
             val state by live.collectAsState(initial = first)
             WidgetRoot(appWidgetId, state.first?.style ?: WidgetStyle(), state.second)
         }
-    }
-}
-
-class AtharWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = AtharWidget()
-
-    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-        super.onDeleted(context, appWidgetIds)
-        val store = WidgetStore(context)
-        appWidgetIds.forEach(store::remove)
-    }
-}
-
-/** Same widget, smaller default size in the widget picker. */
-class AtharSmallWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = AtharWidget()
-
-    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-        super.onDeleted(context, appWidgetIds)
-        val store = WidgetStore(context)
-        appWidgetIds.forEach(store::remove)
     }
 }
 
@@ -136,14 +119,21 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
     val widthPx = (size.width.value * density).toInt().coerceAtLeast(1)
     val heightPx = (size.height.value * density).toInt().coerceAtLeast(1)
     val backdrop = remember(style, widthPx, heightPx) { WidgetBackground.render(context, style, widthPx, heightPx) }
-    val small = size.width < 170.dp || size.height < 100.dp
+    val wDp = size.width.value
+    val hDp = size.height.value
+    val small = wDp < 170f || hDp < 100f
+    // Text and spacing follow the real size: designs were tuned for ~320×150 (wide) and ~160×160 (square).
+    val wideShape = wDp / hDp.coerceAtLeast(1f) > 1.4f
+    val scale = minOf(wDp / (if (wideShape) 320f else 160f), hDp / (if (wideShape) 150f else 160f)).coerceIn(0.6f, 1.8f)
+    val tiny = hDp < 78f || wDp < 120f
+    val padDp = ((if (small) 10f else 14f) * scale.coerceIn(0.7f, 1.3f))
     val text = Color(style.textColor)
     val accent = Color(style.accentColor)
 
     val font = remember(style.fontId) {
         FontRegistry.typeface(context, style.fontId)?.let { it to FontRegistry.boldTypeface(context, style.fontId, it) }
     }
-    val padPx = ((if (small) 10 else 14) * 2 * density).toInt()
+    val padPx = (padDp * 2 * density).toInt()
 
     val contentH = (heightPx - padPx).coerceAtLeast(40)
     CompositionLocalProvider(
@@ -151,6 +141,9 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
         LocalWidgetFont provides font,
         LocalTextWidth provides (widthPx - padPx).coerceAtLeast(40),
         LocalClick provides style.click,
+        LocalScale provides scale,
+        LocalTiny provides tiny,
+        LocalSizeDp provides (wDp to hDp),
     ) {
     Box(GlanceModifier.fillMaxSize()) {
         Image(
@@ -159,7 +152,7 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
             modifier = GlanceModifier.fillMaxSize(),
             contentScale = ContentScale.FillBounds,
         )
-        Box(GlanceModifier.fillMaxSize().padding(if (small) 10.dp else 14.dp)) {
+        Box(GlanceModifier.fillMaxSize().padding(padDp.dp)) {
             when (data) {
                 WidgetData.Unconfigured -> Message(
                     context.getString(R.string.widget_tap_to_setup),
@@ -239,6 +232,15 @@ private val LocalWidgetFont = compositionLocalOf<Pair<Typeface, Typeface>?> { nu
 /** Width available for text, in px. */
 private val LocalTextWidth = compositionLocalOf { 600 }
 
+/** Text scale for the current widget size (1 = reference design size). */
+private val LocalScale = compositionLocalOf { 1f }
+
+/** Very small widget: show only the essentials so nothing overlaps. */
+private val LocalTiny = compositionLocalOf { false }
+
+/** Widget size in dp (width, height). */
+private val LocalSizeDp = compositionLocalOf { 320f to 150f }
+
 /** Height available for content, in px. */
 private val LocalContentHeight = compositionLocalOf { 300 }
 
@@ -266,12 +268,13 @@ private fun WText(
     widthFraction: Float = 1f,
 ) {
     val font = LocalWidgetFont.current
+    val scaled = style.size * LocalScale.current
     if (font == null) {
         Text(
             text,
             style = TextStyle(
                 color = c(style.color),
-                fontSize = style.size,
+                fontSize = scaled,
                 fontWeight = if (style.bold) FontWeight.Bold else FontWeight.Normal,
                 textAlign = style.align,
             ),
@@ -282,12 +285,12 @@ private fun WText(
     }
     val context = LocalContext.current
     val maxWidth = (LocalTextWidth.current * widthFraction).toInt()
-    val bitmap = remember(text, style, maxLines, maxWidth, font) {
+    val bitmap = remember(text, style, scaled, maxLines, maxWidth, font) {
         TextBitmap.render(
             context,
             text,
             if (style.bold) font.second else font.first,
-            style.size.value,
+            scaled.value,
             style.color.toArgb(),
             maxWidth,
             maxLines,
@@ -321,10 +324,18 @@ private fun Header(title: String, color: Color, accent: Color, trailing: String?
 private fun PrayerContent(d: WidgetData.NextPrayer, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
     Column(GlanceModifier.fillMaxSize().tapOpen("prayer")) {
+        val (w, h) = LocalSizeDp.current
+        if (LocalTiny.current) {
+            Row(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                WText(d.name, style = style(text, 20.sp, bold = true), maxLines = 1, modifier = GlanceModifier.defaultWeight())
+                WText(d.time, style = style(accent, 15.sp, bold = true), maxLines = 1)
+            }
+            return@Column
+        }
         Header("🕌 " + context.getString(R.string.next_prayer), text, accent, if (small) null else d.place)
         WText(d.name, style = style(text, if (small) 24.sp else 28.sp, bold = true), maxLines = 1)
         WText(d.time, style = style(accent, if (small) 14.sp else 16.sp, bold = true), maxLines = 1)
-        if (!small) {
+        if (!small && w >= 230f && h >= 115f) {
             Spacer(GlanceModifier.height(6.dp))
             Row(GlanceModifier.fillMaxWidth()) {
                 d.rows.forEach { row ->
@@ -351,7 +362,7 @@ private fun BigContent(d: WidgetData.Big, small: Boolean, text: Color, accent: C
                 WText(d.unit, style = style(text.copy(alpha = 0.75f), 13.sp), maxLines = 1)
             }
         }
-        WText(d.line1, style = style(accent, 12.sp, bold = true), maxLines = 1)
+        if (!LocalTiny.current) WText(d.line1, style = style(accent, 12.sp, bold = true), maxLines = 1)
         if (!small && d.line2.isNotEmpty()) WText(d.line2, style = style(text.copy(alpha = 0.7f), 11.sp), maxLines = 1)
     }
 }
@@ -414,7 +425,7 @@ private fun HabitsContent(d: WidgetData.Habits, small: Boolean, text: Color, acc
         }
         Spacer(GlanceModifier.height(6.dp))
         Row(GlanceModifier.fillMaxWidth()) {
-            d.rows.take(if (small) 3 else 5).forEach { h ->
+            d.rows.take((LocalSizeDp.current.first / 62f).toInt().coerceIn(1, 6)).forEach { h ->
                 Column(
                     GlanceModifier.defaultWeight().tapAction(WidgetActionReceiver.intent(context, WidgetActionReceiver.TOGGLE_HABIT, h.id)),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -432,8 +443,10 @@ private fun HabitsContent(d: WidgetData.Habits, small: Boolean, text: Color, acc
 private fun DebtsContent(d: WidgetData.Debts, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
     Column(GlanceModifier.fillMaxSize().tapOpen("debts")) {
-        Header("💼 " + context.getString(R.string.debts), text, accent, d.currency)
-        Spacer(GlanceModifier.height(6.dp))
+        if (!LocalTiny.current) {
+            Header("💼 " + context.getString(R.string.debts), text, accent, d.currency)
+            Spacer(GlanceModifier.height(6.dp))
+        }
         Row(GlanceModifier.fillMaxWidth()) {
             Column(GlanceModifier.defaultWeight()) {
                 WText(d.owedLabel, style = style(text.copy(alpha = 0.7f), 11.sp))
@@ -455,9 +468,10 @@ private fun TasbihContent(d: WidgetData.Tasbih, small: Boolean, text: Color, acc
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        WText(d.dhikr, style = style(accent, 13.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+        val tinyT = LocalTiny.current
+        if (!tinyT) WText(d.dhikr, style = style(accent, 13.sp, bold = true, align = TextAlign.Center), maxLines = 1)
         WText("${d.count}", style = style(text, if (small) 34.sp else 42.sp, bold = true, align = TextAlign.Center))
-        WText("/ ${d.target} · ${d.today}", style = style(text.copy(alpha = 0.7f), 11.sp, align = TextAlign.Center), maxLines = 1)
+        if (!tinyT) WText("/ ${d.target} · ${d.today}", style = style(text.copy(alpha = 0.7f), 11.sp, align = TextAlign.Center), maxLines = 1)
     }
 }
 
@@ -469,7 +483,11 @@ private fun VerseContent(d: WidgetData.Verse, small: Boolean, text: Color, accen
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        WText(d.text, style = style(text, if (small) 15.sp else 19.sp, bold = true, align = TextAlign.Center))
+        WText(
+            d.text,
+            style = style(text, if (small) 15.sp else 19.sp, bold = true, align = TextAlign.Center),
+            maxLines = (LocalSizeDp.current.second / 38f).toInt().coerceIn(1, 6),
+        )
         Spacer(GlanceModifier.height(4.dp))
         WText(d.ref, style = style(accent, 11.sp, align = TextAlign.Center))
     }
@@ -508,7 +526,7 @@ private fun DateContent(d: WidgetData.DateInfo, ws: WidgetStyle, small: Boolean,
         }
         else -> Column(center, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
             WText(d.day, style = style(text, if (small) 22.sp else 28.sp, bold = true, align = TextAlign.Center), maxLines = 1)
-            WText(d.gregorian, style = style(text.copy(alpha = 0.8f), 13.sp, align = TextAlign.Center), maxLines = 1)
+            if (!LocalTiny.current) WText(d.gregorian, style = style(text.copy(alpha = 0.8f), 13.sp, align = TextAlign.Center), maxLines = 1)
             WText(d.hijri, style = style(accent, 14.sp, bold = true, align = TextAlign.Center), maxLines = 1)
         }
     }
@@ -534,10 +552,14 @@ private fun DotsContent(d: WidgetData.Dots, ws: WidgetStyle, text: Color, accent
 @Composable
 private fun WideClockContent(ws: WidgetStyle) {
     val context = LocalContext.current
-    val views = remember(ws.variant, ws.textColor) {
+    val (wDp, hDp) = LocalSizeDp.current
+    val digitDp = minOf(hDp * 0.28f, wDp * 0.12f).coerceIn(14f, 64f)
+    val views = remember(ws.variant, ws.textColor, digitDp) {
         RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_wide_clock_dark else R.layout.widget_wide_clock_light).apply {
             setTextColor(R.id.wide_hour, ws.textColor)
             setTextColor(R.id.wide_minute, ws.textColor)
+            setTextViewTextSize(R.id.wide_hour, TypedValue.COMPLEX_UNIT_DIP, digitDp)
+            setTextViewTextSize(R.id.wide_minute, TypedValue.COMPLEX_UNIT_DIP, digitDp)
         }
     }
     Box(GlanceModifier.fillMaxSize().tapOpen("home")) {
@@ -549,7 +571,9 @@ private fun WideClockContent(ws: WidgetStyle) {
 @Composable
 private fun WorldClockContent(d: WidgetData.WorldClock, ws: WidgetStyle) {
     val context = LocalContext.current
-    val views = remember(d, ws.variant, ws.textColor, ws.accentColor) {
+    val (wDp, hDp) = LocalSizeDp.current
+    val timeDp = (if (ws.variant == 1) minOf(hDp * 0.17f, wDp * 0.2f) else minOf(hDp * 0.26f, wDp * 0.11f)).coerceIn(14f, 56f)
+    val views = remember(d, ws.variant, ws.textColor, ws.accentColor, timeDp) {
         RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_world_clock_stacked else R.layout.widget_world_clock).apply {
             listOf(
                 Triple(R.id.city1_name, R.id.city1_time, R.id.city1_ampm) to d.a,
@@ -559,6 +583,9 @@ private fun WorldClockContent(d: WidgetData.WorldClock, ws: WidgetStyle) {
                 setTextColor(ids.first, ws.accentColor)
                 setTextColor(ids.second, ws.textColor)
                 setTextColor(ids.third, ws.textColor)
+                setTextViewTextSize(ids.second, TypedValue.COMPLEX_UNIT_DIP, timeDp)
+                setTextViewTextSize(ids.first, TypedValue.COMPLEX_UNIT_DIP, (timeDp * 0.4f).coerceIn(9f, 18f))
+                setTextViewTextSize(ids.third, TypedValue.COMPLEX_UNIT_DIP, (timeDp * 0.36f).coerceIn(8f, 16f))
                 setString(ids.second, "setTimeZone", city.zone)
                 setString(ids.third, "setTimeZone", city.zone)
             }
@@ -626,14 +653,17 @@ private fun pill(context: Context, color: Color): android.graphics.Bitmap {
 @Composable
 private fun ClockContent(d: WidgetData.Clock, ws: WidgetStyle, small: Boolean, text: Color) {
     val context = LocalContext.current
-    val views = remember(d.analog, ws.fontId, ws.variant, ws.textColor, ws.accentColor, small) {
+    val (wDp, hDp) = LocalSizeDp.current
+    val timeDp = minOf(hDp * (if (ws.variant == 1) 0.55f else 0.42f), wDp * 0.24f).coerceIn(18f, 110f)
+    val views = remember(d.analog, ws.fontId, ws.variant, ws.textColor, ws.accentColor, timeDp) {
         if (d.analog) {
             RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_analog_dark else R.layout.widget_analog_light)
         } else {
             RemoteViews(context.packageName, ClockLayouts.digital(ws.fontId)).apply {
                 setTextColor(R.id.clock_time, ws.textColor)
                 setTextColor(R.id.clock_date, ws.accentColor)
-                setTextViewTextSize(R.id.clock_time, TypedValue.COMPLEX_UNIT_SP, if (small) 40f else 58f)
+                setTextViewTextSize(R.id.clock_time, TypedValue.COMPLEX_UNIT_DIP, timeDp)
+                setTextViewTextSize(R.id.clock_date, TypedValue.COMPLEX_UNIT_DIP, (timeDp * 0.26f).coerceIn(10f, 22f))
                 if (ws.variant == 1) setViewVisibility(R.id.clock_date, View.GONE)
             }
         }
@@ -644,7 +674,7 @@ private fun ClockContent(d: WidgetData.Clock, ws: WidgetStyle, small: Boolean, t
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AndroidRemoteViews(views, GlanceModifier.defaultWeight().fillMaxWidth())
-        if (!d.analog && ws.variant == 0 && !small) {
+        if (!d.analog && ws.variant == 0 && !small && hDp >= 120f) {
             WText(d.hijri, style = style(text.copy(alpha = 0.8f), 12.sp, align = TextAlign.Center), maxLines = 1)
         }
     }

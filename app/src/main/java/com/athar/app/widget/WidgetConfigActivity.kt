@@ -48,7 +48,10 @@ class WidgetConfigActivity : ComponentActivity() {
         val w = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
         val h = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT)
         val previewSize = if (w > 0 && h > 0) androidx.compose.ui.unit.DpSize(w.dp, h.dp) else null
-        val initial = store.get(appWidgetId) ?: store.pending ?: WidgetConfig(WidgetContent(WidgetType.NextPrayer))
+        val initial = store.get(appWidgetId)
+            ?: store.pending
+            ?: WidgetProviders.defaultConfig(this, appWidgetId)
+            ?: WidgetConfig(WidgetContent(WidgetType.NextPrayer))
 
         setContent {
             AtharFontsTheme {

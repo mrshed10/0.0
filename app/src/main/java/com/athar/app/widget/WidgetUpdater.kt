@@ -66,7 +66,7 @@ object WidgetUpdater {
 
     fun placedWidgetIds(context: Context): List<Int> {
         val awm = AppWidgetManager.getInstance(context)
-        return listOf(AtharWidgetReceiver::class.java, AtharSmallWidgetReceiver::class.java)
+        return WidgetProviders.receivers
             .flatMap { awm.getAppWidgetIds(ComponentName(context, it)).toList() }
     }
 }

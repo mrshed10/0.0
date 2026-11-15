@@ -273,9 +273,6 @@
     <string name="reminder_paused">Paused</string>
     <string name="empty_reminders_title">No reminders</string>
     <string name="empty_reminders_body">Set a reminder with your own tone, once or repeating daily, weekly, monthly or yearly.</string>
-
-    <string name="widget_name">Athar</string>
-    <string name="widget_small_name">Athar (small)</string>
     <string name="widget_description">Any item from Athar on a glass card</string>
     <string name="widget_small_description">A compact glass card</string>
     <string name="widget_tap_to_setup">Tap to set up</string>
@@ -513,6 +510,35 @@
     <string name="crash_share">Share</string>
     <string name="crash_clear">Clear</string>
     <string name="crash_copied">Copied</string>
+
+    <string name="widget_name_custom">Athar · Custom</string>
+    <string name="widget_name_custom_small">Athar · Custom (small)</string>
+    <string name="widget_name_prayer">Athar · Prayer times</string>
+    <string name="widget_name_clock">Athar · Clock</string>
+    <string name="widget_name_calendar">Athar · Calendar</string>
+    <string name="widget_name_schedule">Athar · Salaries &amp; dates</string>
+    <string name="widget_name_tasks">Athar · Today\'s tasks</string>
+    <string name="widget_name_habits">Athar · Habits</string>
+    <string name="widget_name_calligraphy">Athar · Calligraphy</string>
+    <string name="widget_prayer_description">Next prayer with today\'s times</string>
+    <string name="widget_clock_description">Wide live clock; change to any clock design</string>
+    <string name="widget_calendar_description">Day, date and month; also calendar and dots</string>
+    <string name="widget_schedule_description">All upcoming salaries and reminders (scrollable)</string>
+    <string name="widget_tasks_description">Tick off today\'s tasks from the home screen</string>
+    <string name="widget_habits_description">Mark habits done and keep your streaks</string>
+    <string name="widget_calligraphy_description">Day and month names in Arabic calligraphy</string>
+    <string name="preview_days_12">12 days</string>
+    <string name="preview_days_16">16 days</string>
+    <string name="preview_days_17">17 days</string>
+    <string name="preview_days_20">20 days</string>
+    <string name="preview_reminder">Car service</string>
+    <string name="preview_task_1">Read 10 pages</string>
+    <string name="preview_task_2">Pay the electricity bill</string>
+    <string name="preview_task_3">Call mom</string>
+    <string name="preview_habit_1">Wird</string>
+    <string name="preview_habit_2">Walk</string>
+    <string name="preview_habit_3">Water</string>
+    <string name="preview_habit_4">Sleep</string>
 
     <string-array name="hijri_months">
         <item>Muharram</item>
