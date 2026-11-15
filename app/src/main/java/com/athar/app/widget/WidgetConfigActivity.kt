@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.athar.app.core.designsystem.glass.AuroraBackground
 import com.athar.app.core.designsystem.glass.LocalHazeState
+import com.athar.app.core.designsystem.glass.LocalSheetHost
+import com.athar.app.core.designsystem.glass.SheetHost
 import com.athar.app.core.designsystem.theme.AtharFontsTheme
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
@@ -56,7 +58,8 @@ class WidgetConfigActivity : ComponentActivity() {
         setContent {
             AtharFontsTheme {
                 val haze = remember { HazeState() }
-                CompositionLocalProvider(LocalHazeState provides haze) {
+                val sheets = remember { SheetHost() }
+                CompositionLocalProvider(LocalHazeState provides haze, LocalSheetHost provides sheets) {
                     Box(Modifier.fillMaxSize()) {
                         AuroraBackground(haze)
                         WidgetEditorScreen(
@@ -74,6 +77,7 @@ class WidgetConfigActivity : ComponentActivity() {
                                 }
                             },
                         )
+                        sheets.Render()
                     }
                 }
             }

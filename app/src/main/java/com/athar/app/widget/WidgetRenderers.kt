@@ -157,6 +157,15 @@ object WidgetRenderers {
         return bmp
     }
 
+    /** One line of dot-matrix text, [heightPx] tall. */
+    fun dotText(text: String, heightPx: Int, maxWidthPx: Int, color: Int): Bitmap {
+        val cols = DotMatrix.columns(text).coerceAtLeast(1)
+        val cell = min(heightPx / DotMatrix.ROWS.toFloat(), maxWidthPx / cols.toFloat()).coerceAtLeast(1f)
+        val bmp = bitmap((cols * cell).toInt() + 2, (DotMatrix.ROWS * cell).toInt() + 2)
+        DotMatrix.draw(Canvas(bmp), text, 1f, 1f, cell, color)
+        return bmp
+    }
+
     /** Big clock digits in a custom font; one line per entry of [lines]. */
     fun bigClock(w: Int, h: Int, lines: List<String>, typeface: Typeface?, color: Int, accent: Int): Bitmap {
         val bmp = bitmap(w, h)

@@ -51,11 +51,13 @@ import androidx.compose.ui.unit.dp
 import com.athar.app.AtharApplication
 import com.athar.app.R
 import com.athar.app.core.designsystem.component.GlassIconButton
+import com.athar.app.core.designsystem.glass.HideBottomBar
 import com.athar.app.core.designsystem.theme.AtharColors
 import kotlinx.coroutines.flow.first
 
 enum class GalleryTab(@StringRes val label: Int) {
     New(R.string.gallery_new),
+    Nothing(R.string.gallery_nothing),
     Clock(R.string.gallery_clock),
     Digital(R.string.gallery_digital),
     Date(R.string.gallery_date),
@@ -97,7 +99,24 @@ object WidgetTemplates {
 
     private val dark = WidgetStyle(kind = BackgroundKind.Gradient, color1 = 0xFF1C1C1E.toInt(), color2 = 0xFF2C2C2E.toInt(), opacity = 92, accentColor = 0xFFE6C27A.toInt())
 
+    /** Nothing-inspired: deep black, faint dot grid, white dots, red accent. */
+    val nothingDark = WidgetStyle(
+        kind = BackgroundKind.DotGrid, color1 = 0xFF000000.toInt(), opacity = 100, border = false, cornerDp = 30,
+        textColor = 0xFFFFFFFF.toInt(), accentColor = 0xFFD71921.toInt(),
+    )
+    val nothingLight = nothingDark.copy(color1 = 0xFFF1F1F1.toInt(), textColor = 0xFF111111.toInt())
+
     val all = listOf(
+        // Nothing style
+        t("nothing_clock", GalleryTab.Nothing, R.string.widget_type_nothing_clock, WidgetType.NothingClock, nothingDark, wide = false, isNew = true),
+        t("nothing_clock_wide", GalleryTab.Nothing, R.string.tpl_nothing_clock_wide, WidgetType.NothingClock, nothingDark.copy(variant = 1), wide = true, isNew = true),
+        t("nothing_clock_light", GalleryTab.Nothing, R.string.tpl_nothing_light, WidgetType.NothingClock, nothingLight, wide = false),
+        t("nothing_glyph", GalleryTab.Nothing, R.string.widget_type_nothing_glyph, WidgetType.NothingGlyph, nothingDark, wide = false, isNew = true),
+        t("nothing_glyph_year", GalleryTab.Nothing, R.string.tpl_nothing_year, WidgetType.NothingGlyph, nothingDark.copy(variant = 1), wide = false),
+        t("nothing_prayer", GalleryTab.Nothing, R.string.widget_type_nothing_prayer, WidgetType.NothingPrayer, nothingDark, wide = true, isNew = true),
+        t("nothing_counter", GalleryTab.Nothing, R.string.widget_type_nothing_counter, WidgetType.NothingCounter, nothingDark, wide = false),
+        t("nothing_date", GalleryTab.Nothing, R.string.widget_type_nothing_date, WidgetType.NothingDate, nothingDark, wide = false),
+        t("nothing_hijri", GalleryTab.Nothing, R.string.tpl_nothing_hijri, WidgetType.NothingDate, nothingLight.copy(variant = 1), wide = false),
         // From the design file: clocks & world time
         t("wide_clock", GalleryTab.Clock, R.string.widget_type_wide_clock, WidgetType.WideClock, dark, wide = true, isNew = true),
         t("wide_clock_frost", GalleryTab.Clock, R.string.tpl_wide_frost, WidgetType.WideClock, frost.copy(variant = 1), wide = true),
@@ -189,6 +208,7 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
             WidgetType.Counter to (c.counterRepository.counters.first().firstOrNull()?.id ?: -1),
             WidgetType.Habit to (c.habitRepository.habits.first().firstOrNull()?.id ?: -1),
             WidgetType.DebtPerson to (c.debtRepository.people.first().firstOrNull()?.id ?: -1),
+            WidgetType.NothingCounter to (c.counterRepository.counters.first().firstOrNull()?.id ?: -1),
         )
     }
     fun resolved(t: WidgetTemplate): WidgetConfig {
@@ -198,10 +218,17 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
 
     customizing?.let { template ->
         BackHandler { customizing = null }
+        val savedMsg = stringResource(R.string.studio_saved)
+        val templateName = stringResource(template.name)
         WidgetEditorScreen(
             initial = resolved(template),
             wide = template.wide,
             saveLabel = stringResource(R.string.add_to_home_screen),
+            secondaryLabel = stringResource(R.string.studio_save_to_designs),
+            onSecondary = { config ->
+                DesignLibrary(context).save(SavedDesign(DesignLibrary.newId(), templateName, config, template.wide, System.currentTimeMillis()))
+                Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+            },
             onCancel = { customizing = null },
             onSave = { config ->
                 val ok = WidgetPinner.pin(context, config, small = !template.wide)
@@ -213,6 +240,7 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
     }
 
     BackHandler(onBack = onBack)
+    HideBottomBar()
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
@@ -248,7 +276,7 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
         Spacer(Modifier.height(12.dp))
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottom + 120.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = bottom + 48.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize(),

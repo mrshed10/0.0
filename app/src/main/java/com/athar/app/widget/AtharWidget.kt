@@ -86,7 +86,7 @@ class AtharWidget : GlanceAppWidget() {
         val first = firstConfig to WidgetDataLoader.load(context, firstConfig)
         val live = combine(WidgetStore.changes, WidgetUpdater.version, WidgetUpdater.tick) { a, b, t ->
             // Clock ticks only matter to minute clocks.
-            Triple(a, b, if (store.get(appWidgetId)?.content?.type?.minuteClock == true) t else 0L)
+            Triple(a, b, if (store.get(appWidgetId)?.needsMinuteTick() == true) t else 0L)
         }
             .distinctUntilChanged()
             .map {
@@ -183,6 +183,10 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
                     WidgetRenderers.bigClock(w, h, data.lines, font?.first ?: FontRegistry.typeface(context, "bebasneue"), style.textColor, style.accentColor)
                 }
                 is WidgetData.Dots -> DotsContent(data, style, text, accent)
+                is WidgetData.NothingStyle -> BitmapContent("home") { w, h ->
+                    NothingRenderer.render(w, h, data.spec, style.textColor, style.accentColor, font?.first)
+                }
+                is WidgetData.Custom -> CustomContent(data, text, accent)
                 is WidgetData.MonthGrid -> BitmapContent("dates") { w, h ->
                     WidgetRenderers.calendar(
                         w, h, data.month, data.today, data.startSunday, data.weekdays, font?.first,
@@ -638,6 +642,41 @@ private fun ClockContent(d: WidgetData.Clock, ws: WidgetStyle, small: Boolean, t
         AndroidRemoteViews(views, GlanceModifier.defaultWeight().fillMaxWidth())
         if (!d.analog && ws.variant == 0 && !small && hDp >= 120f) {
             WText(d.hijri, style = style(text.copy(alpha = 0.8f), 12.sp, align = TextAlign.Center), maxLines = 1)
+        }
+    }
+}
+
+/** A widget the user designed: stacked lines, each with its own size, colour and style. */
+@Composable
+private fun CustomContent(d: WidgetData.Custom, text: Color, accent: Color) {
+    val context = LocalContext.current
+    val density = context.resources.displayMetrics.density
+    val scale = LocalScale.current
+    val width = LocalTextWidth.current
+    val align = when (d.align) {
+        0 -> Alignment.Start
+        2 -> Alignment.End
+        else -> Alignment.CenterHorizontally
+    }
+    val textAlign = when (d.align) {
+        0 -> TextAlign.Start
+        2 -> TextAlign.End
+        else -> TextAlign.Center
+    }
+    Column(
+        GlanceModifier.fillMaxSize().tapOpen("home"),
+        horizontalAlignment = align,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        d.lines.forEach { line ->
+            val color = line.color?.let { Color(it) } ?: if (line.accent) accent else text
+            if (line.dots && DotMatrix.supports(line.text)) {
+                val heightPx = (line.sizeSp * scale * density * 0.9f).toInt().coerceAtLeast(8)
+                val bitmap = remember(line, heightPx, width, color) { WidgetRenderers.dotText(line.text, heightPx, width, color.toArgb()) }
+                Image(ImageProvider(bitmap), contentDescription = line.text)
+            } else {
+                WText(line.text, style = style(color, line.sizeSp.sp, bold = line.bold, align = textAlign), maxLines = 2)
+            }
         }
     }
 }

@@ -72,7 +72,9 @@ import com.athar.app.core.designsystem.component.GlassButton
 import com.athar.app.core.designsystem.component.GlassChip
 import com.athar.app.core.designsystem.component.GlassIconButton
 import com.athar.app.core.designsystem.component.GlassSegmented
+import com.athar.app.core.designsystem.component.GlassTextField
 import com.athar.app.core.designsystem.glass.GlassCard
+import com.athar.app.core.designsystem.glass.HideBottomBar
 import com.athar.app.core.designsystem.theme.AtharColors
 import com.athar.app.core.fonts.FontRegistry
 import com.athar.app.core.format.currentLocale
@@ -101,6 +103,11 @@ fun WidgetEditorScreen(
     saveLabel: String? = null,
     /** The placed widget's real size, so the preview matches it exactly. */
     previewSize: androidx.compose.ui.unit.DpSize? = null,
+    /** Shows a name field (saved designs). */
+    name: androidx.compose.runtime.MutableState<String>? = null,
+    /** Optional second action, e.g. "Save to My designs". */
+    secondaryLabel: String? = null,
+    onSecondary: ((WidgetConfig) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -108,6 +115,7 @@ fun WidgetEditorScreen(
     val style = config.style
     fun setStyle(s: WidgetStyle) { config = config.copy(style = s) }
     BackHandler(onBack = onCancel)
+    HideBottomBar()
 
     // Items for types that point at one record.
     val items by produceState(emptyList<Pickable>(), config.content.type) {
@@ -143,7 +151,7 @@ fun WidgetEditorScreen(
 
     LazyColumn(
         Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = bottom + 24.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = bottom + 56.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -151,6 +159,16 @@ fun WidgetEditorScreen(
                 GlassIconButton(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back), onCancel)
                 Spacer(Modifier.width(12.dp))
                 Text(stringResource(R.string.widget_editor_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            }
+        }
+        name?.let { nameState ->
+            item {
+                GlassTextField(
+                    nameState.value,
+                    { nameState.value = it.take(60) },
+                    stringResource(R.string.design_name_hint),
+                    Modifier.fillMaxWidth(),
+                )
             }
         }
         item {
@@ -196,7 +214,14 @@ fun WidgetEditorScreen(
                         GlassChip(
                             "${type.emoji} " + stringResource(type.label),
                             if (type == config.content.type) AtharColors.Gold else AtharColors.TextSecondary,
-                            Modifier.clickable { config = config.copy(content = WidgetContent(type)) },
+                            Modifier.clickable {
+                                config = config.copy(
+                                    content = WidgetContent(
+                                        type,
+                                        extra = if (type == WidgetType.Custom) CustomSpecJson.encode(CustomSpec.starter()) else "",
+                                    ),
+                                )
+                            },
                         )
                     }
                 }
@@ -277,6 +302,15 @@ fun WidgetEditorScreen(
             }
         }
 
+        if (config.content.type == WidgetType.Custom) {
+            item {
+                CustomDesigner(
+                    spec = CustomSpecJson.decode(config.content.extra),
+                    onChange = { config = config.copy(content = config.content.copy(extra = CustomSpecJson.encode(it))) },
+                )
+            }
+        }
+
         item {
             GlassCard(Modifier.fillMaxWidth()) {
                 CardHeader(stringResource(R.string.widget_presets), Icons.Rounded.Check, tint = AtharColors.Violet)
@@ -313,6 +347,7 @@ fun WidgetEditorScreen(
                         stringResource(R.string.bg_color),
                         stringResource(R.string.bg_gradient),
                         stringResource(R.string.bg_image),
+                        stringResource(R.string.bg_dots),
                     ),
                     selectedIndex = style.kind.ordinal,
                     onSelect = {
@@ -414,6 +449,16 @@ fun WidgetEditorScreen(
             }
         }
 
+        if (secondaryLabel != null && onSecondary != null) {
+            item {
+                GlassButton(
+                    secondaryLabel,
+                    { onSecondary(config) },
+                    filled = false,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
         item {
             GlassButton(
                 saveLabel ?: stringResource(R.string.save),

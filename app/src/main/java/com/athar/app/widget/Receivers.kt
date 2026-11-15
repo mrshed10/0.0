@@ -32,6 +32,7 @@ class ScheduleWidgetReceiver : AtharReceiverBase()
 class TasksWidgetReceiver : AtharReceiverBase()
 class HabitsWidgetReceiver : AtharReceiverBase()
 class CalligraphyWidgetReceiver : AtharReceiverBase()
+class NothingWidgetReceiver : AtharReceiverBase()
 
 object WidgetProviders {
     /** Receiver → starting design (template id); null = let the user choose. */
@@ -45,6 +46,7 @@ object WidgetProviders {
         TasksWidgetReceiver::class.java to "tasks",
         HabitsWidgetReceiver::class.java to "habits_row",
         CalligraphyWidgetReceiver::class.java to "cal_day_ar",
+        NothingWidgetReceiver::class.java to "nothing_clock",
     )
 
     val receivers: List<Class<out AtharReceiverBase>> get() = defaults.keys.toList()

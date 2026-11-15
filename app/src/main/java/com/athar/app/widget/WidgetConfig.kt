@@ -28,10 +28,16 @@ enum class WidgetType(@StringRes val label: Int, val emoji: String, val needsIte
     MonthCalendar(R.string.widget_type_calendar, "📆"),
     CalligraphyDay(R.string.widget_type_calligraphy_day, "🖋️"),
     CalligraphyMonth(R.string.widget_type_calligraphy_month, "🖋️"),
+    NothingClock(R.string.widget_type_nothing_clock, "⚫"),
+    NothingGlyph(R.string.widget_type_nothing_glyph, "⚫"),
+    NothingPrayer(R.string.widget_type_nothing_prayer, "⚫"),
+    NothingCounter(R.string.widget_type_nothing_counter, "⚫", needsItem = true),
+    NothingDate(R.string.widget_type_nothing_date, "⚫"),
+    Custom(R.string.widget_type_custom, "🎨"),
     ;
 
-    /** Redrawn every minute (bitmap clocks). */
-    val minuteClock: Boolean get() = this == BigClock
+    /** Redrawn every minute (bitmap clocks and countdowns). */
+    val minuteClock: Boolean get() = this in setOf(BigClock, NothingClock, NothingGlyph, NothingPrayer)
 }
 
 /**
@@ -40,7 +46,7 @@ enum class WidgetType(@StringRes val label: Int, val emoji: String, val needsIte
  */
 data class WidgetContent(val type: WidgetType, val itemId: Long = -1, val extra: String = "")
 
-enum class BackgroundKind { Color, Gradient, Image }
+enum class BackgroundKind { Color, Gradient, Image, DotGrid }
 
 /** What tapping the widget does. */
 enum class ClickBehavior { None, Quick, OpenApp }
@@ -96,16 +102,18 @@ object WidgetPresets {
 }
 
 object WidgetJson {
-    fun encode(config: WidgetConfig): String = JSONObject()
+    fun encode(config: WidgetConfig): String = encodeObject(config).toString()
+
+    fun encodeObject(config: WidgetConfig): JSONObject = JSONObject()
         .put("type", config.content.type.name)
         .put("item", config.content.itemId)
         .put("extra", config.content.extra)
         .put("style", encodeStyle(config.style))
-        .toString()
 
-    fun decode(raw: String?): WidgetConfig? = runCatching {
-        val o = JSONObject(raw ?: return null)
-        val type = WidgetType.entries.firstOrNull { it.name == o.getString("type") } ?: return null
+    fun decode(raw: String?): WidgetConfig? = runCatching { decodeObject(JSONObject(raw ?: return null)) }.getOrNull()
+
+    fun decodeObject(o: JSONObject): WidgetConfig? = runCatching {
+        val type = WidgetType.entries.firstOrNull { it.name == o.getString("type") } ?: return@runCatching null
         WidgetConfig(WidgetContent(type, o.optLong("item", -1), o.optString("extra", "")), decodeStyle(o.optJSONObject("style")))
     }.getOrNull()
 

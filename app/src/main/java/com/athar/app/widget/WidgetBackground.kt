@@ -42,6 +42,24 @@ object WidgetBackground {
 
         when (style.kind) {
             BackgroundKind.Color -> canvas.drawRect(rect, Paint().apply { color = style.color1; this.alpha = alpha })
+            BackgroundKind.DotGrid -> {
+                // Nothing-style: solid colour with a faint grid of dots.
+                canvas.drawRect(rect, Paint().apply { color = style.color1; this.alpha = alpha })
+                val step = 9f * density
+                val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = style.textColor
+                    this.alpha = (alpha * 0.07f).toInt().coerceAtLeast(8)
+                }
+                var y = step / 2
+                while (y < h) {
+                    var x = step / 2
+                    while (x < w) {
+                        canvas.drawCircle(x, y, 1.1f * density, dot)
+                        x += step
+                    }
+                    y += step
+                }
+            }
             BackgroundKind.Gradient -> canvas.drawRect(rect, gradientPaint(style, w, h, alpha))
             BackgroundKind.Image -> {
                 val image = style.imagePath?.let { loadImage(it, w, h) }

@@ -15,3 +15,13 @@ class BottomBarController {
 }
 
 val LocalBottomBarController = staticCompositionLocalOf { BottomBarController() }
+
+/** Hides the floating bar while this screen is shown (full-screen editors with bottom buttons). */
+@androidx.compose.runtime.Composable
+fun HideBottomBar() {
+    val bar = LocalBottomBarController.current
+    androidx.compose.runtime.DisposableEffect(bar) {
+        bar.hide()
+        onDispose { bar.show() }
+    }
+}

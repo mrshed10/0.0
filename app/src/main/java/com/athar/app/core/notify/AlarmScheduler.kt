@@ -12,6 +12,7 @@ import com.athar.app.core.format.formatGregorian
 import com.athar.app.core.region.Cities
 import com.athar.app.feature.prayer.Prayer
 import com.athar.app.feature.prayer.PrayerAlertMath
+import com.athar.app.widget.needsMinuteTick
 import com.athar.app.feature.reminders.ReminderMath
 import com.athar.app.feature.salary.SalarySchedule
 import com.athar.app.feature.salary.SalarySource
@@ -163,7 +164,7 @@ class AlarmScheduler(
     private fun clockTick(now: LocalDateTime): Alarm? {
         val store = com.athar.app.widget.WidgetStore(context)
         val needed = com.athar.app.widget.WidgetUpdater.placedWidgetIds(context)
-            .any { store.get(it)?.content?.type?.minuteClock == true }
+            .any { store.get(it)?.needsMinuteTick() == true }
         if (!needed) return null
         val next = now.withSecond(0).withNano(0).plusMinutes(1).plusSeconds(1)
         return Alarm(CLOCK_TICK, next, null, null, "", "", AlarmAction.Tick, wakeup = false)

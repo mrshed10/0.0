@@ -333,6 +333,23 @@ private fun PreviewContent(d: WidgetData, style: WidgetStyle, small: Boolean) {
             }
         }
         is WidgetData.WorldClock -> WorldPreview(d, style, text, accent)
+        is WidgetData.NothingStyle -> RenderedPreview(style) { w, h, tf ->
+            NothingRenderer.render(w, h, d.spec, style.textColor, style.accentColor, tf)
+        }
+        is WidgetData.Custom -> Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = when (d.align) {
+                0 -> Alignment.Start
+                2 -> Alignment.End
+                else -> Alignment.CenterHorizontally
+            },
+            verticalArrangement = Arrangement.Center,
+        ) {
+            d.lines.forEach { line ->
+                val color = line.color?.let { Color(it) } ?: if (line.accent) accent else text
+                PText(line.text, color, line.sizeSp.sp, bold = line.bold, center = d.align == 1, maxLines = 2)
+            }
+        }
         is WidgetData.WideClock -> WidePreview(style.variant == 1, text)
         is WidgetData.Clock -> if (d.analog) {
             AnalogPreview(dark = style.variant == 1, accent = accent)

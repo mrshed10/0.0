@@ -45,7 +45,7 @@ object WidgetUpdater {
         val store = WidgetStore(context)
         val manager = GlanceAppWidgetManager(context)
         placedWidgetIds(context)
-            .filter { store.get(it)?.content?.type?.minuteClock == true }
+            .filter { store.get(it)?.needsMinuteTick() == true }
             .forEach { id -> runCatching { AtharWidget().update(context, manager.getGlanceIdBy(id)) } }
     }
 
@@ -173,6 +173,10 @@ object LockCard {
                 .setContentText(data.rows.take(3).joinToString(" • ") { "${it.name}: ${it.daysText}" })
             is WidgetData.Clock -> builder.setContentTitle(data.day).setContentText(data.hijri)
             is WidgetData.Dots -> builder.setContentTitle("${data.title} · ${data.percent}%")
+            is WidgetData.NothingStyle -> builder.setContentTitle(listOfNotNull(data.spec.top, data.spec.big).joinToString(" · "))
+                .setContentText(data.spec.bottom.orEmpty())
+            is WidgetData.Custom -> builder.setContentTitle(data.lines.firstOrNull()?.text.orEmpty())
+                .setContentText(data.lines.drop(1).joinToString(" · ") { it.text })
             is WidgetData.Calligraphy -> builder.setContentTitle(data.main).setContentText(data.sub.orEmpty())
             is WidgetData.WorldClock, is WidgetData.WideClock, is WidgetData.BigClock, is WidgetData.MonthGrid -> {
                 val today = java.time.LocalDate.now()

@@ -66,7 +66,12 @@ sealed interface WidgetData {
     data class Dots(val title: String, val percent: Int, val filled: Int, val total: Int) : WidgetData
     data class MonthGrid(val month: java.time.YearMonth, val today: LocalDate, val startSunday: Boolean, val weekdays: List<String>) : WidgetData
     data class Calligraphy(val main: String, val number: String?, val sub: String?, val latin: Boolean) : WidgetData
+    data class NothingStyle(val spec: NothingSpec) : WidgetData
+    data class Custom(val lines: List<CustomLine>, val align: Int) : WidgetData
 }
+
+/** One resolved line of a custom widget. */
+data class CustomLine(val text: String, val sizeSp: Int, val color: Int?, val accent: Boolean, val bold: Boolean, val dots: Boolean)
 
 object WidgetDataLoader {
     /** Never throws: a failure shows "item missing" instead of a broken widget. */
@@ -236,6 +241,82 @@ object WidgetDataLoader {
                     }
                 if (rows.isEmpty()) WidgetData.Missing else WidgetData.Schedule(rows)
             }
+            WidgetType.NothingClock -> {
+                val t = now.toLocalTime()
+                val use24 = android.text.format.DateFormat.is24HourFormat(context)
+                val hh = String.format(java.util.Locale.ENGLISH, "%02d", if (use24) t.hour else (t.hour % 12).let { if (it == 0) 12 else it })
+                val mm = String.format(java.util.Locale.ENGLISH, "%02d", t.minute)
+                WidgetData.NothingStyle(
+                    NothingSpec(
+                        top = CalendarNames.dayEnShort(today.dayOfWeek),
+                        big = "$hh:$mm",
+                        bigAccent = setOf(2),
+                        bottom = if (config.style.variant == 1) hijri(today) else "${today.dayOfMonth} ${CalendarNames.monthsEn[today.monthValue - 1].take(3)}",
+                    ),
+                )
+            }
+            WidgetType.NothingGlyph -> if (config.style.variant == 1) {
+                val p = (today.dayOfYear - 1f) / today.lengthOfYear()
+                WidgetData.NothingStyle(NothingSpec(top = today.year.toString(), big = "${(p * 100).toInt()}%", bottom = "YEAR", ring = p))
+            } else {
+                val minutes = now.toLocalTime().toSecondOfDay() / 60
+                val p = minutes / 1440f
+                WidgetData.NothingStyle(
+                    NothingSpec(
+                        top = "DAY",
+                        big = "${(p * 100).toInt()}%",
+                        bottom = String.format(java.util.Locale.ENGLISH, "%02d:%02d", minutes / 60, minutes % 60),
+                        ring = p,
+                    ),
+                )
+            }
+            WidgetType.NothingPrayer -> {
+                val prefs = c.settings.prayer.value
+                val times = prefs.timesFor(today)
+                val next = PrayerSchedule.next(now, times, prefs.timesFor(today.plusDays(1)))
+                val left = java.time.Duration.between(now, next.at).toMinutes().coerceAtLeast(0)
+                val previous = times.filter { it.prayer.isObligatory }.map { today.atTime(it.time) }.filter { !it.isAfter(now) }.maxOrNull()
+                    ?: next.at.minusHours(6)
+                val total = java.time.Duration.between(previous, next.at).toMinutes().coerceAtLeast(1)
+                WidgetData.NothingStyle(
+                    NothingSpec(
+                        top = s(next.prayer.label),
+                        big = String.format(java.util.Locale.ENGLISH, "%02d:%02d", left / 60, left % 60),
+                        bigAccent = setOf(2),
+                        bottom = "AT " + DateTimeFormatter.ofPattern("HH:mm", java.util.Locale.ENGLISH).format(next.at),
+                        bar = 1f - left.toFloat() / total,
+                    ),
+                )
+            }
+            WidgetType.NothingCounter -> {
+                val counter = c.counterRepository.counters.first().firstOrNull { it.id == config.content.itemId }
+                    ?: return WidgetData.Missing
+                val reading = CounterMath.read(counter, today)
+                WidgetData.NothingStyle(
+                    NothingSpec(
+                        top = counter.title,
+                        big = reading.days.toString(),
+                        bottom = when {
+                            reading.days == 0L -> "TODAY"
+                            reading.phase == CounterPhase.Remaining || reading.phase == CounterPhase.StartsIn -> "DAYS LEFT"
+                            else -> "DAYS SINCE"
+                        },
+                    ),
+                )
+            }
+            WidgetType.NothingDate -> if (config.style.variant == 1) {
+                val h = HijriCalendar.fromGregorian(today)
+                WidgetData.NothingStyle(NothingSpec(top = CalendarNames.hijriEn[h.month - 1], big = h.day.toString(), bottom = "${h.year} AH"))
+            } else {
+                WidgetData.NothingStyle(
+                    NothingSpec(
+                        top = CalendarNames.monthsEn[today.monthValue - 1],
+                        big = today.dayOfMonth.toString(),
+                        bottom = CalendarNames.dayEn(today.dayOfWeek),
+                    ),
+                )
+            }
+            WidgetType.Custom -> CustomWidgets.resolve(context, CustomSpecJson.decode(config.content.extra), now)
             WidgetType.AnalogClock, WidgetType.DigitalClock -> WidgetData.Clock(
                 analog = config.content.type == WidgetType.AnalogClock,
                 hijri = hijri(today) + " " + s(R.string.hijri_suffix),
