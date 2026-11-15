@@ -2,16 +2,13 @@
 
 تطبيق Android TV / TV Box يحوّل لوحة مفاتيح USB عادية إلى ريموت كنترول يعمل في الخلفية داخل جميع التطبيقات عبر `AccessibilityService`.
 
-| الزر | الوظيفة |
-|---|---|
-| F12 | رفع الصوت |
-| F11 | خفض الصوت |
-| F10 | كتم / إلغاء الكتم |
-| F1 أو Home | الشاشة الرئيسية |
-| Esc أو Backspace | رجوع |
-| F2 | التطبيقات الأخيرة |
-
-> Backspace و Home يعملان بشكل طبيعي عند الكتابة داخل مربع نص.
+## المزايا
+- **تخصيص كامل للأزرار:** اضغط «إضافة تخصيص جديد»، ثم اضغط أي زر في الكيبورد، واختر وظيفته
+  (رفع/خفض/كتم الصوت، الرئيسية، الرجوع، التطبيقات الأخيرة، تشغيل/إيقاف، التالي/السابق، الإشعارات).
+- التخصيصات محفوظة في SharedPreferences وتبقى بعد إعادة تشغيل الجهاز، ويمكن تعديلها أو حذفها من الجدول.
+- **حماية من الإغلاق:** الخدمة تعمل كخدمة أمامية بإشعار صامت، وتعيد تشغيل نفسها عند إغلاق التطبيق.
+- أزرار الكتابة (الحروف، Backspace، المسافة...) تعمل طبيعياً داخل مربعات النص حتى لو كانت مخصّصة.
+- الأسهم و Enter وزر الرجوع محجوزة للتنقّل ولا يمكن تخصيصها.
 
 ## هيكل المشروع
 ```
@@ -26,10 +23,12 @@ KeyboardRemoteTV/
     └── src/main/
         ├── AndroidManifest.xml
         ├── java/com/tvremote/keyboard/
-        │   ├── MainActivity.kt
-        │   └── KeyboardRemoteService.kt
+        │   ├── MainActivity.kt          (الواجهة + نافذة التقاط الزر + الجدول)
+        │   ├── KeyboardRemoteService.kt (خدمة إمكانية الوصول + الخدمة الأمامية)
+        │   ├── KeyMappingStore.kt       (الحفظ في SharedPreferences)
+        │   └── RemoteAction.kt          (قائمة الوظائف)
         └── res/
-            ├── layout/activity_main.xml
+            ├── layout/activity_main.xml, item_mapping.xml
             ├── xml/accessibility_service_config.xml
             ├── values/ (strings, colors, styles)
             └── drawable/ (أيقونة، بانر، خلفيات الأزرار)

@@ -4,7 +4,7 @@
     <string name="subtitle">حوّل لوحة المفاتيح الخارجية إلى ريموت كنترول يعمل في جميع التطبيقات</string>
 
     <string name="service_label">ريموت الكيبورد</string>
-    <string name="service_description">تلتقط هذه الخدمة أزرار لوحة المفاتيح الخارجية (F1، F2، F10، F11، F12، Esc، Backspace، Home) وتحوّلها إلى أوامر: الصوت، الرئيسية، الرجوع، والتطبيقات الأخيرة. لا تقرأ الخدمة ما تكتبه ولا ترسل أي بيانات.</string>
+    <string name="service_description">تلتقط هذه الخدمة أزرار لوحة المفاتيح الخارجية التي خصّصتها في التطبيق وتحوّلها إلى أوامر: الصوت، الرئيسية، الرجوع، التطبيقات الأخيرة، والتحكم بالوسائط. لا تقرأ الخدمة ما تكتبه ولا ترسل أي بيانات.</string>
 
     <string name="status_enabled">✔ الخدمة مفعّلة</string>
     <string name="status_disabled">✖ الخدمة غير مفعّلة</string>
@@ -14,14 +14,39 @@
     <string name="settings_fallback">ابحث في الإعدادات عن «إمكانية الوصول» (Accessibility) وفعّل «ريموت الكيبورد»</string>
     <string name="settings_not_found">تعذّر فتح الإعدادات على هذا الجهاز. فعّل الخدمة عبر ADB (راجع ملف README)</string>
 
-    <string name="table_title">وظائف الأزرار</string>
+    <!-- التخصيص -->
+    <string name="add_mapping_button">＋ إضافة تخصيص جديد</string>
+    <string name="add_mapping">إضافة تخصيص جديد</string>
+    <string name="capture_message">اضغط الآن على الزر المطلوب في الكيبورد...\n\n(الأسهم و Enter وزر الرجوع محجوزة للتنقّل في الواجهة)</string>
+    <string name="key_reserved">هذا الزر محجوز للتنقّل، اختر زراً آخر</string>
+    <string name="choose_action_for">اختر وظيفة الزر: %1$s</string>
+    <string name="saved_mapping">تم الحفظ: %1$s ← %2$s</string>
+    <string name="confirm_delete">حذف تخصيص الزر %1$s (%2$s)؟</string>
+    <string name="cancel">إلغاء</string>
+    <string name="edit">تعديل</string>
+    <string name="delete">حذف</string>
+
+    <string name="table_title">الأزرار المخصّصة</string>
     <string name="col_key">زر الكيبورد</string>
     <string name="col_action">الوظيفة</string>
+    <string name="col_manage">إدارة</string>
+    <string name="empty_mappings">لا توجد أزرار مخصّصة بعد. اضغط «إضافة تخصيص جديد» للبدء.</string>
+    <string name="note_typing">ملاحظة: عند الكتابة داخل مربع نص تعمل أزرار الكتابة (الحروف، Backspace، المسافة...) بشكل طبيعي حتى لو كانت مخصّصة.</string>
+
+    <!-- الوظائف -->
     <string name="act_volume_up">رفع مستوى الصوت</string>
     <string name="act_volume_down">خفض مستوى الصوت</string>
     <string name="act_mute">كتم / إلغاء كتم الصوت</string>
     <string name="act_home">الشاشة الرئيسية</string>
     <string name="act_back">رجوع</string>
     <string name="act_recents">التطبيقات الأخيرة</string>
-    <string name="note_typing">ملاحظة: عند الكتابة داخل مربع نص يعمل Backspace للحذف و Home لبداية السطر بشكل طبيعي، و Esc يبقى زر رجوع.</string>
+    <string name="act_play_pause">تشغيل / إيقاف مؤقت</string>
+    <string name="act_media_next">المقطع التالي</string>
+    <string name="act_media_previous">المقطع السابق</string>
+    <string name="act_notifications">لوحة الإشعارات</string>
+
+    <!-- الإشعار الدائم -->
+    <string name="notif_channel">تشغيل الخدمة في الخلفية</string>
+    <string name="notif_title">ريموت الكيبورد يعمل</string>
+    <string name="notif_text">الخدمة نشطة في الخلفية</string>
 </resources>

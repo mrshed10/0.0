@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- صف واحد في جدول التخصيصات: الزر | الوظيفة | تعديل / حذف -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="2dp"
+    android:background="@color/row_bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp">
+
+    <TextView
+        android:id="@+id/keyName"
+        style="@style/TableKey"
+        android:layout_width="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/actionName"
+        style="@style/TableCell"
+        android:layout_width="0dp"
+        android:layout_weight="1.4" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="260dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/editButton"
+            style="@style/SmallButton"
+            android:background="@drawable/small_button_bg"
+            android:text="@string/edit" />
+
+        <Button
+            android:id="@+id/deleteButton"
+            style="@style/SmallButton"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/delete_button_bg"
+            android:text="@string/delete" />
+    </LinearLayout>
+</LinearLayout>

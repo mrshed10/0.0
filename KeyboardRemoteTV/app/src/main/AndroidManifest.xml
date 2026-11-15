@@ -9,6 +9,10 @@
         android:name="android.software.leanback"
         android:required="false" />
 
+    <!-- الخدمة الأمامية (Foreground Service) لحماية الخدمة من الإغلاق -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application
         android:allowBackup="true"
         android:banner="@drawable/app_banner"
@@ -33,6 +37,7 @@
         <service
             android:name=".KeyboardRemoteService"
             android:exported="true"
+            android:foregroundServiceType="specialUse"
             android:label="@string/service_label"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
@@ -41,6 +46,10 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
+            <!-- مطلوب في Android 14+ لنوع specialUse -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the keyboard-to-remote accessibility service alive on TV boxes" />
         </service>
 
     </application>
