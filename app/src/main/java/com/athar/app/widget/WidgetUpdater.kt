@@ -58,10 +58,14 @@ object WidgetUpdater {
 
 /** Asks the launcher to place a widget showing [content] (Android 8+, supported by Samsung One UI). */
 object WidgetPinner {
-    fun pin(context: Context, content: WidgetContent): Boolean {
+    fun pin(context: Context, content: WidgetContent): Boolean = pin(context, WidgetConfig(content))
+
+    /** Places a widget with a fully customized [config] (from the gallery). */
+    fun pin(context: Context, config: WidgetConfig): Boolean {
+        val content = config.content
         val awm = AppWidgetManager.getInstance(context)
         if (!awm.isRequestPinAppWidgetSupported) return false
-        WidgetStore(context).pending = WidgetConfig(content)
+        WidgetStore(context).pending = config
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0)
         val callback = PendingIntent.getBroadcast(context, 1, Intent(context, WidgetPinnedReceiver::class.java), flags)
         val provider = if (content.type.prefersSmall) AtharSmallWidgetReceiver::class.java else AtharWidgetReceiver::class.java
@@ -70,7 +74,10 @@ object WidgetPinner {
 }
 
 private val WidgetType.prefersSmall: Boolean
-    get() = this in setOf(WidgetType.Counter, WidgetType.Salary, WidgetType.Habit, WidgetType.Tasbih, WidgetType.DebtPerson, WidgetType.Date)
+    get() = this in setOf(
+        WidgetType.Counter, WidgetType.Salary, WidgetType.Habit, WidgetType.Tasbih,
+        WidgetType.DebtPerson, WidgetType.Date, WidgetType.AnalogClock,
+    )
 
 /** Called by the launcher once a pinned widget exists: give it the chosen content. */
 class WidgetPinnedReceiver : BroadcastReceiver() {
@@ -149,6 +156,7 @@ object LockCard {
                 .setContentText(data.rows.joinToString(" • ") { "${if (it.doneToday) "✅" else it.emoji} ${it.title} ${it.streak}" })
             is WidgetData.Schedule -> builder.setContentTitle("🗓️ " + context.getString(R.string.widget_type_schedule))
                 .setContentText(data.rows.take(3).joinToString(" • ") { "${it.name}: ${it.daysText}" })
+            is WidgetData.Clock -> builder.setContentTitle(data.day).setContentText(data.hijri)
             WidgetData.Missing, WidgetData.Unconfigured -> {
                 nm.cancel(NOTIFICATION_ID)
                 return

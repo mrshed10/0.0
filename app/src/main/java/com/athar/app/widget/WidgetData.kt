@@ -42,6 +42,8 @@ sealed interface WidgetData {
     data class DateInfo(val day: String, val gregorian: String, val hijri: String) : WidgetData
     data class ScheduleRow(val name: String, val date: String, val days: Long, val daysText: String, val salary: Boolean)
     data class Schedule(val rows: List<ScheduleRow>) : WidgetData
+    /** Live clock; [hijri] and [day] are drawn under digital clocks. */
+    data class Clock(val analog: Boolean, val hijri: String, val day: String) : WidgetData
 }
 
 object WidgetDataLoader {
@@ -211,6 +213,15 @@ object WidgetDataLoader {
                         WidgetData.ScheduleRow(name, greg(date, "EEE d MMM"), days, daysText(days), salary)
                     }
                 if (rows.isEmpty()) WidgetData.Missing else WidgetData.Schedule(rows)
+            }
+            WidgetType.AnalogClock, WidgetType.DigitalClock -> WidgetData.Clock(
+                analog = config.content.type == WidgetType.AnalogClock,
+                hijri = hijri(today) + " " + s(R.string.hijri_suffix),
+                day = today.dayOfWeek.getDisplayName(TextStyle.FULL, locale),
+            )
+            WidgetType.Dhikr -> {
+                val d = SpiritualContent.dhikrFor(today)
+                WidgetData.Verse(d.ar, s(R.string.dhikr_repeat, d.count.toString()))
             }
             WidgetType.Date -> WidgetData.DateInfo(
                 day = today.dayOfWeek.getDisplayName(TextStyle.FULL, locale),

@@ -18,12 +18,18 @@ enum class WidgetType(@StringRes val label: Int, val emoji: String, val needsIte
     Verse(R.string.widget_type_verse, "📖"),
     Date(R.string.widget_type_date, "📅"),
     Schedule(R.string.widget_type_schedule, "🗓️"),
+    AnalogClock(R.string.widget_type_analog, "🕰️"),
+    DigitalClock(R.string.widget_type_digital, "⌚"),
+    Dhikr(R.string.widget_type_dhikr, "📿"),
 }
 
 /** [itemId] = -1 means "automatic" (e.g. the nearest salary). */
 data class WidgetContent(val type: WidgetType, val itemId: Long = -1)
 
 enum class BackgroundKind { Color, Gradient, Image }
+
+/** What tapping the widget does. */
+enum class ClickBehavior { None, Quick, OpenApp }
 
 /** How dates are written on the widget: "Sunday 15 November" or "2026/11/15". */
 enum class DateStyle { Words, Numeric }
@@ -49,6 +55,9 @@ data class WidgetStyle(
     /** Font id for the widget text; null = system font. */
     val fontId: String? = null,
     val dateStyle: DateStyle = DateStyle.Words,
+    val click: ClickBehavior = ClickBehavior.Quick,
+    /** Design variant for clocks (e.g. light/dark dial, with/without date). */
+    val variant: Int = 0,
 )
 
 data class WidgetConfig(val content: WidgetContent, val style: WidgetStyle = WidgetStyle())
@@ -93,6 +102,8 @@ object WidgetJson {
         .put("text", s.textColor).put("accent", s.accentColor)
         .put("font", s.fontId ?: JSONObject.NULL)
         .put("date", s.dateStyle.name)
+        .put("click", s.click.name)
+        .put("variant", s.variant)
 
     private fun decodeStyle(o: JSONObject?): WidgetStyle {
         val d = WidgetStyle()
@@ -112,6 +123,8 @@ object WidgetJson {
             accentColor = o.optInt("accent", d.accentColor),
             fontId = if (o.isNull("font")) null else o.optString("font"),
             dateStyle = DateStyle.entries.firstOrNull { it.name == o.optString("date") } ?: d.dateStyle,
+            click = ClickBehavior.entries.firstOrNull { it.name == o.optString("click") } ?: d.click,
+            variant = o.optInt("variant", d.variant).coerceIn(0, 3),
         )
     }
 }

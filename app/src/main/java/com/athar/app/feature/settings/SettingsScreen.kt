@@ -58,7 +58,7 @@ import com.athar.app.core.security.BiometricAuth
 import java.time.LocalDate
 
 @Composable
-fun SettingsRoute(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
+fun SettingsRoute(onBack: () -> Unit, onOpenGallery: () -> Unit, viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.Factory)) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var exportPassword by remember { mutableStateOf("") }
@@ -154,7 +154,7 @@ fun SettingsRoute(onBack: () -> Unit, viewModel: SettingsViewModel = viewModel(f
 
             item(key = "widgets") {
                 Column {
-                    WidgetsSettingsCard(onMessage = { widgetMessage = it })
+                    WidgetsSettingsCard(onMessage = { widgetMessage = it }, onOpenGallery = onOpenGallery)
                     widgetMessage?.let {
                         Spacer(Modifier.height(8.dp))
                         Text(it, style = MaterialTheme.typography.bodyMedium, color = AtharColors.Gold, modifier = Modifier.fillMaxWidth())

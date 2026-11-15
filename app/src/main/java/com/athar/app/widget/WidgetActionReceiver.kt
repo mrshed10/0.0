@@ -32,6 +32,7 @@ class WidgetActionReceiver : BroadcastReceiver() {
                     }
                     TOGGLE_HABIT -> if (id >= 0) container.habitRepository.toggle(id, today)
                     TASBIH -> container.settings.updateTasbih { it.tapped(today) }
+                    REFRESH -> Unit
                 }
                 WidgetUpdater.refreshAll(context)
             } finally {
@@ -44,6 +45,7 @@ class WidgetActionReceiver : BroadcastReceiver() {
         const val TOGGLE_TASK = "com.athar.app.widget.TOGGLE_TASK"
         const val TOGGLE_HABIT = "com.athar.app.widget.TOGGLE_HABIT"
         const val TASBIH = "com.athar.app.widget.TASBIH"
+        const val REFRESH = "com.athar.app.widget.REFRESH"
         private const val EXTRA_ID = "id"
 
         /** A unique data URI per item keeps each button's PendingIntent separate. */

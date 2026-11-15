@@ -65,5 +65,11 @@ object SpiritualContent {
 
     fun verseFor(date: LocalDate): Verse = verses[(date.toEpochDay() % verses.size).toInt().let { if (it < 0) it + verses.size else it }]
 
+    /** A different dhikr each day (morning and evening lists combined). */
+    fun dhikrFor(date: LocalDate): Dhikr {
+        val all = (morning + evening).distinctBy { it.ar }
+        return all[Math.floorMod(date.toEpochDay(), all.size.toLong()).toInt()]
+    }
+
     fun text(d: Dhikr, locale: Locale) = if (locale.language == "ar") d.ar else d.en
 }

@@ -4,6 +4,9 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
+import android.util.TypedValue
+import android.view.View
+import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -24,6 +27,7 @@ import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
+import androidx.glance.appwidget.AndroidRemoteViews
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -135,7 +139,11 @@ private fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
     }
     val padPx = ((if (small) 10 else 14) * 2 * density).toInt()
 
-    CompositionLocalProvider(LocalWidgetFont provides font, LocalTextWidth provides (widthPx - padPx).coerceAtLeast(40)) {
+    CompositionLocalProvider(
+        LocalWidgetFont provides font,
+        LocalTextWidth provides (widthPx - padPx).coerceAtLeast(40),
+        LocalClick provides style.click,
+    ) {
     Box(GlanceModifier.fillMaxSize()) {
         Image(
             provider = ImageProvider(backdrop),
@@ -148,13 +156,16 @@ private fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
                 WidgetData.Unconfigured -> Message(
                     context.getString(R.string.widget_tap_to_setup),
                     text,
-                    actionStartActivity(
-                        Intent(context, WidgetConfigActivity::class.java)
-                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    // Setting up always opens the editor, whatever the tap behaviour.
+                    GlanceModifier.clickable(
+                        actionStartActivity(
+                            Intent(context, WidgetConfigActivity::class.java)
+                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        ),
                     ),
                 )
-                WidgetData.Missing -> Message(context.getString(R.string.widget_item_missing), text, openApp(context, "home"))
+                WidgetData.Missing -> Message(context.getString(R.string.widget_item_missing), text, GlanceModifier.tapOpen("home"))
                 is WidgetData.NextPrayer -> PrayerContent(data, small, text, accent)
                 is WidgetData.Big -> BigContent(data, small, text, accent)
                 is WidgetData.Tasks -> TasksContent(data, small, text, accent)
@@ -164,11 +175,34 @@ private fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
                 is WidgetData.Verse -> VerseContent(data, small, text, accent)
                 is WidgetData.DateInfo -> DateContent(data, small, text, accent)
                 is WidgetData.Schedule -> ScheduleContent(data, small, text, accent)
+                is WidgetData.Clock -> ClockContent(data, style, small, text)
             }
         }
     }
     }
 }
+
+/** The widget's tap behaviour (none / quick action / open app). */
+private val LocalClick = compositionLocalOf { ClickBehavior.Quick }
+
+/**
+ * Tapping a non-button area: opens the app only in [ClickBehavior.OpenApp];
+ * in [ClickBehavior.Quick] it just refreshes the data; [ClickBehavior.None] ignores it.
+ */
+@Composable
+private fun GlanceModifier.tapOpen(tab: String): GlanceModifier {
+    val context = LocalContext.current
+    return when (LocalClick.current) {
+        ClickBehavior.None -> this
+        ClickBehavior.Quick -> clickable(actionSendBroadcast(WidgetActionReceiver.intent(context, WidgetActionReceiver.REFRESH, 0)))
+        ClickBehavior.OpenApp -> clickable(openApp(context, tab))
+    }
+}
+
+/** A button (tick a task, mark a habit, count): runs in place unless taps are off. */
+@Composable
+private fun GlanceModifier.tapAction(intent: Intent): GlanceModifier =
+    if (LocalClick.current == ClickBehavior.None) this else clickable(actionSendBroadcast(intent))
 
 private data class WStyle(val color: Color, val size: TextUnit, val bold: Boolean, val align: TextAlign)
 
@@ -231,8 +265,8 @@ private fun WText(
 }
 
 @Composable
-private fun Message(text: String, color: Color, action: androidx.glance.action.Action) {
-    Box(GlanceModifier.fillMaxSize().clickable(action), contentAlignment = Alignment.Center) {
+private fun Message(text: String, color: Color, tap: GlanceModifier) {
+    Box(GlanceModifier.fillMaxSize().then(tap), contentAlignment = Alignment.Center) {
         WText(text, style = style(color, 14.sp, bold = true, align = TextAlign.Center))
     }
 }
@@ -248,7 +282,7 @@ private fun Header(title: String, color: Color, accent: Color, trailing: String?
 @Composable
 private fun PrayerContent(d: WidgetData.NextPrayer, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
-    Column(GlanceModifier.fillMaxSize().clickable(openApp(context, "prayer"))) {
+    Column(GlanceModifier.fillMaxSize().tapOpen("prayer")) {
         Header("🕌 " + context.getString(R.string.next_prayer), text, accent, if (small) null else d.place)
         WText(d.name, style = style(text, if (small) 24.sp else 28.sp, bold = true), maxLines = 1)
         WText(d.time, style = style(accent, if (small) 14.sp else 16.sp, bold = true), maxLines = 1)
@@ -270,7 +304,7 @@ private fun PrayerContent(d: WidgetData.NextPrayer, small: Boolean, text: Color,
 @Composable
 private fun BigContent(d: WidgetData.Big, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
-    Column(GlanceModifier.fillMaxSize().clickable(openApp(context, d.tab))) {
+    Column(GlanceModifier.fillMaxSize().tapOpen(d.tab)) {
         WText(d.title, style = style(accent, 13.sp, bold = true), maxLines = 1)
         Row(verticalAlignment = Alignment.Bottom) {
             WText(d.value, style = style(text, if (small) 30.sp else 38.sp, bold = true), maxLines = 1)
@@ -290,7 +324,7 @@ private fun TasksContent(d: WidgetData.Tasks, small: Boolean, text: Color, accen
     val size = LocalSize.current
     val maxRows = ((size.height.value - 40) / 26).toInt().coerceIn(1, 8)
     Column(GlanceModifier.fillMaxSize()) {
-        Box(GlanceModifier.fillMaxWidth().clickable(openApp(context, "tasks"))) {
+        Box(GlanceModifier.fillMaxWidth().tapOpen("tasks")) {
             Header("✅ " + context.getString(R.string.today_tasks), text, accent, d.summary)
         }
         Spacer(GlanceModifier.height(4.dp))
@@ -302,7 +336,7 @@ private fun TasksContent(d: WidgetData.Tasks, small: Boolean, text: Color, accen
                 GlanceModifier
                     .fillMaxWidth()
                     .padding(vertical = 3.dp)
-                    .clickable(actionSendBroadcast(WidgetActionReceiver.intent(LocalContext.current, WidgetActionReceiver.TOGGLE_TASK, row.id))),
+                    .tapAction(WidgetActionReceiver.intent(LocalContext.current, WidgetActionReceiver.TOGGLE_TASK, row.id)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 WText(if (row.done) "☑" else "☐", style = style(if (row.done) accent else text, 17.sp, bold = true))
@@ -326,7 +360,7 @@ private fun HabitsContent(d: WidgetData.Habits, small: Boolean, text: Color, acc
     if (d.single) {
         val h = d.rows.first()
         Column(
-            GlanceModifier.fillMaxSize().clickable(actionSendBroadcast(WidgetActionReceiver.intent(context, WidgetActionReceiver.TOGGLE_HABIT, h.id))),
+            GlanceModifier.fillMaxSize().tapAction(WidgetActionReceiver.intent(context, WidgetActionReceiver.TOGGLE_HABIT, h.id)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -337,14 +371,14 @@ private fun HabitsContent(d: WidgetData.Habits, small: Boolean, text: Color, acc
         return
     }
     Column(GlanceModifier.fillMaxSize()) {
-        Box(GlanceModifier.fillMaxWidth().clickable(openApp(context, "habits"))) {
+        Box(GlanceModifier.fillMaxWidth().tapOpen("habits")) {
             Header("🔥 " + context.getString(R.string.habits), text, accent)
         }
         Spacer(GlanceModifier.height(6.dp))
         Row(GlanceModifier.fillMaxWidth()) {
             d.rows.take(if (small) 3 else 5).forEach { h ->
                 Column(
-                    GlanceModifier.defaultWeight().clickable(actionSendBroadcast(WidgetActionReceiver.intent(context, WidgetActionReceiver.TOGGLE_HABIT, h.id))),
+                    GlanceModifier.defaultWeight().tapAction(WidgetActionReceiver.intent(context, WidgetActionReceiver.TOGGLE_HABIT, h.id)),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     WText(if (h.doneToday) "✅" else h.emoji, style = style(text, 22.sp, align = TextAlign.Center))
@@ -359,7 +393,7 @@ private fun HabitsContent(d: WidgetData.Habits, small: Boolean, text: Color, acc
 @Composable
 private fun DebtsContent(d: WidgetData.Debts, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
-    Column(GlanceModifier.fillMaxSize().clickable(openApp(context, "debts"))) {
+    Column(GlanceModifier.fillMaxSize().tapOpen("debts")) {
         Header("💼 " + context.getString(R.string.debts), text, accent, d.currency)
         Spacer(GlanceModifier.height(6.dp))
         Row(GlanceModifier.fillMaxWidth()) {
@@ -379,7 +413,7 @@ private fun DebtsContent(d: WidgetData.Debts, small: Boolean, text: Color, accen
 private fun TasbihContent(d: WidgetData.Tasbih, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
     Column(
-        GlanceModifier.fillMaxSize().clickable(actionSendBroadcast(WidgetActionReceiver.intent(context, WidgetActionReceiver.TASBIH, 0))),
+        GlanceModifier.fillMaxSize().tapAction(WidgetActionReceiver.intent(context, WidgetActionReceiver.TASBIH, 0)),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -393,7 +427,7 @@ private fun TasbihContent(d: WidgetData.Tasbih, small: Boolean, text: Color, acc
 private fun VerseContent(d: WidgetData.Verse, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
     Column(
-        GlanceModifier.fillMaxSize().clickable(openApp(context, "home")),
+        GlanceModifier.fillMaxSize().tapOpen("home"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -407,7 +441,7 @@ private fun VerseContent(d: WidgetData.Verse, small: Boolean, text: Color, accen
 private fun DateContent(d: WidgetData.DateInfo, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
     Column(
-        GlanceModifier.fillMaxSize().clickable(openApp(context, "home")),
+        GlanceModifier.fillMaxSize().tapOpen("home"),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -424,7 +458,7 @@ private fun ScheduleContent(d: WidgetData.Schedule, small: Boolean, text: Color,
     val size = LocalSize.current
     val rowHeight = if (small) 30 else 34
     val maxRows = ((size.height.value - 34) / rowHeight).toInt().coerceIn(1, 10)
-    Column(GlanceModifier.fillMaxSize().clickable(openApp(context, "salaries"))) {
+    Column(GlanceModifier.fillMaxSize().tapOpen("salaries")) {
         Header("🗓️ " + context.getString(R.string.widget_type_schedule), text, accent)
         Spacer(GlanceModifier.height(4.dp))
         d.rows.take(maxRows).forEach { row ->
@@ -459,4 +493,32 @@ private fun pill(context: Context, color: Color): android.graphics.Bitmap {
     val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { this.color = color.toArgb() }
     android.graphics.Canvas(bitmap).drawRoundRect(0f, 0f, w.toFloat(), h.toFloat(), h / 2f, h / 2f, paint)
     return bitmap
+}
+
+/** Live clock via the launcher's own TextClock/AnalogClock (no app wake-ups). */
+@Composable
+private fun ClockContent(d: WidgetData.Clock, ws: WidgetStyle, small: Boolean, text: Color) {
+    val context = LocalContext.current
+    val views = remember(d.analog, ws.fontId, ws.variant, ws.textColor, ws.accentColor, small) {
+        if (d.analog) {
+            RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_analog_dark else R.layout.widget_analog_light)
+        } else {
+            RemoteViews(context.packageName, ClockLayouts.digital(ws.fontId)).apply {
+                setTextColor(R.id.clock_time, ws.textColor)
+                setTextColor(R.id.clock_date, ws.accentColor)
+                setTextViewTextSize(R.id.clock_time, TypedValue.COMPLEX_UNIT_SP, if (small) 40f else 58f)
+                if (ws.variant == 1) setViewVisibility(R.id.clock_date, View.GONE)
+            }
+        }
+    }
+    Column(
+        GlanceModifier.fillMaxSize().tapOpen("home"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AndroidRemoteViews(views, GlanceModifier.defaultWeight().fillMaxWidth())
+        if (!d.analog && ws.variant == 0 && !small) {
+            WText(d.hijri, style = style(text.copy(alpha = 0.8f), 12.sp, align = TextAlign.Center), maxLines = 1)
+        }
+    }
 }

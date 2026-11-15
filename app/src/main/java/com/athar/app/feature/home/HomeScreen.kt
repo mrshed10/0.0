@@ -50,6 +50,7 @@ data class HomeNavigation(
     val onOpenHabits: () -> Unit = {},
     val onOpenDebts: () -> Unit = {},
     val onOpenPrayer: () -> Unit = {},
+    val onOpenGallery: () -> Unit = {},
 )
 
 @Composable
@@ -62,13 +63,14 @@ fun HomeRoute(
     onOpenTasks: () -> Unit,
     onOpenHabits: () -> Unit,
     onOpenDebts: () -> Unit,
+    onOpenGallery: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     HomeScreen(
         state = state,
         nav = HomeNavigation(
-            onPinToWidget, onOpenSettings, onOpenCounters, onOpenSalaries, onOpenTasks, onOpenHabits, onOpenDebts, onOpenPrayer,
+            onPinToWidget, onOpenSettings, onOpenCounters, onOpenSalaries, onOpenTasks, onOpenHabits, onOpenDebts, onOpenPrayer, onOpenGallery,
         ),
         onToggleTask = viewModel::toggleTask,
         onToggleHabit = viewModel::toggleHabit,
@@ -95,7 +97,7 @@ fun HomeScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = bottom + 120.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item(key = "header") { HomeHeader(state.today, nav.onOpenSettings) }
+        item(key = "header") { HomeHeader(state.today, nav.onOpenSettings, nav.onOpenGallery) }
         state.nextPrayer?.let { next ->
             item(key = "prayer") {
                 NextPrayerCard(

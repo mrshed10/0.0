@@ -40,6 +40,8 @@ class WidgetConfigActivity : ComponentActivity() {
             return
         }
         val store = WidgetStore(this)
+        val wide = AppWidgetManager.getInstance(this).getAppWidgetInfo(appWidgetId)
+            ?.provider?.className?.contains("Small") != true
         val initial = store.get(appWidgetId) ?: store.pending ?: WidgetConfig(WidgetContent(WidgetType.NextPrayer))
 
         setContent {
@@ -50,6 +52,7 @@ class WidgetConfigActivity : ComponentActivity() {
                         AuroraBackground(haze)
                         WidgetEditorScreen(
                             initial = initial,
+                            wide = wide,
                             onCancel = { finish() },
                             onSave = { config ->
                                 store.put(appWidgetId, config)

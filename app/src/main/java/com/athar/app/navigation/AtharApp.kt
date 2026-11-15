@@ -50,6 +50,7 @@ import com.athar.app.feature.tasks.TasksRoute
 import com.athar.app.feature.home.HomeRoute
 import com.athar.app.AtharApplication
 import com.athar.app.widget.WidgetContent
+import com.athar.app.widget.WidgetGalleryScreen
 import com.athar.app.widget.WidgetPinner
 import com.athar.app.core.region.LocalCurrency
 import com.athar.app.feature.dates.RemindersRoute
@@ -84,6 +85,7 @@ fun AtharApp(startTab: String? = null) {
     var tasksPage by rememberSaveable { mutableIntStateOf(if (startTab == "habits") 1 else 0) }
     var datesPage by rememberSaveable { mutableIntStateOf(if (startTab == "salaries") 1 else 0) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showGallery by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val pinContext = LocalContext.current
@@ -107,8 +109,10 @@ fun AtharApp(startTab: String? = null) {
         Box(Modifier.fillMaxSize()) {
             AuroraBackground(hazeState)
 
-            if (showSettings) {
-                SettingsRoute(onBack = { showSettings = false })
+            if (showGallery) {
+                WidgetGalleryScreen(onBack = { showGallery = false })
+            } else if (showSettings) {
+                SettingsRoute(onBack = { showSettings = false }, onOpenGallery = { showGallery = true })
             } else {
                 when (tab) {
                     AtharTab.Home -> HomeRoute(
@@ -120,6 +124,7 @@ fun AtharApp(startTab: String? = null) {
                         onOpenTasks = { tasksPage = 0; tab = AtharTab.Tasks },
                         onOpenHabits = { tasksPage = 1; tab = AtharTab.Tasks },
                         onOpenDebts = { tab = AtharTab.Debts },
+                        onOpenGallery = { showGallery = true },
                     )
                     AtharTab.Dates -> {
                         val switcher: @Composable () -> Unit = {
@@ -167,7 +172,7 @@ fun AtharApp(startTab: String? = null) {
                 GlassBottomBar(
                     items = AtharTab.entries.map { GlassBarItem(stringResource(it.label), it.icon) },
                     selectedIndex = tab.ordinal,
-                    onSelect = { showSettings = false; tab = AtharTab.entries[it] },
+                    onSelect = { showSettings = false; showGallery = false; tab = AtharTab.entries[it] },
                     modifier = Modifier
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 12.dp),

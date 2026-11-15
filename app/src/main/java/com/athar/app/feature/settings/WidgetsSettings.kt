@@ -56,7 +56,7 @@ import kotlinx.coroutines.flow.first
 /** Placed widgets (edit), add a widget, and the lock-screen card. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun WidgetsSettingsCard(onMessage: (String) -> Unit) {
+fun WidgetsSettingsCard(onMessage: (String) -> Unit, onOpenGallery: () -> Unit) {
     val context = LocalContext.current
     val container = (context.applicationContext as AtharApplication).container
     val lifecycle = LocalLifecycleOwner.current
@@ -66,7 +66,6 @@ fun WidgetsSettingsCard(onMessage: (String) -> Unit) {
         val store = WidgetStore(context)
         WidgetUpdater.placedWidgetIds(context).map { it to store.get(it) }
     }
-    var addSheet by remember { mutableStateOf(false) }
     val pinRequested = stringResource(R.string.pin_requested)
     val pinUnsupported = stringResource(R.string.pin_unsupported)
 
@@ -104,7 +103,7 @@ fun WidgetsSettingsCard(onMessage: (String) -> Unit) {
         Spacer(Modifier.height(10.dp))
         GlassButton(
             stringResource(R.string.widgets_add),
-            { addSheet = true },
+            onOpenGallery,
             color = AtharColors.Violet,
             icon = Icons.Rounded.Add,
             modifier = Modifier.fillMaxWidth(),
@@ -152,28 +151,5 @@ fun WidgetsSettingsCard(onMessage: (String) -> Unit) {
         }
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.lock_card_note), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
-    }
-
-    if (addSheet) {
-        GlassSheet(onDismiss = { addSheet = false }) {
-            Text(stringResource(R.string.widgets_add), style = MaterialTheme.typography.titleLarge)
-            Text(stringResource(R.string.widgets_add_hint), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextSecondary)
-            WidgetType.entries.filterNot { it.needsItem }.forEach { type ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            addSheet = false
-                            onMessage(if (WidgetPinner.pin(context, WidgetContent(type))) pinRequested else pinUnsupported)
-                        }
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(type.emoji, style = MaterialTheme.typography.titleLarge)
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(type.label), style = MaterialTheme.typography.bodyLarge)
-                }
-            }
-        }
     }
 }

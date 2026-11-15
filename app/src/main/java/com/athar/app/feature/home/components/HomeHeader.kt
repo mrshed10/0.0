@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +28,7 @@ import java.time.LocalDate
 
 /** Greeting, day name and both calendars side by side. */
 @Composable
-fun HomeHeader(today: LocalDate, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeHeader(today: LocalDate, onOpenSettings: () -> Unit, onOpenGallery: () -> Unit, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -52,6 +54,12 @@ fun HomeHeader(today: LocalDate, onOpenSettings: () -> Unit, modifier: Modifier 
                 color = AtharColors.Gold,
             )
         }
+        GlassIconButton(
+            icon = Icons.Rounded.Widgets,
+            contentDescription = stringResource(R.string.gallery_title),
+            onClick = onOpenGallery,
+        )
+        Spacer(Modifier.width(8.dp))
         GlassIconButton(
             icon = Icons.Rounded.Settings,
             contentDescription = stringResource(R.string.settings),

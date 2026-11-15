@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.TextFields
+import androidx.compose.material.icons.rounded.TouchApp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -92,7 +93,13 @@ private data class Pickable(val id: Long, val title: String)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (WidgetConfig) -> Unit) {
+fun WidgetEditorScreen(
+    initial: WidgetConfig,
+    onCancel: () -> Unit,
+    onSave: (WidgetConfig) -> Unit,
+    wide: Boolean = true,
+    saveLabel: String? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var config by remember { mutableStateOf(initial) }
@@ -138,7 +145,39 @@ fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (Wid
                 Text(stringResource(R.string.widget_editor_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
         }
-        item { WidgetPreview(style, data) }
+        item {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                WidgetPreview(config, data, wide, Modifier.fillMaxWidth(if (wide) 1f else 0.55f))
+            }
+        }
+
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Gold) {
+                CardHeader(stringResource(R.string.click_behavior), Icons.Rounded.TouchApp)
+                Spacer(Modifier.height(10.dp))
+                GlassSegmented(
+                    options = listOf(
+                        stringResource(R.string.click_none),
+                        stringResource(R.string.click_quick),
+                        stringResource(R.string.click_open),
+                    ),
+                    selectedIndex = style.click.ordinal,
+                    onSelect = { setStyle(style.copy(click = ClickBehavior.entries[it])) },
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(
+                        when (style.click) {
+                            ClickBehavior.None -> R.string.click_none_hint
+                            ClickBehavior.Quick -> R.string.click_quick_hint
+                            ClickBehavior.OpenApp -> R.string.click_open_hint
+                        },
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AtharColors.TextTertiary,
+                )
+            }
+        }
 
         item {
             GlassCard(Modifier.fillMaxWidth()) {
@@ -151,6 +190,24 @@ fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (Wid
                             if (type == config.content.type) AtharColors.Gold else AtharColors.TextSecondary,
                             Modifier.clickable { config = config.copy(content = WidgetContent(type)) },
                         )
+                    }
+                }
+                if (config.content.type == WidgetType.AnalogClock || config.content.type == WidgetType.DigitalClock) {
+                    Spacer(Modifier.height(12.dp))
+                    FieldLabel(stringResource(R.string.clock_design))
+                    Spacer(Modifier.height(6.dp))
+                    GlassSegmented(
+                        options = if (config.content.type == WidgetType.AnalogClock) {
+                            listOf(stringResource(R.string.clock_light_hands), stringResource(R.string.clock_dark_hands))
+                        } else {
+                            listOf(stringResource(R.string.clock_with_date), stringResource(R.string.clock_time_only))
+                        },
+                        selectedIndex = style.variant.coerceIn(0, 1),
+                        onSelect = { setStyle(style.copy(variant = it)) },
+                    )
+                    if (config.content.type == WidgetType.DigitalClock && !ClockLayouts.supportsFont(style.fontId)) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(stringResource(R.string.clock_font_note), style = MaterialTheme.typography.labelSmall, color = AtharColors.Rose)
                     }
                 }
                 if (config.content.type.needsItem || config.content.type == WidgetType.Salary) {
@@ -319,7 +376,7 @@ fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (Wid
 
         item {
             GlassButton(
-                stringResource(R.string.save),
+                saveLabel ?: stringResource(R.string.save),
                 { onSave(config) },
                 enabled = !config.content.type.needsItem || config.content.itemId >= 0,
                 icon = Icons.Rounded.Check,
@@ -381,44 +438,3 @@ private fun LabeledSlider(label: String, value: Int, range: IntRange, suffix: St
     }
 }
 
-/** Approximate on-screen preview using the same background renderer as the real widget. */
-@Composable
-private fun WidgetPreview(style: WidgetStyle, data: WidgetData) {
-    val context = LocalContext.current
-    BoxWithConstraints(Modifier.fillMaxWidth().height(170.dp)) {
-        val density = LocalDensity.current
-        val wPx = with(density) { maxWidth.roundToPx() }
-        val hPx = with(density) { maxHeight.roundToPx() }
-        val bitmap by produceState<android.graphics.Bitmap?>(null, style, wPx, hPx) {
-            value = withContext(Dispatchers.Default) { WidgetBackground.render(context, style, wPx, hPx) }
-        }
-        bitmap?.let {
-            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
-        }
-        val text = Color(style.textColor)
-        val accent = Color(style.accentColor)
-        val (title, main, sub) = previewLines(data)
-        val family = remember(style.fontId) {
-            style.fontId?.let { FontRegistry.composeFamily(context, it) } ?: FontFamily.Default
-        }
-        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center) {
-            Text(title, color = accent, fontFamily = family, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(main, color = text, fontFamily = family, fontWeight = FontWeight.Bold, fontSize = 30.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text(sub, color = text.copy(alpha = 0.75f), fontFamily = family, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Start)
-        }
-    }
-}
-
-private fun previewLines(d: WidgetData): Triple<String, String, String> = when (d) {
-    is WidgetData.NextPrayer -> Triple("🕌 ${d.place}", d.name, d.time)
-    is WidgetData.Big -> Triple(d.title, "${d.value} ${d.unit}".trim(), d.line1)
-    is WidgetData.Tasks -> Triple("✅ ${d.summary}", d.rows.firstOrNull()?.title ?: "—", d.rows.drop(1).take(2).joinToString(" • ") { it.title })
-    is WidgetData.Habits -> Triple("🔥", d.rows.joinToString("  ") { (if (it.doneToday) "✅" else it.emoji) }, d.rows.joinToString(" • ") { "${it.title} ${it.streak}" })
-    is WidgetData.Debts -> Triple("💼 ${d.currency}", "${d.owedLabel} ${d.owed}", "${d.oweLabel} ${d.owe}")
-    is WidgetData.Tasbih -> Triple("📿 ${d.dhikr}", "${d.count} / ${d.target}", d.today)
-    is WidgetData.Verse -> Triple("📖 ${d.ref}", d.text, "")
-    is WidgetData.DateInfo -> Triple(d.hijri, d.day, d.gregorian)
-    is WidgetData.Schedule -> Triple("🗓️", d.rows.first().let { "${it.name} · ${it.daysText}" }, d.rows.drop(1).take(2).joinToString(" • ") { "${it.name} ${it.daysText}" })
-    WidgetData.Missing -> Triple("", "—", "")
-    WidgetData.Unconfigured -> Triple("", "…", "")
-}

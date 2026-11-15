@@ -14,6 +14,8 @@ class WidgetJsonTest {
                 opacity = 0, imagePath = "/data/bg.jpg", blur = 20, dim = 10, cornerDp = 32, border = false,
                 textColor = 0xFF000000.toInt(), accentColor = 0xFFE6C27A.toInt(), fontId = "amiri",
                 dateStyle = DateStyle.Numeric,
+                click = ClickBehavior.None,
+                variant = 1,
             ),
         )
         assertEquals(config, WidgetJson.decode(WidgetJson.encode(config)))
@@ -41,5 +43,22 @@ class WidgetJsonTest {
         assertNull(WidgetJson.decode(null))
         assertNull(WidgetJson.decode("nope"))
         assertNull(WidgetJson.decode("""{"type":"Unknown"}"""))
+    }
+
+    @Test
+    fun oldConfigsDefaultToQuickTaps() {
+        val raw = """{"type":"TodayTasks","item":-1,"style":{"opacity":40}}"""
+        assertEquals(ClickBehavior.Quick, WidgetJson.decode(raw)!!.style.click)
+    }
+
+    @Test
+    fun everyGalleryTabHasDesignsAndIdsAreUnique() {
+        GalleryTab.entries.forEach { tab ->
+            assertEquals("tab $tab is empty", true, WidgetTemplates.forTab(tab).isNotEmpty())
+        }
+        assertEquals(WidgetTemplates.all.size, WidgetTemplates.all.map { it.id }.toSet().size)
+        WidgetTemplates.all.forEach { t ->
+            assertEquals(t.config, WidgetJson.decode(WidgetJson.encode(t.config)))
+        }
     }
 }
