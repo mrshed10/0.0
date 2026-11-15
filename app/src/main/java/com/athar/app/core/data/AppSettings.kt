@@ -5,7 +5,11 @@ import android.content.SharedPreferences
 import com.athar.app.core.fonts.FontRegistry
 import com.athar.app.core.region.Cities
 import com.athar.app.core.region.Country
+import com.athar.app.feature.prayer.AdhanVolume
 import com.athar.app.feature.prayer.AsrMadhab
+import com.athar.app.feature.prayer.PrayerAlert
+import com.athar.app.feature.prayer.PrayerAlertsJson
+import com.athar.app.feature.prayer.SilentPrefs
 import com.athar.app.feature.prayer.Prayer
 import com.athar.app.feature.prayer.PrayerCalculator
 import com.athar.app.feature.prayer.PrayerMethod
@@ -25,15 +29,28 @@ data class PrayerPrefs(
     val cityId: String?,
     val method: PrayerMethod,
     val madhab: AsrMadhab,
-    val adhanEnabled: Set<Prayer>,
-    /** Minutes before each prayer for an extra reminder; 0 = off. */
-    val preMinutes: Int,
-    /** Notification sound URIs; null = system default. */
+    /** Adhan sound URIs; null = default alarm sound. */
     val fajrTone: String?,
     val adhanTone: String?,
+    /** Per-prayer settings (obligatory prayers). */
+    val alerts: Map<Prayer, PrayerAlert> = defaultAlerts(),
+    val volume: AdhanVolume = AdhanVolume.Alarm,
+    /** Play the adhan on the alarm stream so it is heard in silent/vibrate mode. */
+    val adhanInSilent: Boolean = true,
+    val silent: SilentPrefs = SilentPrefs(),
 ) {
     fun timesFor(date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): List<PrayerTime> =
         PrayerCalculator.times(date, latitude, longitude, method, madhab, zone)
+
+    fun alert(prayer: Prayer): PrayerAlert = alerts[prayer] ?: PrayerAlert.default(prayer)
+
+    /** Prayers whose adhan is on. */
+    val adhanEnabled: Set<Prayer> get() = Prayer.entries.filter { it.isObligatory && alert(it).adhan }.toSet()
+
+    companion object {
+        fun defaultAlerts(): Map<Prayer, PrayerAlert> =
+            Prayer.entries.filter { it.isObligatory }.associateWith { PrayerAlert.default(it) }
+    }
 }
 
 data class GeneralPrefs(
@@ -118,10 +135,12 @@ class AppSettings(context: Context) {
             .putString("prayer_city", value.cityId)
             .putString("prayer_method", value.method.name)
             .putString("prayer_madhab", value.madhab.name)
-            .putStringSet("prayer_adhan", value.adhanEnabled.map { it.name }.toSet())
-            .putInt("prayer_pre", value.preMinutes)
             .putString("tone_fajr", value.fajrTone)
             .putString("tone_adhan", value.adhanTone)
+            .putString("prayer_alerts", PrayerAlertsJson.encodeAlerts(value.alerts))
+            .putString("prayer_volume", value.volume.name)
+            .putBoolean("prayer_adhan_in_silent", value.adhanInSilent)
+            .putString("prayer_silent", PrayerAlertsJson.encodeSilent(value.silent))
             .apply()
         _prayer.value = value
     }
@@ -134,12 +153,37 @@ class AppSettings(context: Context) {
             cityId = if (prefs.contains("prayer_lat")) prefs.getString("prayer_city", null) else riyadh.id,
             method = enumOr(prefs.getString("prayer_method", null), PrayerMethod.UmmAlQura),
             madhab = enumOr(prefs.getString("prayer_madhab", null), AsrMadhab.Standard),
-            adhanEnabled = prefs.getStringSet("prayer_adhan", null)
-                ?.mapNotNull { name -> Prayer.entries.firstOrNull { it.name == name } }?.toSet()
-                ?: Prayer.entries.filter { it.isObligatory }.toSet(),
-            preMinutes = prefs.getInt("prayer_pre", 0),
             fajrTone = prefs.getString("tone_fajr", null),
             adhanTone = prefs.getString("tone_adhan", null),
+            alerts = PrayerAlertsJson.decodeAlerts(prefs.getString("prayer_alerts", null)) ?: legacyAlerts(),
+            volume = enumOr(prefs.getString("prayer_volume", null), AdhanVolume.Alarm),
+            adhanInSilent = prefs.getBoolean("prayer_adhan_in_silent", true),
+            silent = PrayerAlertsJson.decodeSilent(prefs.getString("prayer_silent", null)) ?: SilentPrefs(),
+        )
+    }
+
+    /** Settings saved by earlier versions (one adhan set + one pre-alert time). */
+    private fun legacyAlerts(): Map<Prayer, PrayerAlert> {
+        val enabled = prefs.getStringSet("prayer_adhan", null)
+        val pre = prefs.getInt("prayer_pre", 0)
+        return PrayerPrefs.defaultAlerts().mapValues { (p, a) ->
+            a.copy(
+                adhan = enabled?.contains(p.name) ?: true,
+                preEnabled = pre > 0,
+                preMinutes = if (pre > 0) pre else a.preMinutes,
+            )
+        }
+    }
+
+    /** Restores adhan, alerts and silent-mode settings (keeps location and method). */
+    fun resetPrayerAlerts() = updatePrayer {
+        it.copy(
+            fajrTone = null,
+            adhanTone = null,
+            alerts = PrayerPrefs.defaultAlerts(),
+            volume = AdhanVolume.Alarm,
+            adhanInSilent = true,
+            silent = SilentPrefs(),
         )
     }
 

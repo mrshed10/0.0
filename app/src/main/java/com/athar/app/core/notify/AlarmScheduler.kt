@@ -11,6 +11,7 @@ import com.athar.app.core.data.PlannerRepository
 import com.athar.app.core.format.formatGregorian
 import com.athar.app.core.region.Cities
 import com.athar.app.feature.prayer.Prayer
+import com.athar.app.feature.prayer.PrayerAlertMath
 import com.athar.app.feature.reminders.ReminderMath
 import com.athar.app.feature.salary.SalarySchedule
 import com.athar.app.feature.salary.SalarySource
@@ -20,15 +21,19 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** One scheduled notification. */
+/** What happens when an alarm fires. */
+enum class AlarmAction { Notify, Adhan, SilentOn, SilentOff, Refresh }
+
+/** One scheduled alarm. */
 data class Alarm(
     val code: Int,
     val at: LocalDateTime,
-    /** null = silent refresh of widgets / lock card. */
+    /** null = no notification (silent refresh / ringer change). */
     val kind: AlertKind?,
     val tone: String?,
     val title: String,
     val text: String,
+    val action: AlarmAction = if (kind == null) AlarmAction.Refresh else AlarmAction.Notify,
 )
 
 /**
@@ -45,6 +50,8 @@ class AlarmScheduler(
     fun canScheduleExact(): Boolean = Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()
 
     suspend fun rescheduleAll(now: LocalDateTime = LocalDateTime.now()) {
+        // Silent mode turned off while a window was running: give the phone its sound back.
+        if (!settings.prayer.value.silent.enabled) RingerControl.restore(context)
         val alarms = prayerAlarms(now) + salaryAlarms(now) + reminderAlarms(now) + refreshAlarms(now)
         val codes = alarms.map { it.code }.toSet()
         (settings.scheduledAlarmCodes - codes).forEach { cancel(it) }
@@ -55,42 +62,82 @@ class AlarmScheduler(
     private val locale get() = context.resources.configuration.locales[0]
     private fun clock(t: java.time.LocalTime) = DateTimeFormatter.ofPattern("h:mm a", locale).format(t)
 
+    /**
+     * Per prayer: adhan, up to 3 pre-alerts, iqama alert, and silent on/off.
+     * Each item gets its next occurrence (today or tomorrow).
+     */
     private fun prayerAlarms(now: LocalDateTime): List<Alarm> {
         val prefs = settings.prayer.value
-        val today = prefs.timesFor(now.toLocalDate())
-        val tomorrow = prefs.timesFor(now.toLocalDate().plusDays(1))
+        val days = listOf(now.toLocalDate(), now.toLocalDate().plusDays(1))
+        val timesByDay = days.associateWith { prefs.timesFor(it) }
         val place = Cities.byId(prefs.cityId)?.name(locale) ?: context.getString(R.string.my_location)
         val result = mutableListOf<Alarm>()
-        for (prayer in Prayer.entries.filter { it.isObligatory && it in prefs.adhanEnabled }) {
+
+        for (prayer in Prayer.entries.filter { it.isObligatory }) {
+            val alert = prefs.alert(prayer)
             val name = context.getString(prayer.label)
-            fun next(offsetMinutes: Long): LocalDateTime? = listOf(
-                now.toLocalDate() to today,
-                now.toLocalDate().plusDays(1) to tomorrow,
-            ).firstNotNullOfOrNull { (day, times) ->
-                times.firstOrNull { it.prayer == prayer }?.let { day.atTime(it.time).minusMinutes(offsetMinutes) }
-                    ?.takeIf { it.isAfter(now) }
+            val adhans = days.mapNotNull { day ->
+                timesByDay[day]?.firstOrNull { it.prayer == prayer }?.let { day.atTime(it.time) }
             }
-            next(0)?.let { at ->
-                result += Alarm(
-                    code = 1000 + prayer.ordinal,
-                    at = at,
-                    kind = if (prayer == Prayer.Fajr) AlertKind.Fajr else AlertKind.Adhan,
-                    tone = if (prayer == Prayer.Fajr) prefs.fajrTone else prefs.adhanTone,
-                    title = context.getString(R.string.notif_adhan_title, name),
-                    text = "${clock(at.toLocalTime())} · $place",
-                )
-            }
-            if (prefs.preMinutes > 0) {
-                next(prefs.preMinutes.toLong())?.let { at ->
+            fun nextAt(transform: (LocalDateTime) -> LocalDateTime?): Pair<LocalDateTime, LocalDateTime>? =
+                adhans.firstNotNullOfOrNull { adhan -> transform(adhan)?.takeIf { it.isAfter(now) }?.let { adhan to it } }
+
+            if (alert.adhan) {
+                nextAt { it }?.let { (adhan, at) ->
                     result += Alarm(
-                        code = 1100 + prayer.ordinal,
+                        code = 1000 + prayer.ordinal,
                         at = at,
-                        kind = AlertKind.PrePrayer,
-                        tone = null,
-                        title = context.getString(R.string.notif_pre_title, name, prefs.preMinutes.toString()),
-                        text = "${clock(at.plusMinutes(prefs.preMinutes.toLong()).toLocalTime())} · $place",
+                        kind = if (prayer == Prayer.Fajr) AlertKind.Fajr else AlertKind.Adhan,
+                        tone = if (prayer == Prayer.Fajr) prefs.fajrTone else prefs.adhanTone,
+                        title = context.getString(R.string.notif_adhan_title, name),
+                        text = "${clock(adhan.toLocalTime())} · $place",
+                        action = AlarmAction.Adhan,
                     )
                 }
+            }
+            alert.preOffsets().forEachIndexed { i, minutes ->
+                nextAt { it.minusMinutes(minutes.toLong()) }?.let { (adhan, at) ->
+                    result += Alarm(
+                        code = 1100 + prayer.ordinal * 10 + i,
+                        at = at,
+                        kind = AlertKind.PrePrayer,
+                        tone = alert.preTone,
+                        title = context.getString(R.string.notif_pre_title, name, minutes.toString()),
+                        text = "${clock(adhan.toLocalTime())} · $place",
+                    )
+                }
+            }
+            if (alert.iqamaEnabled && alert.iqamaAlert) {
+                nextAt { it.plusMinutes(alert.iqamaMinutes.toLong()) }?.let { (_, at) ->
+                    result += Alarm(
+                        code = 1200 + prayer.ordinal,
+                        at = at,
+                        kind = AlertKind.Iqama,
+                        tone = alert.iqamaTone,
+                        title = context.getString(R.string.notif_iqama_title, name),
+                        text = clock(at.toLocalTime()),
+                    )
+                }
+            }
+            // Silent window: start and end are scheduled independently so an
+            // ongoing window still gets its "restore" alarm.
+            val windows = adhans.mapNotNull { PrayerAlertMath.silentWindow(prayer, it, alert, prefs.silent) }
+            windows.firstOrNull { it.start.isAfter(now) }?.let { w ->
+                result += Alarm(
+                    code = 1300 + prayer.ordinal,
+                    at = w.start,
+                    kind = AlertKind.Status,
+                    tone = null,
+                    title = context.getString(
+                        R.string.notif_silent_title,
+                        if (w.jumuah) context.getString(R.string.jumuah) else name,
+                    ),
+                    text = context.getString(R.string.notif_silent_until, clock(w.end.toLocalTime())),
+                    action = AlarmAction.SilentOn,
+                )
+            }
+            windows.firstOrNull { it.end.isAfter(now) }?.let { w ->
+                result += Alarm(1400 + prayer.ordinal, w.end, null, null, "", "", AlarmAction.SilentOff)
             }
         }
         return result
@@ -160,6 +207,7 @@ class AlarmScheduler(
         if (alarm != null) {
             intent.putExtra(AlarmReceiver.EXTRA_CODE, code)
                 .putExtra(AlarmReceiver.EXTRA_KIND, alarm.kind?.name)
+                .putExtra(AlarmReceiver.EXTRA_ACTION, alarm.action.name)
                 .putExtra(AlarmReceiver.EXTRA_TONE, alarm.tone)
                 .putExtra(AlarmReceiver.EXTRA_TITLE, alarm.title)
                 .putExtra(AlarmReceiver.EXTRA_TEXT, alarm.text)

@@ -13,6 +13,7 @@ class WidgetJsonTest {
                 kind = BackgroundKind.Image, color1 = 0x80112233.toInt(), color2 = 0xFFABCDEF.toInt(), angle = 45,
                 opacity = 0, imagePath = "/data/bg.jpg", blur = 20, dim = 10, cornerDp = 32, border = false,
                 textColor = 0xFF000000.toInt(), accentColor = 0xFFE6C27A.toInt(), fontId = "amiri",
+                dateStyle = DateStyle.Numeric,
             ),
         )
         assertEquals(config, WidgetJson.decode(WidgetJson.encode(config)))

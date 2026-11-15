@@ -15,6 +15,7 @@ import com.athar.app.feature.habits.StreakMath
 import com.athar.app.feature.prayer.PrayerSchedule
 import com.athar.app.feature.prayer.SpiritualContent
 import com.athar.app.feature.prayer.dhikr
+import com.athar.app.feature.reminders.ReminderMath
 import com.athar.app.feature.salary.SalarySchedule
 import com.athar.app.feature.tasks.TaskGrouping
 import kotlinx.coroutines.flow.first
@@ -39,22 +40,44 @@ sealed interface WidgetData {
     data class Tasbih(val count: Int, val target: Int, val dhikr: String, val today: String) : WidgetData
     data class Verse(val text: String, val ref: String) : WidgetData
     data class DateInfo(val day: String, val gregorian: String, val hijri: String) : WidgetData
+    data class ScheduleRow(val name: String, val date: String, val days: Long, val daysText: String, val salary: Boolean)
+    data class Schedule(val rows: List<ScheduleRow>) : WidgetData
 }
 
 object WidgetDataLoader {
+    /** Never throws: a failure shows "item missing" instead of a broken widget. */
     suspend fun load(context: Context, config: WidgetConfig?): WidgetData {
         if (config == null) return WidgetData.Unconfigured
+        return runCatching { loadUnsafe(context, config) }.getOrDefault(WidgetData.Missing)
+    }
+
+    private suspend fun loadUnsafe(context: Context, config: WidgetConfig): WidgetData {
         val c = (context.applicationContext as AtharApplication).container
         val locale = context.resources.configuration.locales[0]
         val now = LocalDateTime.now()
         val today = now.toLocalDate()
         val res = context.resources
         fun s(id: Int, vararg args: Any) = res.getString(id, *args)
+        val numeric = config.style.dateStyle == DateStyle.Numeric
         fun hijri(date: LocalDate): String {
             val h = HijriCalendar.fromGregorian(date)
-            return "${h.day} ${res.getStringArray(R.array.hijri_months)[h.month - 1]} ${h.year}"
+            return if (numeric) {
+                String.format(java.util.Locale.ENGLISH, "%d/%02d/%02d", h.year, h.month, h.day)
+            } else {
+                "${h.day} ${res.getStringArray(R.array.hijri_months)[h.month - 1]} ${h.year}"
+            }
         }
-        fun greg(date: LocalDate, pattern: String = "EEE d MMM") = DateTimeFormatter.ofPattern(pattern, locale).format(date)
+        fun greg(date: LocalDate, pattern: String = "EEE d MMM"): String =
+            if (numeric) {
+                DateTimeFormatter.ofPattern("yyyy/MM/dd", java.util.Locale.ENGLISH).format(date)
+            } else {
+                DateTimeFormatter.ofPattern(pattern, locale).format(date)
+            }
+        fun daysText(days: Long) = when (days) {
+            0L -> s(R.string.today)
+            1L -> s(R.string.tomorrow)
+            else -> "$days ${s(R.string.unit_days)}"
+        }
         fun clock(t: java.time.LocalTime) = DateTimeFormatter.ofPattern("h:mm a", locale).format(t)
 
         return when (config.content.type) {
@@ -171,6 +194,23 @@ object WidgetDataLoader {
             WidgetType.Verse -> {
                 val v = SpiritualContent.verseFor(today)
                 WidgetData.Verse("﴿ ${v.ar} ﴾", if (locale.language == "ar") v.refAr else v.refEn)
+            }
+            WidgetType.Schedule -> {
+                val weekend = c.settings.general.value.country.weekend
+                val salaries = c.plannerRepository.salaries.first().map { src ->
+                    val date = SalarySchedule.next(src, today, weekend)
+                    Triple(src.name, date, true)
+                }
+                val reminders = c.plannerRepository.reminders.first().filter { it.enabled }.mapNotNull { r ->
+                    ReminderMath.next(r, now)?.let { Triple(r.title, it.toLocalDate(), false) }
+                }
+                val rows = (salaries + reminders)
+                    .sortedBy { it.second }
+                    .map { (name, date, salary) ->
+                        val days = ChronoUnit.DAYS.between(today, date)
+                        WidgetData.ScheduleRow(name, greg(date, "EEE d MMM"), days, daysText(days), salary)
+                    }
+                if (rows.isEmpty()) WidgetData.Missing else WidgetData.Schedule(rows)
             }
             WidgetType.Date -> WidgetData.DateInfo(
                 day = today.dayOfWeek.getDisplayName(TextStyle.FULL, locale),

@@ -17,12 +17,16 @@ enum class WidgetType(@StringRes val label: Int, val emoji: String, val needsIte
     Tasbih(R.string.widget_type_tasbih, "📿"),
     Verse(R.string.widget_type_verse, "📖"),
     Date(R.string.widget_type_date, "📅"),
+    Schedule(R.string.widget_type_schedule, "🗓️"),
 }
 
 /** [itemId] = -1 means "automatic" (e.g. the nearest salary). */
 data class WidgetContent(val type: WidgetType, val itemId: Long = -1)
 
 enum class BackgroundKind { Color, Gradient, Image }
+
+/** How dates are written on the widget: "Sunday 15 November" or "2026/11/15". */
+enum class DateStyle { Words, Numeric }
 
 /** Full visual control: transparency, colours, gradient, image + blur, corners. Colours are ARGB ints. */
 data class WidgetStyle(
@@ -42,8 +46,9 @@ data class WidgetStyle(
     val border: Boolean = true,
     val textColor: Int = 0xFFFFFFFF.toInt(),
     val accentColor: Int = 0xFFE6C27A.toInt(),
-    /** Font id for the widget text (phase 4); null = system font. */
+    /** Font id for the widget text; null = system font. */
     val fontId: String? = null,
+    val dateStyle: DateStyle = DateStyle.Words,
 )
 
 data class WidgetConfig(val content: WidgetContent, val style: WidgetStyle = WidgetStyle())
@@ -87,6 +92,7 @@ object WidgetJson {
         .put("corner", s.cornerDp).put("border", s.border)
         .put("text", s.textColor).put("accent", s.accentColor)
         .put("font", s.fontId ?: JSONObject.NULL)
+        .put("date", s.dateStyle.name)
 
     private fun decodeStyle(o: JSONObject?): WidgetStyle {
         val d = WidgetStyle()
@@ -105,6 +111,7 @@ object WidgetJson {
             textColor = o.optInt("text", d.textColor),
             accentColor = o.optInt("accent", d.accentColor),
             fontId = if (o.isNull("font")) null else o.optString("font"),
+            dateStyle = DateStyle.entries.firstOrNull { it.name == o.optString("date") } ?: d.dateStyle,
         )
     }
 }

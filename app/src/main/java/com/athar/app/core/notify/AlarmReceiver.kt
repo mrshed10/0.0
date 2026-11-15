@@ -22,15 +22,27 @@ import kotlinx.coroutines.launch
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val kind = AlertKind.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_KIND) }
-        if (kind != null) {
-            Notifier.post(
-                context = context,
-                id = intent.getIntExtra(EXTRA_CODE, 0),
-                kind = kind,
-                tone = intent.getStringExtra(EXTRA_TONE),
-                title = intent.getStringExtra(EXTRA_TITLE).orEmpty(),
-                text = intent.getStringExtra(EXTRA_TEXT).orEmpty(),
-            )
+        val action = AlarmAction.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_ACTION) }
+            ?: if (kind == null) AlarmAction.Refresh else AlarmAction.Notify
+        val id = intent.getIntExtra(EXTRA_CODE, 0)
+        val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()
+        val tone = intent.getStringExtra(EXTRA_TONE)
+        val prefs = (context.applicationContext as AtharApplication).container.settings.prayer.value
+
+        when (action) {
+            AlarmAction.Notify -> if (kind != null) Notifier.post(context, id, kind, tone, title, text)
+            AlarmAction.Adhan -> if (Notifier.canPost(context)) {
+                AdhanService.start(context, kind == AlertKind.Fajr, tone, prefs.volume, prefs.adhanInSilent, title, text)
+            }
+            AlarmAction.SilentOn -> if (RingerControl.enable(context, prefs.silent.mode)) {
+                Notifier.post(context, SILENT_NOTIFICATION, AlertKind.Status, null, title, text)
+            }
+            AlarmAction.SilentOff -> {
+                RingerControl.restore(context)
+                androidx.core.app.NotificationManagerCompat.from(context).cancel(SILENT_NOTIFICATION)
+            }
+            AlarmAction.Refresh -> Unit
         }
         rescheduleAsync(context)
     }
@@ -41,6 +53,8 @@ class AlarmReceiver : BroadcastReceiver() {
         const val EXTRA_TONE = "tone"
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
+        const val EXTRA_ACTION = "action"
+        private const val SILENT_NOTIFICATION = 5_151
     }
 }
 
@@ -68,6 +82,17 @@ object Notifier {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
             NotificationManagerCompat.from(context).areNotificationsEnabled()
 
+    /** Adhan notification without sound (sound, if any, comes from [AdhanService]). */
+    fun postSilentAdhan(context: Context, fajr: Boolean, title: String, text: String) {
+        if (!canPost(context)) return
+        val notification = AdhanService.buildNotification(context, if (fajr) AlertKind.Fajr else AlertKind.Adhan, title, text, withStop = false)
+        try {
+            NotificationManagerCompat.from(context).notify(AdhanService.NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            // Permission revoked.
+        }
+    }
+
     fun post(context: Context, id: Int, kind: AlertKind, tone: String?, title: String, text: String) {
         if (!canPost(context)) return
         val channel = Channels.ensure(context, kind, tone)
@@ -85,7 +110,8 @@ object Notifier {
             .setAutoCancel(true)
             .setContentIntent(open)
             .setCategory(if (kind.alarmUsage) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_REMINDER)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (kind == AlertKind.Status) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(kind == AlertKind.Status)
             .build()
         try {
             NotificationManagerCompat.from(context).notify(id, notification)

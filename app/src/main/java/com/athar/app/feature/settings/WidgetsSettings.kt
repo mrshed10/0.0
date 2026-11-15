@@ -121,7 +121,7 @@ fun WidgetsSettingsCard(onMessage: (String) -> Unit) {
         value = container.counterRepository.counters.first().map { it.id to it.title }
     }
     val lockTypes = listOf(
-        WidgetType.NextPrayer, WidgetType.Salary, WidgetType.TodayTasks, WidgetType.Habits,
+        WidgetType.NextPrayer, WidgetType.Salary, WidgetType.Schedule, WidgetType.TodayTasks, WidgetType.Habits,
         WidgetType.Date, WidgetType.Verse, WidgetType.Tasbih,
     )
     GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Gold) {

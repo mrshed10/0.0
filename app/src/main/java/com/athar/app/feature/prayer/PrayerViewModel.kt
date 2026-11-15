@@ -28,6 +28,8 @@ data class PrayerUiState(
     val qibla: Double,
     val city: City?,
     val tasbih: TasbihState,
+    /** The prayer whose time we are in (elapsed, time left, iqama). */
+    val current: CurrentPrayer?,
 )
 
 class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
@@ -50,6 +52,7 @@ class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
     private fun build(now: LocalDateTime, prefs: PrayerPrefs, tasbih: TasbihState): PrayerUiState {
         val today = prefs.timesFor(now.toLocalDate())
         val tomorrow = prefs.timesFor(now.toLocalDate().plusDays(1))
+        val yesterday = prefs.timesFor(now.toLocalDate().minusDays(1))
         return PrayerUiState(
             now = now,
             prefs = prefs,
@@ -58,6 +61,9 @@ class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
             qibla = PrayerCalculator.qibla(prefs.latitude, prefs.longitude),
             city = Cities.byId(prefs.cityId),
             tasbih = tasbih,
+            current = PrayerWindow.current(now, yesterday, today, tomorrow) { p ->
+                prefs.alert(p).takeIf { it.iqamaEnabled }?.iqamaMinutes
+            },
         )
     }
 
@@ -71,13 +77,37 @@ class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
 
     fun setMethod(method: PrayerMethod) = settings.updatePrayer { it.copy(method = method) }
     fun setMadhab(madhab: AsrMadhab) = settings.updatePrayer { it.copy(madhab = madhab) }
-    fun setPreMinutes(minutes: Int) = settings.updatePrayer { it.copy(preMinutes = minutes) }
     fun setFajrTone(tone: String?) = settings.updatePrayer { it.copy(fajrTone = tone) }
     fun setAdhanTone(tone: String?) = settings.updatePrayer { it.copy(adhanTone = tone) }
 
     fun toggleAdhan(prayer: Prayer) = settings.updatePrayer {
-        it.copy(adhanEnabled = if (prayer in it.adhanEnabled) it.adhanEnabled - prayer else it.adhanEnabled + prayer)
+        val a = it.alert(prayer)
+        it.copy(alerts = it.alerts + (prayer to a.copy(adhan = !a.adhan)))
     }
+
+    /** Saves one prayer's settings and whether the phone goes silent for it. */
+    fun saveAlert(prayer: Prayer, alert: PrayerAlert, silentForPrayer: Boolean) = settings.updatePrayer {
+        val prayers = if (silentForPrayer) it.silent.prayers + prayer else it.silent.prayers - prayer
+        it.copy(alerts = it.alerts + (prayer to alert), silent = it.silent.copy(prayers = prayers))
+    }
+
+    /** Copies [alert] to all prayers, keeping each prayer's own iqama time. */
+    fun applyToAll(alert: PrayerAlert, silentForPrayer: Boolean) = settings.updatePrayer { p ->
+        val obligatory = Prayer.entries.filter { it.isObligatory }
+        p.copy(
+            alerts = obligatory.associateWith { alert.copy(iqamaMinutes = p.alert(it).iqamaMinutes) },
+            silent = p.silent.copy(prayers = if (silentForPrayer) obligatory.toSet() else emptySet()),
+        )
+    }
+
+    fun setIqamaMinutes(prayer: Prayer, minutes: Int) = settings.updatePrayer {
+        it.copy(alerts = it.alerts + (prayer to it.alert(prayer).copy(iqamaMinutes = minutes.coerceIn(0, 90))))
+    }
+
+    fun setVolume(volume: AdhanVolume) = settings.updatePrayer { it.copy(volume = volume) }
+    fun setAdhanInSilent(enabled: Boolean) = settings.updatePrayer { it.copy(adhanInSilent = enabled) }
+    fun updateSilent(transform: (SilentPrefs) -> SilentPrefs) = settings.updatePrayer { it.copy(silent = transform(it.silent)) }
+    fun resetDefaults() = settings.resetPrayerAlerts()
 
     // --- tasbih ---
     fun tasbihTap() = settings.updateTasbih { it.tapped(LocalDate.now()) }

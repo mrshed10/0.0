@@ -57,6 +57,7 @@ fun AppContainer.keepWidgetsInSync(context: Context, scope: CoroutineScope) {
             debtRepository.people,
             debtRepository.entries,
             plannerRepository.salaries,
+            plannerRepository.reminders,
             settings.prayer,
             settings.general,
             settings.tasbih,

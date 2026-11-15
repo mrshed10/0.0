@@ -90,6 +90,7 @@ fun PrayerTabRoute(viewModel: PrayerViewModel = viewModel(factory = PrayerViewMo
     val locale = currentLocale()
     var citySheet by remember { mutableStateOf(false) }
     var methodSheet by remember { mutableStateOf(false) }
+    var prayerSheet by remember { mutableStateOf<Prayer?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -120,6 +121,7 @@ fun PrayerTabRoute(viewModel: PrayerViewModel = viewModel(factory = PrayerViewMo
                     viewModel = viewModel,
                     onPickCity = { citySheet = true },
                     onPickMethod = { methodSheet = true },
+                    onOpenPrayer = { prayerSheet = it },
                 )
                 1 -> item(key = "tasbih") {
                     TasbihPanel(
@@ -139,6 +141,15 @@ fun PrayerTabRoute(viewModel: PrayerViewModel = viewModel(factory = PrayerViewMo
             CitySheet(
                 onSelect = { viewModel.selectCity(it); citySheet = false },
                 onDismiss = { citySheet = false },
+            )
+        }
+        prayerSheet?.let { prayer ->
+            PrayerSettingsSheet(
+                prayer = prayer,
+                prefs = state.prefs,
+                onDismiss = { prayerSheet = null },
+                onSave = { alert, silent -> viewModel.saveAlert(prayer, alert, silent); prayerSheet = null },
+                onApplyAll = { alert, silent -> viewModel.applyToAll(alert, silent); prayerSheet = null },
             )
         }
         if (methodSheet) {
@@ -161,9 +172,11 @@ private fun LazyListScope.timesPage(
     viewModel: PrayerViewModel,
     onPickCity: () -> Unit,
     onPickMethod: () -> Unit,
+    onOpenPrayer: (Prayer) -> Unit,
 ) {
     item(key = "next") { NextPrayerHero(state) }
-    item(key = "list") { TimesCard(state, viewModel::toggleAdhan) }
+    state.current?.let { item(key = "current") { CurrentPrayerCard(state, it) } }
+    item(key = "list") { TimesCard(state, viewModel::toggleAdhan, onOpen = onOpenPrayer) }
     item(key = "perm") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { AlertPermissionCards() } }
     item(key = "location") { LocationCard(state, onPickCity, viewModel::useLocation) }
     item(key = "qibla") { QiblaCard(state.qibla) }
@@ -185,19 +198,11 @@ private fun LazyListScope.timesPage(
                 onSelect = { viewModel.setMadhab(AsrMadhab.entries[it]) },
                 accent = AtharColors.Violet,
             )
-            Spacer(Modifier.height(12.dp))
-            FieldLabel(stringResource(R.string.pre_prayer_label))
-            Spacer(Modifier.height(6.dp))
-            val options = listOf(0, 5, 10, 15, 30)
-            GlassSegmented(
-                options = options.map { if (it == 0) stringResource(R.string.off) else it.toString() },
-                selectedIndex = options.indexOf(state.prefs.preMinutes).coerceAtLeast(0),
-                onSelect = { viewModel.setPreMinutes(options[it]) },
-                accent = AtharColors.Violet,
-            )
         }
     }
-    item(key = "tones") { TonesCard(state, viewModel) }
+    item(key = "audio") { AdhanAudioCard(state.prefs, viewModel) }
+    item(key = "silent") { SilentModeCard(state.prefs, viewModel) }
+    item(key = "reset") { ResetPrayerDefaults(viewModel::resetDefaults) }
 }
 
 @Composable
@@ -221,9 +226,15 @@ private fun NextPrayerHero(state: PrayerUiState) {
 }
 
 @Composable
-private fun TimesCard(state: PrayerUiState, onToggle: (Prayer) -> Unit) {
+private fun TimesCard(state: PrayerUiState, onToggle: (Prayer) -> Unit, onOpen: (Prayer) -> Unit) {
     val locale = currentLocale()
     GlassCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 8.dp, horizontal = 12.dp)) {
+        Text(
+            stringResource(R.string.prayer_tap_for_settings),
+            style = MaterialTheme.typography.labelSmall,
+            color = AtharColors.TextTertiary,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
         state.times.forEach { slot ->
             val isNext = slot.prayer == state.next.prayer && state.next.at.toLocalDate() == state.now.toLocalDate()
             Row(
@@ -231,6 +242,7 @@ private fun TimesCard(state: PrayerUiState, onToggle: (Prayer) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(if (isNext) AtharColors.Gold.copy(alpha = 0.14f) else Color.Transparent)
+                    .clickable(enabled = slot.prayer.isObligatory) { onOpen(slot.prayer) }
                     .padding(horizontal = 10.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -243,7 +255,7 @@ private fun TimesCard(state: PrayerUiState, onToggle: (Prayer) -> Unit) {
                 )
                 Text(slot.time.formatClock(locale), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (slot.prayer.isObligatory) {
-                    val on = slot.prayer in state.prefs.adhanEnabled
+                    val on = state.prefs.alert(slot.prayer).adhan
                     IconButton(onClick = { onToggle(slot.prayer) }) {
                         Icon(
                             if (on) Icons.Rounded.Notifications else Icons.Rounded.NotificationsOff,
@@ -325,29 +337,6 @@ private fun QiblaCard(qibla: Double) {
                 Text(stringResource(R.string.qibla_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
             }
         }
-    }
-}
-
-@Composable
-private fun TonesCard(state: PrayerUiState, viewModel: PrayerViewModel) {
-    val context = LocalContext.current
-    val testTitle = stringResource(R.string.notif_adhan_title, stringResource(R.string.prayer_dhuhr))
-    val testText = stringResource(R.string.tone_test_text)
-    GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Gold) {
-        CardHeader(stringResource(R.string.adhan_tones), Icons.Rounded.MusicNote)
-        Spacer(Modifier.height(12.dp))
-        ToneRow(stringResource(R.string.tone_fajr), state.prefs.fajrTone, viewModel::setFajrTone)
-        Spacer(Modifier.height(14.dp))
-        ToneRow(stringResource(R.string.tone_other_prayers), state.prefs.adhanTone, viewModel::setAdhanTone)
-        Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.adhan_tone_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
-        Spacer(Modifier.height(10.dp))
-        GlassButton(
-            stringResource(R.string.tone_test),
-            { Notifier.post(context, 999, AlertKind.Adhan, state.prefs.adhanTone, testTitle, testText) },
-            filled = false,
-            modifier = Modifier.fillMaxWidth(),
-        )
     }
 }
 

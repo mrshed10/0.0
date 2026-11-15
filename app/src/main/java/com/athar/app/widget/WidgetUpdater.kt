@@ -20,18 +20,29 @@ import com.athar.app.core.notify.Notifier
 import com.athar.app.feature.prayer.PrayerSchedule
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.ZoneId
 
 object WidgetUpdater {
-    /** Redraws every placed widget and the lock-screen card. */
+    private val _version = MutableStateFlow(0L)
+
+    /** Bumped on every refresh; live widgets collect it and reload their data. */
+    val version: StateFlow<Long> = _version.asStateFlow()
+
+    /** Reloads every placed widget (live or not) and the lock-screen card. */
     suspend fun refreshAll(context: Context) {
+        _version.update { it + 1 }
         runCatching { AtharWidget().updateAll(context) }
         runCatching { LockCard.update(context) }
     }
 
     suspend fun refresh(context: Context, appWidgetId: Int) {
+        _version.update { it + 1 }
         runCatching {
             val glanceId = GlanceAppWidgetManager(context).getGlanceIdBy(appWidgetId)
             AtharWidget().update(context, glanceId)
@@ -136,6 +147,8 @@ object LockCard {
             is WidgetData.Debts -> builder.setContentTitle("💼 ${data.owedLabel} ${data.owed} · ${data.oweLabel} ${data.owe}")
             is WidgetData.Habits -> builder.setContentTitle("🔥 " + context.getString(R.string.habits))
                 .setContentText(data.rows.joinToString(" • ") { "${if (it.doneToday) "✅" else it.emoji} ${it.title} ${it.streak}" })
+            is WidgetData.Schedule -> builder.setContentTitle("🗓️ " + context.getString(R.string.widget_type_schedule))
+                .setContentText(data.rows.take(3).joinToString(" • ") { "${it.name}: ${it.daysText}" })
             WidgetData.Missing, WidgetData.Unconfigured -> {
                 nm.cancel(NOTIFICATION_ID)
                 return

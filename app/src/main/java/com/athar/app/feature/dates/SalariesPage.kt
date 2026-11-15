@@ -27,6 +27,12 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Widgets
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.athar.app.widget.WidgetContent
+import com.athar.app.widget.WidgetPinner
+import com.athar.app.widget.WidgetType
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -83,6 +89,9 @@ fun SalariesRoute(switcher: @Composable () -> Unit, viewModel: PlannerViewModel 
     var editing by remember { mutableStateOf<SalarySource?>(null) }
     var countrySheet by remember { mutableStateOf(false) }
     val general = state.general
+    val context = LocalContext.current
+    val pinRequested = stringResource(R.string.pin_requested)
+    val pinUnsupported = stringResource(R.string.pin_unsupported)
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -95,9 +104,16 @@ fun SalariesRoute(switcher: @Composable () -> Unit, viewModel: PlannerViewModel 
                     title = stringResource(R.string.salaries),
                     subtitle = general?.let { "${it.country.flag} " + stringResource(it.country.label) },
                     action = {
-                        GlassIconButton(Icons.Rounded.Add, stringResource(R.string.add_salary), {
-                            editing = SalarySource(name = "", payDay = 27)
-                        })
+                        Row {
+                            GlassIconButton(Icons.Rounded.Widgets, stringResource(R.string.pin_schedule_widget), {
+                                val ok = WidgetPinner.pin(context, WidgetContent(WidgetType.Schedule))
+                                Toast.makeText(context, if (ok) pinRequested else pinUnsupported, Toast.LENGTH_LONG).show()
+                            })
+                            Spacer(Modifier.width(8.dp))
+                            GlassIconButton(Icons.Rounded.Add, stringResource(R.string.add_salary), {
+                                editing = SalarySource(name = "", payDay = 27)
+                            })
+                        }
                     },
                 )
             }

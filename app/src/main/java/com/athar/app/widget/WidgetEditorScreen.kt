@@ -111,7 +111,7 @@ fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (Wid
             else -> emptyList()
         }
     }
-    val data by produceState<WidgetData>(WidgetData.Unconfigured, config.content) {
+    val data by produceState<WidgetData>(WidgetData.Unconfigured, config.content, config.style.dateStyle) {
         value = WidgetDataLoader.load(context, config)
     }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -285,6 +285,15 @@ fun WidgetEditorScreen(initial: WidgetConfig, onCancel: () -> Unit, onSave: (Wid
                 FieldLabel(stringResource(R.string.accent_color))
                 Spacer(Modifier.height(6.dp))
                 Swatches(TextPalette, style.accentColor) { setStyle(style.copy(accentColor = it)) }
+                Spacer(Modifier.height(12.dp))
+                FieldLabel(stringResource(R.string.widget_date_style))
+                Spacer(Modifier.height(6.dp))
+                GlassSegmented(
+                    options = listOf(stringResource(R.string.date_words), stringResource(R.string.date_numeric)),
+                    selectedIndex = style.dateStyle.ordinal,
+                    onSelect = { setStyle(style.copy(dateStyle = DateStyle.entries[it])) },
+                    accent = AtharColors.Rose,
+                )
             }
         }
 
@@ -409,6 +418,7 @@ private fun previewLines(d: WidgetData): Triple<String, String, String> = when (
     is WidgetData.Tasbih -> Triple("📿 ${d.dhikr}", "${d.count} / ${d.target}", d.today)
     is WidgetData.Verse -> Triple("📖 ${d.ref}", d.text, "")
     is WidgetData.DateInfo -> Triple(d.hijri, d.day, d.gregorian)
+    is WidgetData.Schedule -> Triple("🗓️", d.rows.first().let { "${it.name} · ${it.daysText}" }, d.rows.drop(1).take(2).joinToString(" • ") { "${it.name} ${it.daysText}" })
     WidgetData.Missing -> Triple("", "—", "")
     WidgetData.Unconfigured -> Triple("", "…", "")
 }

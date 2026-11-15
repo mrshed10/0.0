@@ -1,6 +1,7 @@
 package com.athar.app.widget
 
 import android.content.Context
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Per-widget configuration, keyed by appWidgetId. */
 class WidgetStore(context: Context) {
@@ -9,11 +10,13 @@ class WidgetStore(context: Context) {
     fun get(appWidgetId: Int): WidgetConfig? = WidgetJson.decode(prefs.getString(key(appWidgetId), null))
 
     fun put(appWidgetId: Int, config: WidgetConfig) {
-        prefs.edit().putString(key(appWidgetId), WidgetJson.encode(config)).apply()
+        prefs.edit().putString(key(appWidgetId), WidgetJson.encode(config)).commit()
+        changes.value++
     }
 
     fun remove(appWidgetId: Int) {
         prefs.edit().remove(key(appWidgetId)).apply()
+        changes.value++
     }
 
     /** Config chosen in the app before asking the launcher to pin a widget. */
@@ -33,7 +36,10 @@ class WidgetStore(context: Context) {
 
     private fun key(id: Int) = "w_$id"
 
-    private companion object {
-        const val KEY_PENDING = "pending"
+    companion object {
+        private const val KEY_PENDING = "pending"
+
+        /** Bumped whenever any widget's config changes, so live widgets reload. */
+        val changes = MutableStateFlow(0L)
     }
 }

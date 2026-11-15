@@ -8,7 +8,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -19,18 +23,15 @@ import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.ActionParameters
-import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.ActionCallback
-import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.action.actionSendBroadcast
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
+import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -63,12 +64,24 @@ import java.time.LocalDate
 class AtharWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
+    /**
+     * The composition stays alive between updates, so data is collected as a
+     * flow: it reloads whenever this widget's config changes or app data is
+     * refreshed (instead of being read once and going stale).
+     */
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val config = WidgetStore(context).get(appWidgetId)
-        val data = WidgetDataLoader.load(context, config)
+        val store = WidgetStore(context)
+        val firstConfig = store.get(appWidgetId)
+        val first = firstConfig to WidgetDataLoader.load(context, firstConfig)
+        val live = combine(WidgetStore.changes, WidgetUpdater.version) { a, b -> a to b }
+            .map {
+                val config = store.get(appWidgetId)
+                config to WidgetDataLoader.load(context, config)
+            }
         provideContent {
-            WidgetRoot(appWidgetId, config?.style ?: WidgetStyle(), data)
+            val state by live.collectAsState(initial = first)
+            WidgetRoot(appWidgetId, state.first?.style ?: WidgetStyle(), state.second)
         }
     }
 }
@@ -91,37 +104,6 @@ class AtharSmallWidgetReceiver : GlanceAppWidgetReceiver() {
         super.onDeleted(context, appWidgetIds)
         val store = WidgetStore(context)
         appWidgetIds.forEach(store::remove)
-    }
-}
-
-private val TaskIdKey = ActionParameters.Key<Long>("taskId")
-private val HabitIdKey = ActionParameters.Key<Long>("habitId")
-
-/** Tick a task straight from the home screen. */
-class ToggleTaskAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val id = parameters[TaskIdKey] ?: return
-        val repo = (context.applicationContext as AtharApplication).container.taskRepository
-        val task = repo.tasks.first().firstOrNull { it.id == id } ?: return
-        repo.setDone(id, !task.done, LocalDate.now())
-        AtharWidget().updateAll(context)
-    }
-}
-
-/** Mark a habit done today (or undo). */
-class ToggleHabitAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        val id = parameters[HabitIdKey] ?: return
-        (context.applicationContext as AtharApplication).container.habitRepository.toggle(id, LocalDate.now())
-        AtharWidget().updateAll(context)
-    }
-}
-
-/** One tasbih count. */
-class TasbihTapAction : ActionCallback {
-    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        (context.applicationContext as AtharApplication).container.settings.updateTasbih { it.tapped(LocalDate.now()) }
-        AtharWidget().updateAll(context)
     }
 }
 
@@ -181,6 +163,7 @@ private fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) {
                 is WidgetData.Tasbih -> TasbihContent(data, small, text, accent)
                 is WidgetData.Verse -> VerseContent(data, small, text, accent)
                 is WidgetData.DateInfo -> DateContent(data, small, text, accent)
+                is WidgetData.Schedule -> ScheduleContent(data, small, text, accent)
             }
         }
     }
@@ -319,7 +302,7 @@ private fun TasksContent(d: WidgetData.Tasks, small: Boolean, text: Color, accen
                 GlanceModifier
                     .fillMaxWidth()
                     .padding(vertical = 3.dp)
-                    .clickable(actionRunCallback<ToggleTaskAction>(actionParametersOf(TaskIdKey to row.id))),
+                    .clickable(actionSendBroadcast(WidgetActionReceiver.intent(LocalContext.current, WidgetActionReceiver.TOGGLE_TASK, row.id))),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 WText(if (row.done) "☑" else "☐", style = style(if (row.done) accent else text, 17.sp, bold = true))
@@ -343,7 +326,7 @@ private fun HabitsContent(d: WidgetData.Habits, small: Boolean, text: Color, acc
     if (d.single) {
         val h = d.rows.first()
         Column(
-            GlanceModifier.fillMaxSize().clickable(actionRunCallback<ToggleHabitAction>(actionParametersOf(HabitIdKey to h.id))),
+            GlanceModifier.fillMaxSize().clickable(actionSendBroadcast(WidgetActionReceiver.intent(context, WidgetActionReceiver.TOGGLE_HABIT, h.id))),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -361,7 +344,7 @@ private fun HabitsContent(d: WidgetData.Habits, small: Boolean, text: Color, acc
         Row(GlanceModifier.fillMaxWidth()) {
             d.rows.take(if (small) 3 else 5).forEach { h ->
                 Column(
-                    GlanceModifier.defaultWeight().clickable(actionRunCallback<ToggleHabitAction>(actionParametersOf(HabitIdKey to h.id))),
+                    GlanceModifier.defaultWeight().clickable(actionSendBroadcast(WidgetActionReceiver.intent(context, WidgetActionReceiver.TOGGLE_HABIT, h.id))),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     WText(if (h.doneToday) "✅" else h.emoji, style = style(text, 22.sp, align = TextAlign.Center))
@@ -394,8 +377,9 @@ private fun DebtsContent(d: WidgetData.Debts, small: Boolean, text: Color, accen
 
 @Composable
 private fun TasbihContent(d: WidgetData.Tasbih, small: Boolean, text: Color, accent: Color) {
+    val context = LocalContext.current
     Column(
-        GlanceModifier.fillMaxSize().clickable(actionRunCallback<TasbihTapAction>()),
+        GlanceModifier.fillMaxSize().clickable(actionSendBroadcast(WidgetActionReceiver.intent(context, WidgetActionReceiver.TASBIH, 0))),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -431,4 +415,48 @@ private fun DateContent(d: WidgetData.DateInfo, small: Boolean, text: Color, acc
         WText(d.gregorian, style = style(text.copy(alpha = 0.8f), 13.sp, align = TextAlign.Center), maxLines = 1)
         WText(d.hijri, style = style(accent, 14.sp, bold = true, align = TextAlign.Center), maxLines = 1)
     }
+}
+
+/** All upcoming salaries and appointments with the days left for each. */
+@Composable
+private fun ScheduleContent(d: WidgetData.Schedule, small: Boolean, text: Color, accent: Color) {
+    val context = LocalContext.current
+    val size = LocalSize.current
+    val rowHeight = if (small) 30 else 34
+    val maxRows = ((size.height.value - 34) / rowHeight).toInt().coerceIn(1, 10)
+    Column(GlanceModifier.fillMaxSize().clickable(openApp(context, "salaries"))) {
+        Header("🗓️ " + context.getString(R.string.widget_type_schedule), text, accent)
+        Spacer(GlanceModifier.height(4.dp))
+        d.rows.take(maxRows).forEach { row ->
+            Row(GlanceModifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                WText(if (row.salary) "💰" else "⏰", style = style(text, 13.sp))
+                Spacer(GlanceModifier.width(6.dp))
+                Column(GlanceModifier.defaultWeight()) {
+                    WText(row.name, style = style(text, if (small) 12.sp else 13.sp, bold = true), maxLines = 1, widthFraction = 0.6f)
+                    if (!small) WText(row.date, style = style(text.copy(alpha = 0.65f), 10.sp), maxLines = 1, widthFraction = 0.6f)
+                }
+                Spacer(GlanceModifier.width(6.dp))
+                Box(
+                    GlanceModifier
+                        .background(ImageProvider(pill(context, if (row.days == 0L) accent else accent.copy(alpha = 0.25f))))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    WText(row.daysText, style = style(if (row.days == 0L) Color(0xFF0B1026) else text, 11.sp, bold = true), maxLines = 1, widthFraction = 0.3f)
+                }
+            }
+        }
+        if (d.rows.size > maxRows) WText("+${d.rows.size - maxRows}", style = style(accent, 11.sp, bold = true))
+    }
+}
+
+/** Small rounded pill bitmap used behind the "days left" label. */
+private fun pill(context: Context, color: Color): android.graphics.Bitmap {
+    val density = context.resources.displayMetrics.density
+    val w = (64 * density).toInt()
+    val h = (22 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { this.color = color.toArgb() }
+    android.graphics.Canvas(bitmap).drawRoundRect(0f, 0f, w.toFloat(), h.toFloat(), h / 2f, h / 2f, paint)
+    return bitmap
 }
