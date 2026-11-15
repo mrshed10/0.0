@@ -56,7 +56,7 @@ import kotlinx.coroutines.flow.first
 /** Placed widgets (edit), add a widget, and the lock-screen card. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun WidgetsSettingsCard(onMessage: (String) -> Unit, onOpenGallery: () -> Unit, onOpenStudio: () -> Unit) {
+fun WidgetsSettingsCard(onMessage: (String) -> Unit, onOpenGallery: () -> Unit) {
     val context = LocalContext.current
     val container = (context.applicationContext as AtharApplication).container
     val lifecycle = LocalLifecycleOwner.current
@@ -109,14 +109,6 @@ fun WidgetsSettingsCard(onMessage: (String) -> Unit, onOpenGallery: () -> Unit, 
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        GlassButton(
-            stringResource(R.string.studio_title),
-            onOpenStudio,
-            color = AtharColors.Violet,
-            filled = false,
-            icon = Icons.Rounded.Edit,
-            modifier = Modifier.fillMaxWidth(),
-        )
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.widgets_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
     }

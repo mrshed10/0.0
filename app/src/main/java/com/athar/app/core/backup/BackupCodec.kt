@@ -151,6 +151,7 @@ object BackupCodec {
         })
         .put("people", array(d.people) {
             JSONObject().put("id", it.id).put("name", it.name).put("phone", it.phone).put("createdAt", it.createdAt)
+                .put("address", it.address ?: JSONObject.NULL)
         })
         .put("debtEntries", array(d.debtEntries) {
             JSONObject().put("id", it.id).put("personId", it.personId).put("type", it.type)
@@ -187,7 +188,10 @@ object BackupCodec {
         },
         habitLogs = list(o, "habitLogs") { HabitLogEntity(it.getLong("habitId"), it.getLong("day")) },
         people = list(o, "people") {
-            PersonEntity(it.getLong("id"), it.getString("name"), it.optString("phone", ""), it.getLong("createdAt"))
+            PersonEntity(
+                it.getLong("id"), it.getString("name"), it.optString("phone", ""), it.getLong("createdAt"),
+                it.optStringOrNull("address"),
+            )
         },
         debtEntries = list(o, "debtEntries") {
             DebtEntryEntity(

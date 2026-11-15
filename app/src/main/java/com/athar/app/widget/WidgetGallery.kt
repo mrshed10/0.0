@@ -56,8 +56,8 @@ import com.athar.app.core.designsystem.theme.AtharColors
 import kotlinx.coroutines.flow.first
 
 enum class GalleryTab(@StringRes val label: Int) {
-    New(R.string.gallery_new),
     Nothing(R.string.gallery_nothing),
+    New(R.string.gallery_new),
     Clock(R.string.gallery_clock),
     Digital(R.string.gallery_digital),
     Date(R.string.gallery_date),
@@ -195,7 +195,7 @@ object WidgetTemplates {
 @Composable
 fun WidgetGalleryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var tab by rememberSaveable { mutableStateOf(GalleryTab.New) }
+    var tab by rememberSaveable { mutableStateOf(GalleryTab.Nothing) }
     var customizing by remember { mutableStateOf<WidgetTemplate?>(null) }
     val pinRequested = stringResource(R.string.pin_requested)
     val pinUnsupported = stringResource(R.string.pin_unsupported)
@@ -218,17 +218,10 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
 
     customizing?.let { template ->
         BackHandler { customizing = null }
-        val savedMsg = stringResource(R.string.studio_saved)
-        val templateName = stringResource(template.name)
         WidgetEditorScreen(
             initial = resolved(template),
             wide = template.wide,
             saveLabel = stringResource(R.string.add_to_home_screen),
-            secondaryLabel = stringResource(R.string.studio_save_to_designs),
-            onSecondary = { config ->
-                DesignLibrary(context).save(SavedDesign(DesignLibrary.newId(), templateName, config, template.wide, System.currentTimeMillis()))
-                Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
-            },
             onCancel = { customizing = null },
             onSave = { config ->
                 val ok = WidgetPinner.pin(context, config, small = !template.wide)

@@ -1,6 +1,27 @@
 package com.athar.app.feature.debts
 
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
+import android.provider.ContactsContract
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
+import java.time.temporal.ChronoUnit
+import kotlin.math.abs
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -72,12 +93,36 @@ import com.athar.app.core.format.formatNumber
 import com.athar.app.core.security.BiometricAuth
 import java.time.LocalDate
 
+/** Days after which an open debt is shown as overdue. */
+private const val OVERDUE_DAYS = 30L
+
 @Composable
 fun DebtsRoute(viewModel: DebtsViewModel = viewModel(factory = DebtsViewModel.Factory)) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var openPersonId by rememberSaveable { mutableStateOf<Long?>(null) }
     var personEditing by remember { mutableStateOf<Person?>(null) }
     var entryEditing by remember { mutableStateOf<DebtEntry?>(null) }
+    var sorting by remember { mutableStateOf(false) }
+    val contactFailed = stringResource(R.string.contact_pick_failed)
+
+    val pickContact = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data ?: return@rememberLauncherForActivityResult
+        val picked = readContact(context, uri)
+        if (picked == null) {
+            Toast.makeText(context, contactFailed, Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.savePerson(picked) { id -> openPersonId = id }
+        }
+    }
+    val openContacts = {
+        val intent = Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
+        try {
+            pickContact.launch(intent)
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(context, contactFailed, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     if (state.locked) {
         LockedDebts(onUnlocked = viewModel::unlock)
@@ -91,7 +136,12 @@ fun DebtsRoute(viewModel: DebtsViewModel = viewModel(factory = DebtsViewModel.Fa
                 state = state,
                 onQuery = viewModel::setQuery,
                 onOpen = { openPersonId = it },
+                onSort = { sorting = true },
                 onAddPerson = { personEditing = Person(name = "") },
+            )
+            AddPersonFab(
+                onNewPerson = { personEditing = Person(name = "") },
+                onFromContacts = openContacts,
             )
         } else {
             BackHandler { openPersonId = null }
@@ -107,6 +157,13 @@ fun DebtsRoute(viewModel: DebtsViewModel = viewModel(factory = DebtsViewModel.Fa
             )
         }
 
+        if (sorting) {
+            DebtSortSheet(
+                selected = state.sort,
+                onDismiss = { sorting = false },
+                onSelect = { viewModel.setSort(it); sorting = false },
+            )
+        }
         personEditing?.let { editing ->
             PersonEditorSheet(
                 initial = editing,
@@ -133,11 +190,25 @@ fun DebtsRoute(viewModel: DebtsViewModel = viewModel(factory = DebtsViewModel.Fa
     }
 }
 
+/** Reads name and number from a picked phone row; null if the row could not be read. */
+private fun readContact(context: Context, uri: Uri): Person? = runCatching {
+    val projection = arrayOf(
+        ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+        ContactsContract.CommonDataKinds.Phone.NUMBER,
+    )
+    context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
+        if (!c.moveToFirst()) return@use null
+        val name = c.getString(0)?.trim().orEmpty()
+        val phone = c.getString(1)?.trim().orEmpty()
+        if (name.isBlank() && phone.isBlank()) null else Person(name = name.ifBlank { phone }, phone = phone)
+    }
+}.getOrNull()
+
 @Composable
 private fun screenPadding(): PaddingValues {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    return PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = bottom + 120.dp)
+    return PaddingValues(start = 16.dp, end = 16.dp, top = top + 12.dp, bottom = bottom + 180.dp)
 }
 
 @Composable
@@ -145,8 +216,10 @@ private fun PeopleList(
     state: DebtsUiState,
     onQuery: (String) -> Unit,
     onOpen: (Long) -> Unit,
+    onSort: () -> Unit,
     onAddPerson: () -> Unit,
 ) {
+    val today = remember { LocalDate.now() }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = screenPadding(),
@@ -154,13 +227,21 @@ private fun PeopleList(
     ) {
         item(key = "header") {
             ScreenHeader(
-                title = stringResource(R.string.debts),
+                title = stringResource(R.string.debts_ledger),
                 subtitle = stringResource(R.string.debts_people_count, state.balances.size.formatNumber()),
-                action = { GlassIconButton(Icons.Rounded.PersonAdd, stringResource(R.string.add_person), onAddPerson) },
+                action = {
+                    if (state.balances.size > 1) {
+                        GlassButton(
+                            stringResource(R.string.sort_by),
+                            onSort,
+                            icon = Icons.AutoMirrored.Rounded.Sort,
+                        )
+                    }
+                },
             )
         }
         item(key = "totals") { TotalsCard(state.totals) }
-        if (state.balances.size > 5) {
+        if (state.balances.size > 3) {
             item(key = "search") {
                 GlassTextField(
                     value = state.query,
@@ -181,42 +262,63 @@ private fun PeopleList(
                 )
             }
         }
+        if (state.sort != DebtSort.AmountDesc && state.balances.size > 1) {
+            item(key = "sortLabel") {
+                Text(
+                    stringResource(R.string.sorted_by, stringResource(state.sort.label)),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AtharColors.TextTertiary,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
+        }
         items(state.visible, key = { it.person.id }) { balance ->
-            PersonRow(balance, onClick = { onOpen(balance.person.id) })
+            PersonRow(balance, today, onClick = { onOpen(balance.person.id) })
         }
     }
 }
 
 @Composable
 private fun TotalsCard(totals: DebtTotals) {
-    GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Teal) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AmountColumn(stringResource(R.string.debts_owed_to_me), totals.owedToMeMinor, AtharColors.Teal, Modifier.weight(1f))
-            Box(Modifier.width(1.dp).height(44.dp).background(Color.White.copy(alpha = 0.15f)))
-            AmountColumn(stringResource(R.string.debts_i_owe), totals.iOweMinor, AtharColors.Rose, Modifier.weight(1f))
+    GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Teal, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            stringResource(R.string.debts_total_remaining),
+            style = MaterialTheme.typography.labelLarge,
+            color = AtharColors.TextSecondary,
+        )
+        Spacer(Modifier.height(4.dp))
+        Row {
+            Text(
+                Money.format(totals.owedToMeMinor),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Bold,
+                color = AtharColors.Teal,
+                maxLines = 1,
+                modifier = Modifier.alignByBaseline(),
+            )
+            Text(
+                " " + LocalCurrency.current,
+                style = MaterialTheme.typography.titleSmall,
+                color = AtharColors.TextSecondary,
+                modifier = Modifier.alignByBaseline(),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SmallStat(stringResource(R.string.debts_i_owe), Money.format(totals.iOweMinor), AtharColors.Rose, Modifier.weight(1f))
+            Box(Modifier.width(1.dp).height(32.dp).background(Color.White.copy(alpha = 0.12f)))
+            SmallStat(stringResource(R.string.debts_open_people), totals.openPeople.formatNumber(), AtharColors.TextPrimary, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-private fun AmountColumn(label: String, minor: Long, color: Color, modifier: Modifier) {
-    Column(modifier.padding(horizontal = 8.dp)) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = AtharColors.TextSecondary)
-        Row {
-            Text(
-                Money.format(minor),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = color,
-                modifier = Modifier.alignByBaseline(),
-            )
-            Text(
-                " " + LocalCurrency.current,
-                style = MaterialTheme.typography.labelMedium,
-                color = AtharColors.TextSecondary,
-                modifier = Modifier.alignByBaseline(),
-            )
-        }
+private fun SmallStat(label: String, value: String, color: Color, modifier: Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = color, maxLines = 1)
     }
 }
 
@@ -229,24 +331,28 @@ fun balanceStyle(minor: Long): Pair<Color, String> = when {
 }
 
 @Composable
-private fun PersonRow(balance: PersonBalance, onClick: () -> Unit) {
-    val locale = currentLocale()
+private fun PersonRow(balance: PersonBalance, today: LocalDate, onClick: () -> Unit) {
     val (color, label) = balanceStyle(balance.balanceMinor)
+    val days = balance.since?.let { ChronoUnit.DAYS.between(it, today).coerceAtLeast(0) }
     GlassCard(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(color.copy(alpha = 0.2f)),
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.18f))
+                    .border(1.dp, color.copy(alpha = 0.45f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    balance.person.name.trim().take(1).uppercase(),
-                    style = MaterialTheme.typography.titleMedium,
+                    balance.person.name.trim().take(1).uppercase().ifEmpty { "?" },
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = color,
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     balance.person.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -254,23 +360,125 @@ private fun PersonRow(balance: PersonBalance, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                balance.lastActivity?.let {
+                if (balance.person.phone.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Call, null, tint = AtharColors.TextTertiary, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            balance.person.phone,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = AtharColors.TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (days != null) {
+                    val overdue = days > OVERDUE_DAYS
                     Text(
-                        it.formatGregorian(locale, "d MMM yyyy"),
+                        when {
+                            days == 0L -> stringResource(R.string.debt_since_today)
+                            overdue -> stringResource(R.string.debt_overdue_days, days.formatNumber())
+                            else -> stringResource(R.string.debt_since_days, days.formatNumber())
+                        },
                         style = MaterialTheme.typography.labelSmall,
-                        color = AtharColors.TextTertiary,
+                        fontWeight = if (overdue) FontWeight.Bold else FontWeight.Normal,
+                        color = if (overdue) AtharColors.Rose else AtharColors.TextTertiary,
                     )
                 }
             }
+            Spacer(Modifier.width(8.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    Money.format(balance.balanceMinor),
+                    Money.format(abs(balance.balanceMinor)),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = color,
+                    maxLines = 1,
                 )
                 Text(label, style = MaterialTheme.typography.labelSmall, color = color)
             }
+        }
+    }
+}
+
+/** Floating add button that unfolds into "new person" and "from contacts". */
+@Composable
+private fun AddPersonFab(onNewPerson: () -> Unit, onFromContacts: () -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val rotation by animateFloatAsState(if (expanded) 45f else 0f, label = "fabRotation")
+    if (expanded) BackHandler { expanded = false }
+
+    Box(Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = expanded, enter = fadeIn(), exit = fadeOut()) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { expanded = false },
+            )
+        }
+        Column(
+            Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(end = 20.dp, bottom = 100.dp),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn() + slideInVertically { it / 2 },
+                exit = fadeOut() + slideOutVertically { it / 2 },
+            ) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FabOption(stringResource(R.string.add_from_contacts), Icons.Rounded.Contacts) {
+                        expanded = false
+                        onFromContacts()
+                    }
+                    FabOption(stringResource(R.string.add_new_person), Icons.Rounded.PersonAdd) {
+                        expanded = false
+                        onNewPerson()
+                    }
+                }
+            }
+            Box(
+                Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(AtharColors.Teal)
+                    .clickable { expanded = !expanded },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Add,
+                    contentDescription = stringResource(R.string.add_person),
+                    tint = Color.Black,
+                    modifier = Modifier.size(30.dp).rotate(rotation),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FabOption(label: String, icon: ImageVector, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(28.dp))
+            .background(Color(0xFF1C2230).copy(alpha = 0.96f))
+            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(28.dp))
+            .clickable(onClick = onClick)
+            .padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+        Spacer(Modifier.width(12.dp))
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).background(AtharColors.Teal.copy(alpha = 0.22f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = AtharColors.Teal, modifier = Modifier.size(22.dp))
         }
     }
 }

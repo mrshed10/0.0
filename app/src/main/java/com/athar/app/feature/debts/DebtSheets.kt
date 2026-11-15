@@ -1,6 +1,14 @@
 package com.athar.app.feature.debts
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +49,7 @@ fun PersonEditorSheet(
 ) {
     var name by remember(initial.id) { mutableStateOf(initial.name) }
     var phone by remember(initial.id) { mutableStateOf(initial.phone) }
+    var address by remember(initial.id) { mutableStateOf(initial.address) }
 
     GlassSheet(onDismiss = onDismiss) {
         Text(
@@ -49,6 +58,7 @@ fun PersonEditorSheet(
             fontWeight = FontWeight.Bold,
         )
         GlassTextField(name, { name = it }, stringResource(R.string.person_name_hint), Modifier.fillMaxWidth())
+        GlassTextField(address, { address = it }, stringResource(R.string.person_address_hint), Modifier.fillMaxWidth())
         GlassTextField(
             phone,
             { phone = it },
@@ -67,7 +77,7 @@ fun PersonEditorSheet(
             }
             GlassButton(
                 text = stringResource(R.string.save),
-                onClick = { onSave(initial.copy(name = name, phone = phone)) },
+                onClick = { onSave(initial.copy(name = name.trim(), phone = phone.trim(), address = address.trim())) },
                 enabled = name.isNotBlank(),
                 icon = Icons.Rounded.Check,
                 modifier = Modifier.weight(1f),
@@ -146,3 +156,44 @@ fun EntryEditorSheet(
         }
     }
 }
+
+@Composable
+fun DebtSortSheet(selected: DebtSort, onDismiss: () -> Unit, onSelect: (DebtSort) -> Unit) {
+    GlassSheet(onDismiss = onDismiss) {
+        Text(
+            stringResource(R.string.sort_by),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        DebtSort.entries.forEach { option ->
+            val active = option == selected
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(if (active) AtharColors.Teal.copy(alpha = 0.16f) else Color.Transparent)
+                    .clickable { onSelect(option) }
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(option.label),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                    color = if (active) AtharColors.Teal else Color.Unspecified,
+                    modifier = Modifier.weight(1f),
+                )
+                if (active) Icon(Icons.Rounded.Check, contentDescription = null, tint = AtharColors.Teal)
+            }
+        }
+    }
+}
+
+val DebtSort.label: Int
+    get() = when (this) {
+        DebtSort.AmountDesc -> R.string.sort_amount_desc
+        DebtSort.AmountAsc -> R.string.sort_amount_asc
+        DebtSort.Overdue -> R.string.sort_overdue
+        DebtSort.Name -> R.string.sort_name
+        DebtSort.Recent -> R.string.sort_recent
+    }

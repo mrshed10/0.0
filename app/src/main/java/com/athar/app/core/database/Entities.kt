@@ -65,6 +65,8 @@ data class PersonEntity(
     val name: String,
     val phone: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    /** Added in v4 (nullable so the upgrade is a simple ALTER TABLE). */
+    @ColumnInfo(name = "address") val address: String? = null,
 )
 
 /** Amounts in minor units (halalas) to avoid rounding errors. */

@@ -20,14 +20,22 @@ data class DebtsUiState(
     val totals: DebtTotals = DebtTotals.Empty,
     val entriesByPerson: Map<Long, List<DebtEntry>> = emptyMap(),
     val query: String = "",
+    val sort: DebtSort = DebtSort.AmountDesc,
     val locked: Boolean = false,
     val loaded: Boolean = false,
 ) {
     val visible: List<PersonBalance>
-        get() = if (query.isBlank()) {
-            balances
-        } else {
-            balances.filter { it.person.name.contains(query.trim(), ignoreCase = true) || it.person.phone.contains(query.trim()) }
+        get() {
+            val q = query.trim()
+            val filtered = if (q.isEmpty()) {
+                balances
+            } else {
+                balances.filter {
+                    it.person.name.contains(q, ignoreCase = true) || it.person.phone.contains(q) ||
+                        it.person.address.contains(q, ignoreCase = true)
+                }
+            }
+            return DebtMath.sort(filtered, sort)
         }
 
     fun balanceOf(personId: Long): PersonBalance? = balances.firstOrNull { it.person.id == personId }
@@ -40,16 +48,19 @@ class DebtsViewModel(
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
+    private val sort = MutableStateFlow(DebtSort.AmountDesc)
+    private val filters = combine(query, sort) { q, s -> q to s }
     private val lockState = combine(settings.debtsLock, session.unlocked) { enabled, unlocked -> enabled && !unlocked }
 
     val uiState: StateFlow<DebtsUiState> =
-        combine(repository.people, repository.entries, query, lockState) { people, entries, q, locked ->
+        combine(repository.people, repository.entries, filters, lockState) { people, entries, (q, s), locked ->
             val balances = DebtMath.balances(people, entries)
             DebtsUiState(
                 balances = balances,
                 totals = DebtMath.totals(balances),
                 entriesByPerson = entries.groupBy { it.personId },
                 query = q,
+                sort = s,
                 locked = locked,
                 loaded = true,
             )
@@ -57,6 +68,10 @@ class DebtsViewModel(
 
     fun setQuery(value: String) {
         query.value = value
+    }
+
+    fun setSort(value: DebtSort) {
+        sort.value = value
     }
 
     fun unlock() = session.unlock()

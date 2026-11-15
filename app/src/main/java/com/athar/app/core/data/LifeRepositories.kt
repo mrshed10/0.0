@@ -67,9 +67,9 @@ private fun HabitEntity.toDomain() = Habit(
 
 private fun Habit.toEntity() = HabitEntity(id, title.trim(), icon.name, tone.name, stamp(createdAt))
 
-private fun PersonEntity.toDomain() = Person(id, name, phone, createdAt)
+private fun PersonEntity.toDomain() = Person(id, name, phone, createdAt, address.orEmpty())
 
-private fun Person.toEntity() = PersonEntity(id, name.trim(), phone.trim(), stamp(createdAt))
+private fun Person.toEntity() = PersonEntity(id, name.trim(), phone.trim(), stamp(createdAt), address.trim().ifBlank { null })
 
 private fun DebtEntryEntity.toDomain() = DebtEntry(
     id = id,

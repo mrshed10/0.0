@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SalarySourceEntity::class,
         ReminderEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class AtharDatabase : RoomDatabase() {
@@ -58,9 +58,16 @@ abstract class AtharDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 -> v4: optional address for people in the debts ledger. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `people` ADD COLUMN `address` TEXT")
+            }
+        }
+
         fun build(context: Context): AtharDatabase =
             Room.databaseBuilder(context.applicationContext, AtharDatabase::class.java, "athar.db")
-                .addMigrations(MIGRATION_2_3)
+                .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                 // v1 was a pre-release test build only.
                 .fallbackToDestructiveMigrationFrom(1)
                 .build()
