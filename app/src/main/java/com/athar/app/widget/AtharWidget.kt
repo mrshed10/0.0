@@ -553,15 +553,7 @@ private fun DotsContent(d: WidgetData.Dots, ws: WidgetStyle, text: Color, accent
 private fun WideClockContent(ws: WidgetStyle) {
     val context = LocalContext.current
     val (wDp, hDp) = LocalSizeDp.current
-    val digitDp = minOf(hDp * 0.28f, wDp * 0.12f).coerceIn(14f, 64f)
-    val views = remember(ws.variant, ws.textColor, digitDp) {
-        RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_wide_clock_dark else R.layout.widget_wide_clock_light).apply {
-            setTextColor(R.id.wide_hour, ws.textColor)
-            setTextColor(R.id.wide_minute, ws.textColor)
-            setTextViewTextSize(R.id.wide_hour, TypedValue.COMPLEX_UNIT_DIP, digitDp)
-            setTextViewTextSize(R.id.wide_minute, TypedValue.COMPLEX_UNIT_DIP, digitDp)
-        }
-    }
+    val views = remember(ws, wDp, hDp) { LiveClockViews.build(context, WidgetData.WideClock, ws, wDp, hDp)!! }
     Box(GlanceModifier.fillMaxSize().tapOpen("home")) {
         AndroidRemoteViews(views, GlanceModifier.fillMaxSize())
     }
@@ -572,29 +564,12 @@ private fun WideClockContent(ws: WidgetStyle) {
 private fun WorldClockContent(d: WidgetData.WorldClock, ws: WidgetStyle) {
     val context = LocalContext.current
     val (wDp, hDp) = LocalSizeDp.current
-    val timeDp = (if (ws.variant == 1) minOf(hDp * 0.17f, wDp * 0.2f) else minOf(hDp * 0.26f, wDp * 0.11f)).coerceIn(14f, 56f)
-    val views = remember(d, ws.variant, ws.textColor, ws.accentColor, timeDp) {
-        RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_world_clock_stacked else R.layout.widget_world_clock).apply {
-            listOf(
-                Triple(R.id.city1_name, R.id.city1_time, R.id.city1_ampm) to d.a,
-                Triple(R.id.city2_name, R.id.city2_time, R.id.city2_ampm) to d.b,
-            ).forEach { (ids, city) ->
-                setTextViewText(ids.first, city.name(d.arabic))
-                setTextColor(ids.first, ws.accentColor)
-                setTextColor(ids.second, ws.textColor)
-                setTextColor(ids.third, ws.textColor)
-                setTextViewTextSize(ids.second, TypedValue.COMPLEX_UNIT_DIP, timeDp)
-                setTextViewTextSize(ids.first, TypedValue.COMPLEX_UNIT_DIP, (timeDp * 0.4f).coerceIn(9f, 18f))
-                setTextViewTextSize(ids.third, TypedValue.COMPLEX_UNIT_DIP, (timeDp * 0.36f).coerceIn(8f, 16f))
-                setString(ids.second, "setTimeZone", city.zone)
-                setString(ids.third, "setTimeZone", city.zone)
-            }
-        }
-    }
+    val views = remember(d, ws, wDp, hDp) { LiveClockViews.build(context, d, ws, wDp, hDp)!! }
     Box(GlanceModifier.fillMaxSize().tapOpen("home")) {
         AndroidRemoteViews(views, GlanceModifier.fillMaxSize())
     }
 }
+
 
 /** All upcoming salaries and appointments with the days left for each; the list scrolls. */
 @Composable
@@ -654,20 +629,7 @@ private fun pill(context: Context, color: Color): android.graphics.Bitmap {
 private fun ClockContent(d: WidgetData.Clock, ws: WidgetStyle, small: Boolean, text: Color) {
     val context = LocalContext.current
     val (wDp, hDp) = LocalSizeDp.current
-    val timeDp = minOf(hDp * (if (ws.variant == 1) 0.55f else 0.42f), wDp * 0.24f).coerceIn(18f, 110f)
-    val views = remember(d.analog, ws.fontId, ws.variant, ws.textColor, ws.accentColor, timeDp) {
-        if (d.analog) {
-            RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_analog_dark else R.layout.widget_analog_light)
-        } else {
-            RemoteViews(context.packageName, ClockLayouts.digital(ws.fontId)).apply {
-                setTextColor(R.id.clock_time, ws.textColor)
-                setTextColor(R.id.clock_date, ws.accentColor)
-                setTextViewTextSize(R.id.clock_time, TypedValue.COMPLEX_UNIT_DIP, timeDp)
-                setTextViewTextSize(R.id.clock_date, TypedValue.COMPLEX_UNIT_DIP, (timeDp * 0.26f).coerceIn(10f, 22f))
-                if (ws.variant == 1) setViewVisibility(R.id.clock_date, View.GONE)
-            }
-        }
-    }
+    val views = remember(d, ws, wDp, hDp) { LiveClockViews.build(context, d, ws, wDp, hDp)!! }
     Column(
         GlanceModifier.fillMaxSize().tapOpen("home"),
         horizontalAlignment = Alignment.CenterHorizontally,

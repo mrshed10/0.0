@@ -27,6 +27,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -79,21 +81,27 @@ fun WidgetPreview(
     val ratio = size?.let { (it.width.value / it.height.value).coerceIn(0.5f, 4f) } ?: if (wide) 2.1f else 1f
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(ratio)) {
         val target = size ?: DpSize(maxWidth, maxHeight)
-        val views by produceState<RemoteViews?>(null, config, data, target) {
-            value = if (data == WidgetData.Unconfigured) null else WidgetPreviewRenderer.render(context, config, data, target)
-        }
-        val real = views
-        if (real != null) {
-            AndroidView(
-                factory = { FrameLayout(it) },
-                update = { frame ->
-                    frame.removeAllViews()
-                    runCatching { frame.addView(real.apply(frame.context, frame)) }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
+        if (LiveClockViews.isLiveClock(data)) {
+            // Clocks: the widget's own backdrop + the same live clock views, drawn directly.
+            LiveClockPreview(config, data, target)
         } else {
-            ComposePreview(config, data, wide)
+            val views by produceState<RemoteViews?>(null, config, data, target) {
+                value = if (data == WidgetData.Unconfigured) null else WidgetPreviewRenderer.render(context, config, data, target)
+            }
+            var failed by remember(views) { mutableStateOf(false) }
+            val real = views
+            if (real != null && !failed) {
+                AndroidView(
+                    factory = { FrameLayout(it) },
+                    update = { frame ->
+                        frame.removeAllViews()
+                        runCatching { frame.addView(real.apply(frame.context, frame)) }.onFailure { failed = true }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                ComposePreview(config, data, wide)
+            }
         }
         // Catch all taps: the preview is not interactive.
         Box(
@@ -469,6 +477,50 @@ private fun WidePreview(dark: Boolean, text: Color) {
             PText(DateTimeFormatter.ofPattern("h").format(now), text, 34.sp, bold = true)
             Spacer(Modifier.weight(1f))
             PText(DateTimeFormatter.ofPattern("mm").format(now), text, 34.sp, bold = true)
+        }
+    }
+}
+
+/** Clock preview built from the exact views the widget uses. Falls back to a drawn look-alike. */
+@Composable
+private fun LiveClockPreview(config: WidgetConfig, data: WidgetData, target: DpSize) {
+    val context = LocalContext.current
+    val style = config.style
+    val density = LocalDensity.current
+    val wPx = with(density) { target.width.roundToPx() }.coerceAtLeast(8)
+    val hPx = with(density) { target.height.roundToPx() }.coerceAtLeast(8)
+    val backdrop by produceState<Bitmap?>(null, style, wPx, hPx) {
+        value = withContext(Dispatchers.Default) { WidgetBackground.render(context, style, wPx, hPx) }
+    }
+    val wDp = target.width.value
+    val hDp = target.height.value
+    val pad = LiveClockViews.paddingDp(wDp, hDp)
+    var failed by remember(data, style, wDp, hDp) { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        backdrop?.let {
+            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize())
+        }
+        if (failed) {
+            Box(Modifier.fillMaxSize().padding(pad.dp)) {
+                CompositionLocalProvider(LocalPreviewFont provides FontFamily.Default) { PreviewContent(data, style, wDp < 200f) }
+            }
+        } else {
+            Column(Modifier.fillMaxSize().padding(pad.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                AndroidView(
+                    factory = { FrameLayout(it) },
+                    update = { frame ->
+                        frame.removeAllViews()
+                        runCatching {
+                            val views = LiveClockViews.build(frame.context, data, style, wDp, hDp) ?: error("no views")
+                            frame.addView(views.apply(frame.context, frame))
+                        }.onFailure { failed = true }
+                    },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                if (data is WidgetData.Clock && !data.analog && style.variant == 0 && wDp >= 170f && hDp >= 120f) {
+                    Text(data.hijri, color = Color(style.textColor).copy(alpha = 0.8f), fontSize = 12.sp, maxLines = 1)
+                }
+            }
         }
     }
 }
