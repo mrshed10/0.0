@@ -201,8 +201,35 @@ class FloatingService : Service() {
             item.setOnGenericMotionListener { _, e -> handleMiddleGeneric(e) }
             grid.addView(item)
         }
+        // اختصارات التطبيقات
+        val apps = Prefs.shortcuts(this).filter { AppRepository.isInstalled(this, it) }
+        val appsGrid = root.findViewById<GridLayout>(R.id.appsGrid)
+        appsGrid.columnCount = apps.size.coerceIn(1, 6)
+        for (pkg in apps) {
+            appsGrid.addView(buildAppItem(appsGrid, AppRepository.icon(this, pkg), AppRepository.label(this, pkg)) {
+                collapse()
+                handler.postDelayed({ MultiWindow.launchApp(this, pkg) }, 120)
+            })
+        }
+        root.findViewById<View>(R.id.appsSection).visibility =
+            if (apps.isEmpty()) View.GONE else View.VISIBLE
+
+        // مجموعات التطبيقات
+        val groups = Prefs.groups(this)
+        val groupsGrid = root.findViewById<GridLayout>(R.id.groupsGrid)
+        groupsGrid.columnCount = groups.size.coerceIn(1, 4)
+        for (group in groups) {
+            val icon = group.packages.firstOrNull()?.let { AppRepository.icon(this, it) }
+            groupsGrid.addView(buildAppItem(groupsGrid, icon, group.name, badge = true) {
+                collapse()
+                handler.postDelayed({ MultiWindow.launchGroup(this, group) }, 120)
+            })
+        }
+        root.findViewById<View>(R.id.groupsSection).visibility =
+            if (groups.isEmpty()) View.GONE else View.VISIBLE
+
         root.findViewById<TextView>(R.id.emptyText).visibility =
-            if (visible.isEmpty()) View.VISIBLE else View.GONE
+            if (visible.isEmpty() && apps.isEmpty() && groups.isEmpty()) View.VISIBLE else View.GONE
 
         // النقر خارج القائمة ⇒ العودة للأيقونة
         root.setOnTouchListener { _, e ->
@@ -242,6 +269,23 @@ class FloatingService : Service() {
             Log.e(TAG, "addView(panel) failed", e)
             showBubble()
         }
+    }
+
+    private fun buildAppItem(
+        parent: GridLayout,
+        icon: android.graphics.drawable.Drawable?,
+        label: String,
+        badge: Boolean = false,
+        onClick: () -> Unit
+    ): View {
+        val item = LayoutInflater.from(this).inflate(R.layout.floating_app_item, parent, false)
+        val iv = item.findViewById<ImageView>(R.id.icon)
+        if (icon != null) iv.setImageDrawable(icon) else iv.setImageResource(R.drawable.ic_bubble)
+        item.findViewById<TextView>(R.id.label).text = label
+        item.findViewById<View>(R.id.badge).visibility = if (badge) View.VISIBLE else View.GONE
+        item.setOnClickListener { onClick() }
+        item.setOnGenericMotionListener { _, e -> handleMiddleGeneric(e) }
+        return item
     }
 
     private fun collapse() {

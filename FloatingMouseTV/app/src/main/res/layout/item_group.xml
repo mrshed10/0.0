@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- صف مجموعة تطبيقات في الإعدادات -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:background="@color/bg"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/groupName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/groupDetails"
+            style="@style/Hint"
+            android:layout_marginTop="2dp" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/groupRun"
+        style="@style/RowButton"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/button_primary_bg"
+        android:text="@string/group_run" />
+
+    <Button
+        android:id="@+id/groupEdit"
+        style="@style/RowButton"
+        android:layout_marginStart="8dp"
+        android:text="@string/edit" />
+
+    <Button
+        android:id="@+id/groupDelete"
+        style="@style/RowButton"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/button_stop_bg"
+        android:text="@string/delete" />
+</LinearLayout>

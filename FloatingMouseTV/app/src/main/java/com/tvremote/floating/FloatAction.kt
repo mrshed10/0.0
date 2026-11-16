@@ -22,7 +22,8 @@ enum class FloatAction(
     PLAY_PAUSE(R.string.act_play_pause, R.drawable.ic_play_pause, false, true),
     BACK(R.string.act_back, R.drawable.ic_back, true, true),
     HOME(R.string.act_home, R.drawable.ic_home, true, true),
-    RECENTS(R.string.act_recents, R.drawable.ic_recents, true, true);
+    RECENTS(R.string.act_recents, R.drawable.ic_recents, true, true),
+    SPLIT_SCREEN(R.string.act_split, R.drawable.ic_split, true, true);
 }
 
 /** تنفيذ الأوامر: الصوت والوسائط عبر AudioManager، وأوامر النظام عبر خدمة إمكانية الوصول */
@@ -52,6 +53,8 @@ object ActionRunner {
                 FloatAction.BACK -> return global(context, android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
                 FloatAction.HOME -> return global(context, android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
                 FloatAction.RECENTS -> return global(context, android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS)
+                // دخول/خروج تقسيم الشاشة (العودة للشاشة الكاملة)
+                FloatAction.SPLIT_SCREEN -> return MultiWindow.toggleSplit(context)
             }
             true
         } catch (e: Exception) {

@@ -46,4 +46,17 @@ object Prefs {
     /** رمز الزر الذي يرسله الجهاز عند الضغط على الزر الأوسط (إن كان يرسله كزر) */
     fun middleKeyCode(c: Context) = p(c).getInt("middle_key", -1)
     fun setMiddleKeyCode(c: Context, v: Int) = p(c).edit().putInt("middle_key", v).apply()
+
+    /** اختصارات التطبيقات المفضلة (بالترتيب) */
+    fun shortcuts(c: Context): List<String> =
+        (p(c).getString("shortcuts", "") ?: "").split(',').filter { it.isNotBlank() }
+
+    fun setShortcuts(c: Context, list: List<String>) =
+        p(c).edit().putString("shortcuts", list.joinToString(",")).apply()
+
+    /** مجموعات التطبيقات */
+    fun groups(c: Context): List<AppGroup> = AppGroup.listFromJson(p(c).getString("groups", "[]"))
+
+    fun setGroups(c: Context, list: List<AppGroup>) =
+        p(c).edit().putString("groups", AppGroup.listToJson(list)).apply()
 }

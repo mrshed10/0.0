@@ -35,6 +35,10 @@ class MainActivity : Activity() {
     private lateinit var middleTestButton: Button
     private lateinit var middleStatus: TextView
     private lateinit var guardStatus: TextView
+    private lateinit var shortcutsSummary: TextView
+    private lateinit var groupsContainer: LinearLayout
+    private lateinit var splitStatus: TextView
+    private lateinit var freeformStatus: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +65,14 @@ class MainActivity : Activity() {
 
         setupSeekBars()
         buildActionCheckboxes()
+
+        shortcutsSummary = findViewById(R.id.shortcutsSummary)
+        groupsContainer = findViewById(R.id.groupsContainer)
+        splitStatus = findViewById(R.id.splitStatus)
+        freeformStatus = findViewById(R.id.freeformStatus)
+        findViewById<Button>(R.id.shortcutsButton).setOnClickListener { chooseShortcuts() }
+        findViewById<Button>(R.id.addGroupButton).setOnClickListener { createGroup() }
+        findViewById<Button>(R.id.enableMultiWindowButton).setOnClickListener { enableMultiWindow() }
 
         middleCheck.isChecked = Prefs.isMiddleBackEnabled(this)
         middleCheck.setOnCheckedChangeListener { _, checked ->
@@ -112,6 +124,190 @@ class MainActivity : Activity() {
             if (AccessibilityGuard.hasPermission(this)) R.string.guard_ok else R.string.guard_missing
         )
         updateMiddleStatus()
+        renderShortcuts()
+        renderGroups()
+        updateMultiWindowStatus()
+    }
+
+    // ───────────────────────── اختصارات التطبيقات ─────────────────────────
+
+    private fun renderShortcuts() {
+        val list = Prefs.shortcuts(this).filter { AppRepository.isInstalled(this, it) }
+        shortcutsSummary.text = if (list.isEmpty()) getString(R.string.shortcuts_none)
+        else list.joinToString("  •  ") { AppRepository.label(this, it) }
+    }
+
+    private fun chooseShortcuts() {
+        val apps = AppRepository.launchableApps(this)
+        if (apps.isEmpty()) {
+            Toast.makeText(this, R.string.no_apps, Toast.LENGTH_LONG).show()
+            return
+        }
+        val current = Prefs.shortcuts(this)
+        val checked = BooleanArray(apps.size) { apps[it].packageName in current }
+
+        AlertDialog.Builder(this, DIALOG_THEME)
+            .setTitle(R.string.shortcuts_choose)
+            .setMultiChoiceItems(apps.map { it.label }.toTypedArray(), checked) { _, i, on ->
+                checked[i] = on
+            }
+            .setPositiveButton(R.string.save) { _, _ ->
+                val chosen = apps.indices.filter { checked[it] }.map { apps[it].packageName }
+                // نحافظ على الترتيب القديم ونضيف الجديد في النهاية
+                val ordered = current.filter { it in chosen } + chosen.filter { it !in current }
+                Prefs.setShortcuts(this, ordered)
+                renderShortcuts()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    // ───────────────────────── مجموعات التطبيقات ─────────────────────────
+
+    private fun renderGroups() {
+        groupsContainer.removeAllViews()
+        for (group in Prefs.groups(this)) {
+            val row = layoutInflater.inflate(R.layout.item_group, groupsContainer, false)
+            row.findViewById<TextView>(R.id.groupName).text = group.name
+            row.findViewById<TextView>(R.id.groupDetails).text = getString(
+                R.string.group_details,
+                getString(group.mode.labelRes),
+                group.packages.joinToString(" + ") { AppRepository.label(this, it) }
+            )
+            row.findViewById<Button>(R.id.groupRun).setOnClickListener {
+                MultiWindow.launchGroup(this, group)
+            }
+            row.findViewById<Button>(R.id.groupEdit).setOnClickListener { createGroup(group) }
+            row.findViewById<Button>(R.id.groupDelete).setOnClickListener {
+                AlertDialog.Builder(this, DIALOG_THEME)
+                    .setTitle(R.string.delete)
+                    .setMessage(getString(R.string.group_delete_confirm, group.name))
+                    .setPositiveButton(R.string.delete) { _, _ ->
+                        Prefs.setGroups(this, Prefs.groups(this).filter { it.id != group.id })
+                        renderGroups()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
+            groupsContainer.addView(row)
+        }
+    }
+
+    /** الخطوة 1: اختيار التطبيقات (2 إلى 4) */
+    private fun createGroup(existing: AppGroup? = null) {
+        val apps = AppRepository.launchableApps(this)
+        if (apps.size < 2) {
+            Toast.makeText(this, R.string.no_apps, Toast.LENGTH_LONG).show()
+            return
+        }
+        val selected = (existing?.packages ?: emptyList()).filter { pkg -> apps.any { it.packageName == pkg } }
+            .toMutableList()
+        val checked = BooleanArray(apps.size) { apps[it].packageName in selected }
+
+        val dialog = AlertDialog.Builder(this, DIALOG_THEME)
+            .setTitle(R.string.group_pick_apps)
+            .setMultiChoiceItems(apps.map { it.label }.toTypedArray(), checked) { _, i, on ->
+                checked[i] = on
+                val pkg = apps[i].packageName
+                if (on) selected += pkg else selected -= pkg // ترتيب الاختيار = ترتيب الفتح
+            }
+            .setPositiveButton(R.string.next, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (selected.size !in 2..4) {
+                    Toast.makeText(this, R.string.group_count_error, Toast.LENGTH_SHORT).show()
+                } else {
+                    dialog.dismiss()
+                    chooseGroupMode(existing, selected.toList())
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    /** الخطوة 2: طريقة الفتح */
+    private fun chooseGroupMode(existing: AppGroup?, packages: List<String>) {
+        val modes = LaunchMode.values()
+        val labels = modes.map { mode ->
+            val support = when (mode) {
+                LaunchMode.SEQUENTIAL -> ""
+                LaunchMode.SPLIT ->
+                    if (MultiWindow.splitSupported(this)) "" else getString(R.string.mode_unsupported_suffix)
+                LaunchMode.WINDOWS ->
+                    if (MultiWindow.freeformSupported(this)) "" else getString(R.string.mode_unsupported_suffix)
+            }
+            getString(mode.labelRes) + support
+        }.toTypedArray()
+        var choice = modes.indexOf(existing?.mode ?: LaunchMode.SPLIT)
+
+        AlertDialog.Builder(this, DIALOG_THEME)
+            .setTitle(R.string.group_pick_mode)
+            .setSingleChoiceItems(labels, choice) { _, i -> choice = i }
+            .setPositiveButton(R.string.next) { _, _ -> nameGroup(existing, packages, modes[choice]) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    /** الخطوة 3: الاسم ثم الحفظ */
+    private fun nameGroup(existing: AppGroup?, packages: List<String>, mode: LaunchMode) {
+        val input = android.widget.EditText(this).apply {
+            setText(existing?.name ?: packages.joinToString(" + ") { AppRepository.label(this@MainActivity, it) })
+            setSelectAllOnFocus(true)
+            setSingleLine()
+        }
+        AlertDialog.Builder(this, DIALOG_THEME)
+            .setTitle(R.string.group_name)
+            .setView(input)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text.toString().trim().ifEmpty { getString(R.string.group_default_name) }
+                val group = AppGroup(
+                    id = existing?.id ?: System.currentTimeMillis().toString(),
+                    name = name,
+                    packages = packages,
+                    mode = mode
+                )
+                val list = Prefs.groups(this).toMutableList()
+                val index = list.indexOfFirst { it.id == group.id }
+                if (index >= 0) list[index] = group else list += group
+                Prefs.setGroups(this, list)
+                renderGroups()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    // ───────────────────────── تقسيم الشاشة ─────────────────────────
+
+    private fun updateMultiWindowStatus() {
+        splitStatus.setText(
+            if (MultiWindow.splitSupported(this)) R.string.mw_split_yes else R.string.mw_split_no
+        )
+        freeformStatus.setText(
+            if (MultiWindow.freeformSupported(this)) R.string.mw_free_yes else R.string.mw_free_no
+        )
+    }
+
+    private fun enableMultiWindow() {
+        if (MultiWindow.developerFlagsEnabled(this)) {
+            showInfo(R.string.mw_title, getString(R.string.mw_already))
+            return
+        }
+        if (AccessibilityGuard.hasPermission(this) && MultiWindow.enableDeveloperFlags(this)) {
+            showInfo(R.string.mw_title, getString(R.string.mw_enabled_reboot))
+        } else {
+            showInfo(R.string.mw_title, getString(R.string.adb_hint) + "\n\n" + getString(R.string.mw_adb_command))
+        }
+        updateMultiWindowStatus()
+    }
+
+    private fun showInfo(titleRes: Int, message: String) {
+        AlertDialog.Builder(this, DIALOG_THEME)
+            .setTitle(titleRes)
+            .setMessage(message)
+            .setPositiveButton(R.string.ok, null)
+            .show()
     }
 
     private fun toggleFloating() {
@@ -269,7 +465,6 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        @Suppress("unused")
-        private const val TAG = "MainActivity"
+        private val DIALOG_THEME = android.R.style.Theme_Material_Dialog_Alert
     }
 }

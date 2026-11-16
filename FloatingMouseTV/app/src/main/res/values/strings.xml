@@ -66,6 +66,56 @@
     <string name="notif_text">انقر لفتح الإعدادات</string>
     <string name="notif_stop">إيقاف</string>
 
+    <!-- اختصارات التطبيقات -->
+    <string name="shortcuts_title">٦) اختصارات التطبيقات في القائمة العائمة</string>
+    <string name="shortcuts_choose">اختيار التطبيقات المفضلة</string>
+    <string name="shortcuts_none">لم تختر أي تطبيق بعد</string>
+    <string name="no_apps">لم يتم العثور على تطبيقات مثبتة</string>
+    <string name="app_not_found">تعذّر فتح التطبيق (ربما أُزيل من الجهاز)</string>
+
+    <!-- مجموعات التطبيقات -->
+    <string name="groups_title">٧) مجموعات التطبيقات (فتح عدة تطبيقات بنقرة واحدة)</string>
+    <string name="groups_hint">مثال: يوتيوب + المتصفح. تظهر كل مجموعة كزر في القائمة العائمة.</string>
+    <string name="group_add">＋ مجموعة جديدة</string>
+    <string name="group_pick_apps">اختر من 2 إلى 4 تطبيقات (بترتيب الفتح)</string>
+    <string name="group_count_error">اختر من 2 إلى 4 تطبيقات</string>
+    <string name="group_pick_mode">طريقة فتح المجموعة</string>
+    <string name="group_name">اسم المجموعة</string>
+    <string name="group_default_name">مجموعتي</string>
+    <string name="group_details">%1$s: %2$s</string>
+    <string name="group_run">تشغيل</string>
+    <string name="group_delete_confirm">حذف المجموعة «%1$s»؟</string>
+    <string name="mode_sequential">فتح متتالي (الأخير أمامك)</string>
+    <string name="mode_split">تقسيم الشاشة (أول تطبيقين)</string>
+    <string name="mode_windows">نوافذ متجاورة (Freeform)</string>
+    <string name="mode_unsupported_suffix"> — غير مدعوم حالياً في جهازك</string>
+    <string name="mode_fallback">الطريقة المختارة غير مدعومة في جهازك، تم الفتح بأفضل طريقة متاحة</string>
+
+    <!-- تقسيم الشاشة -->
+    <string name="mw_title">٨) تقسيم الشاشة والنوافذ المتعددة</string>
+    <string name="mw_split_yes">✔ تقسيم الشاشة: مدعوم في جهازك</string>
+    <string name="mw_split_no">✖ تقسيم الشاشة: غير مدعوم في نظام جهازك</string>
+    <string name="mw_free_yes">✔ النوافذ المتجاورة (Freeform): مفعّلة</string>
+    <string name="mw_free_no">✖ النوافذ المتجاورة (Freeform): غير مفعّلة</string>
+    <string name="mw_hint">أغلب أنظمة أندرويد تي في تُغلق تعدد النوافذ من المصنع. الزر التالي يفعّل خياري المطوّر «فرض قابلية تغيير حجم الأنشطة» و«النوافذ الحرة»، ثم أعد تشغيل الجهاز. النتيجة تختلف من جهاز لآخر، وبعض التطبيقات (مثل يوتيوب للتلفاز) قد ترفض العمل في نافذة.</string>
+    <string name="mw_enable">تفعيل دعم النوافذ المتعددة</string>
+    <string name="mw_enabled_reboot">تم التفعيل ✔
+أعد تشغيل الـ TV Box الآن لتطبيق التغيير.</string>
+    <string name="mw_already">الخياران مفعّلان بالفعل. إن لم يعمل التقسيم بعد إعادة التشغيل فنظام جهازك لا يدعمه.</string>
+    <string name="mw_adb_command">adb shell settings put global force_resizable_activities 1
+adb shell settings put global enable_freeform_support 1
+adb reboot
+
+(أو امنح التطبيق صلاحية WRITE_SECURE_SETTINGS ثم اضغط الزر مرة أخرى)</string>
+    <string name="split_not_supported">تقسيم الشاشة غير مدعوم في هذا التطبيق أو في نظام جهازك</string>
+    <string name="act_split">تقسيم / ملء الشاشة</string>
+    <string name="panel_apps">التطبيقات</string>
+    <string name="panel_groups">المجموعات</string>
+
+    <string name="next">التالي</string>
+    <string name="save">حفظ</string>
+    <string name="edit">تعديل</string>
+    <string name="delete">حذف</string>
     <string name="ok">حسناً</string>
     <string name="cancel">إلغاء</string>
 </resources>

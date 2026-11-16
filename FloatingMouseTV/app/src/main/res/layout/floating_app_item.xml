@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- أيقونة تطبيق أو مجموعة داخل اللوحة العائمة -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="104dp"
+    android:layout_height="108dp"
+    android:layout_margin="6dp"
+    android:background="@drawable/glass_item_bg"
+    android:clickable="true"
+    android:focusable="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <ImageView
+            android:id="@+id/icon"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:id="@+id/label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="@color/glass_text"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- شارة تميّز المجموعة عن التطبيق الواحد -->
+    <ImageView
+        android:id="@+id/badge"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="6dp"
+        android:background="@drawable/badge_bg"
+        android:importantForAccessibility="no"
+        android:padding="3dp"
+        android:src="@drawable/ic_split"
+        android:visibility="gone" />
+</FrameLayout>

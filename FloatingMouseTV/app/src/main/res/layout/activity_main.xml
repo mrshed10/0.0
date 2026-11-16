@@ -132,6 +132,70 @@
                 android:orientation="vertical" />
         </LinearLayout>
 
+        <!-- 6) اختصارات التطبيقات -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/shortcuts_title" />
+
+            <TextView
+                android:id="@+id/shortcutsSummary"
+                style="@style/Hint" />
+
+            <Button
+                android:id="@+id/shortcutsButton"
+                style="@style/SmallButton"
+                android:layout_marginTop="10dp"
+                android:text="@string/shortcuts_choose" />
+        </LinearLayout>
+
+        <!-- 7) مجموعات التطبيقات -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/groups_title" />
+
+            <TextView
+                style="@style/Hint"
+                android:text="@string/groups_hint" />
+
+            <LinearLayout
+                android:id="@+id/groupsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/addGroupButton"
+                style="@style/SmallButton"
+                android:layout_marginTop="10dp"
+                android:text="@string/group_add" />
+        </LinearLayout>
+
+        <!-- 8) تقسيم الشاشة والنوافذ المتعددة -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/mw_title" />
+
+            <TextView
+                android:id="@+id/splitStatus"
+                style="@style/Label" />
+
+            <TextView
+                android:id="@+id/freeformStatus"
+                style="@style/Label"
+                android:layout_marginTop="4dp" />
+
+            <TextView
+                style="@style/Hint"
+                android:layout_marginTop="8dp"
+                android:text="@string/mw_hint" />
+
+            <Button
+                android:id="@+id/enableMultiWindowButton"
+                style="@style/SmallButton"
+                android:layout_marginTop="10dp"
+                android:text="@string/mw_enable" />
+        </LinearLayout>
+
         <!-- الزر الأوسط للماوس -->
         <LinearLayout style="@style/Card">
 
