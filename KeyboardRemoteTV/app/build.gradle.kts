@@ -11,8 +11,8 @@ android {
         applicationId = "com.tvremote.keyboard"
         minSdk = 21          // يعمل على معظم أجهزة TV Box القديمة (Android 5+)
         targetSdk = 35
-        versionCode = 3
-        versionName = "2.1"
+        versionCode = 4
+        versionName = "2.2"
     }
 
     buildTypes {

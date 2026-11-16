@@ -55,6 +55,16 @@
     <string name="guard_turn_on">تشغيل الحماية</string>
     <string name="guard_repaired">تمت إعادة تفعيل الخدمة تلقائياً ✔</string>
 
+    <!-- النافذة العائمة -->
+    <string name="overlay_on">🪟 النافذة العائمة: تعمل — التطبيق يبقى فوق كل التطبيقات ولا يُغلق</string>
+    <string name="overlay_no_permission">⚠ النافذة العائمة: تحتاج صلاحية «الظهور فوق التطبيقات»</string>
+    <string name="overlay_help">اضغط «منح الصلاحية» وفعّل «ريموت الكيبورد»، أو إذا لم تظهر الشاشة نفّذ هذا الأمر مرة واحدة عبر ADB:</string>
+    <string name="overlay_adb_command">appops set com.tvremote.keyboard SYSTEM_ALERT_WINDOW allow</string>
+    <string name="overlay_grant">منح الصلاحية</string>
+    <string name="overlay_icon_show">إظهار أيقونة عائمة</string>
+    <string name="overlay_icon_hide">إخفاء الأيقونة العائمة</string>
+    <string name="overlay_settings_missing">شاشة الصلاحية غير موجودة في هذا الجهاز، استخدم أمر ADB الظاهر</string>
+
     <!-- الإشعار الدائم -->
     <string name="notif_channel">تشغيل الخدمة في الخلفية</string>
     <string name="notif_title">ريموت الكيبورد يعمل</string>

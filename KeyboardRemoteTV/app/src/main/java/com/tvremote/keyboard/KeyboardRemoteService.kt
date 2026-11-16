@@ -32,6 +32,7 @@ class KeyboardRemoteService : AccessibilityService() {
 
     private lateinit var audioManager: AudioManager
     private var connected = false
+    private var overlay: FloatingOverlay? = null
 
     // ───────────────────────── دورة الحياة ─────────────────────────
 
@@ -57,7 +58,11 @@ class KeyboardRemoteService : AccessibilityService() {
             Log.w(TAG, "startService(self) failed", e)
         }
 
-        // ثالثاً: نشغّل الحارس الدوري
+        // ثالثاً: نافذة عائمة فوق التطبيقات ⇒ أولوية "واجهة ظاهرة" ضد الإغلاق
+        instance = this
+        overlay = FloatingOverlay(this).also { it.show() }
+
+        // رابعاً: نشغّل الحارس الدوري
         ServiceGuard.schedulePeriodic(this)
         Log.i(TAG, "Keyboard remote service connected")
     }
@@ -84,7 +89,15 @@ class KeyboardRemoteService : AccessibilityService() {
         super.onTaskRemoved(rootIntent)
     }
 
+    /** تُستدعى من الواجهة بعد منح صلاحية الظهور أو تغيير إعداد الأيقونة */
+    fun refreshOverlay() {
+        overlay?.show()
+    }
+
     override fun onUnbind(intent: Intent?): Boolean {
+        overlay?.hide()
+        overlay = null
+        instance = null
         connected = false
         isRunning = false
         // لا نوقف الإشعار هنا: إن كان الفصل بسبب إغلاق غير مقصود سيعيد الحارس الربط
@@ -93,6 +106,9 @@ class KeyboardRemoteService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        overlay?.hide()
+        overlay = null
+        instance = null
         connected = false
         isRunning = false
         stopForegroundCompat()
@@ -288,6 +304,11 @@ class KeyboardRemoteService : AccessibilityService() {
         /** تضبطه الواجهة أثناء التقاط زر جديد حتى لا تبتلع الخدمة الزر */
         @Volatile
         var captureMode = false
+
+        /** النسخة المتصلة حالياً (لتحديث النافذة العائمة من الواجهة) */
+        @Volatile
+        var instance: KeyboardRemoteService? = null
+            private set
 
         fun component(context: Context) =
             ComponentName(context, KeyboardRemoteService::class.java)

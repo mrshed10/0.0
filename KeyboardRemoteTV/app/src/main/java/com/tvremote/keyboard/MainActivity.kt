@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
@@ -25,6 +27,11 @@ class MainActivity : Activity() {
     private lateinit var guardHelpText: TextView
     private lateinit var guardCommandText: TextView
     private lateinit var guardToggleButton: Button
+    private lateinit var overlayStatusText: TextView
+    private lateinit var overlayHelpText: TextView
+    private lateinit var overlayCommandText: TextView
+    private lateinit var overlayPermissionButton: Button
+    private lateinit var overlayIconButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +46,17 @@ class MainActivity : Activity() {
         guardHelpText = findViewById(R.id.guardHelpText)
         guardCommandText = findViewById(R.id.guardCommandText)
         guardToggleButton = findViewById(R.id.guardToggleButton)
+        overlayStatusText = findViewById(R.id.overlayStatusText)
+        overlayHelpText = findViewById(R.id.overlayHelpText)
+        overlayCommandText = findViewById(R.id.overlayCommandText)
+        overlayPermissionButton = findViewById(R.id.overlayPermissionButton)
+        overlayIconButton = findViewById(R.id.overlayIconButton)
+        overlayPermissionButton.setOnClickListener { openOverlayPermission() }
+        overlayIconButton.setOnClickListener {
+            FloatingOverlay.setIconEnabled(this, !FloatingOverlay.isIconEnabled(this))
+            KeyboardRemoteService.instance?.refreshOverlay()
+            updateOverlay()
+        }
         guardToggleButton.setOnClickListener {
             ServiceGuard.setGuardEnabled(this, !ServiceGuard.isGuardEnabled(this))
             updateGuard()
@@ -53,6 +71,8 @@ class MainActivity : Activity() {
         super.onResume()
         updateStatus()
         updateGuard()
+        updateOverlay()
+        KeyboardRemoteService.instance?.refreshOverlay() // بعد منح الصلاحية نرقّي النافذة فوراً
         renderMappings()
         ServiceGuard.schedulePeriodic(this)
         repairInBackground()
@@ -72,6 +92,35 @@ class MainActivity : Activity() {
         } else {
             statusText.setText(R.string.status_disabled)
             statusText.setBackgroundResource(R.drawable.status_disabled_bg)
+        }
+    }
+
+    // ───────────────────────── النافذة العائمة ─────────────────────────
+
+    private fun updateOverlay() {
+        val granted = FloatingOverlay.canDrawOverlays(this)
+        overlayStatusText.setText(if (granted) R.string.overlay_on else R.string.overlay_no_permission)
+        val help = if (granted) View.GONE else View.VISIBLE
+        overlayHelpText.visibility = help
+        overlayCommandText.visibility = help
+        overlayPermissionButton.visibility = help
+        overlayIconButton.setText(
+            if (FloatingOverlay.isIconEnabled(this)) R.string.overlay_icon_hide
+            else R.string.overlay_icon_show
+        )
+    }
+
+    private fun openOverlayPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName")
+                )
+            )
+        } catch (e: ActivityNotFoundException) {
+            Toast.makeText(this, R.string.overlay_settings_missing, Toast.LENGTH_LONG).show()
         }
     }
 

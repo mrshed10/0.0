@@ -13,6 +13,8 @@
     <!-- الخدمة الأمامية (Foreground Service) لحماية الخدمة من الإغلاق -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- نافذة عائمة فوق التطبيقات لرفع أولوية التطبيق ومنع إغلاقه -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- لتشغيل الحارس بعد إقلاع الجهاز -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- تُمنح مرة واحدة عبر ADB حتى يعيد التطبيق تفعيل خدمته إذا أطفأها النظام:
