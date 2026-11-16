@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- أيقونة التطبيق: دائرة زجاجية عليها شبكة أزرار -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path android:fillColor="#FF2F80ED" android:pathData="M24,2a22,22 0,1 1,0 44a22,22 0,1 1,0 -44z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M14,14h6v6h-6zM21,14h6v6h-6zM28,14h6v6h-6zM14,21h6v6h-6zM21,21h6v6h-6zM28,21h6v6h-6zM14,28h6v6h-6zM21,28h6v6h-6zM28,28h6v6h-6z" />
+</vector>

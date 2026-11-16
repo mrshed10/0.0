@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- إطار يظهر حول العنصر المحدد بالريموت -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape><solid android:color="#22FFFFFF" /><corners android:radius="8dp" />
+            <stroke android:width="2dp" android:color="@color/accent_light" /></shape>
+    </item>
+    <item><shape><solid android:color="@android:color/transparent" /></shape></item>
+</selector>

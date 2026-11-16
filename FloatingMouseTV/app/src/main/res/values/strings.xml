@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">القائمة العائمة</string>
+    <string name="subtitle">تحكّم كامل بالـ TV Box عبر الماوس من خلال زر عائم يظهر فوق جميع التطبيقات</string>
+
+    <!-- الخطوات -->
+    <string name="step_overlay">١) صلاحية الظهور فوق التطبيقات</string>
+    <string name="overlay_ok">✔ ممنوحة</string>
+    <string name="overlay_missing">✖ غير ممنوحة</string>
+    <string name="grant_overlay">منح الصلاحية</string>
+    <string name="need_overlay">امنح صلاحية الظهور فوق التطبيقات أولاً</string>
+    <string name="overlay_adb_title">شاشة الصلاحية غير موجودة في جهازك</string>
+    <string name="overlay_adb_command">adb shell appops set com.tvremote.floating SYSTEM_ALERT_WINDOW allow</string>
+
+    <string name="step_a11y">٢) إمكانية الوصول (لأزرار الرجوع والرئيسية والتطبيقات الأخيرة)</string>
+    <string name="a11y_ok">✔ مفعّلة</string>
+    <string name="a11y_missing">✖ غير مفعّلة</string>
+    <string name="grant_a11y">تفعيل الخدمة</string>
+    <string name="a11y_adb_title">شاشة إمكانية الوصول غير موجودة في جهازك</string>
+    <string name="a11y_adb_command">adb shell settings put secure enabled_accessibility_services com.tvremote.floating/com.tvremote.floating.ControlAccessibilityService\nadb shell settings put secure accessibility_enabled 1</string>
+    <string name="adb_hint">نفّذ هذا الأمر مرة واحدة من كمبيوتر أو جوال متصل بالجهاز عبر ADB:</string>
+    <string name="guard_ok">🛡 الحماية التلقائية تعمل: يعيد التطبيق تفعيل الخدمة بنفسه إذا أطفأها النظام</string>
+    <string name="guard_missing">🛡 لمنع إيقاف الخدمة نهائياً، نفّذ هذا الأمر مرة واحدة عبر ADB:</string>
+    <string name="guard_adb_command">adb shell pm grant com.tvremote.floating android.permission.WRITE_SECURE_SETTINGS</string>
+
+    <string name="toggle_start">▶ تشغيل القائمة العائمة</string>
+    <string name="toggle_stop">■ إيقاف القائمة العائمة</string>
+
+    <!-- المظهر -->
+    <string name="appearance">٤) شكل الأيقونة العائمة</string>
+    <string name="size_label">الحجم: %1$d</string>
+    <string name="alpha_label">الوضوح: %1$d٪ (أقل = أكثر شفافية)</string>
+
+    <string name="visible_buttons">٥) الأزرار الظاهرة في القائمة العائمة</string>
+
+    <!-- الزر الأوسط -->
+    <string name="middle_title">الزر الأوسط للماوس</string>
+    <string name="middle_check">الزر الأوسط = رجوع</string>
+    <string name="middle_test">اختبار الزر الأوسط</string>
+    <string name="middle_test_title">اختبار الزر الأوسط</string>
+    <string name="middle_test_message">اضغط الآن على الزر الأوسط للماوس (العجلة) والمؤشر داخل هذه النافذة...</string>
+    <string name="middle_status_key">✔ يعمل كرجوع في كل النظام (تم تعلّم الزر من جهازك)</string>
+    <string name="middle_status_android15">✔ يعمل كرجوع في كل النظام (Android 15+)</string>
+    <string name="middle_status_floating_only">يعمل كرجوع عند النقر به على الأيقونة أو القائمة العائمة. اضغط «اختبار» لمعرفة هل يمكن تشغيله في كل النظام على جهازك.</string>
+    <string name="middle_result_key">✔ تم! جهازك يرسل الزر الأوسط كزر، وسيعمل الآن كرجوع في كل النظام (يحتاج تفعيل إمكانية الوصول).</string>
+    <string name="middle_result_native_back">✔ جهازك يجعل هذا الزر «رجوع» تلقائياً، لا حاجة لأي إعداد.</string>
+    <string name="middle_result_android15">✔ تم التقاط الزر الأوسط، وسيعمل كرجوع في كل النظام عبر خدمة إمكانية الوصول.</string>
+    <string name="middle_result_floating_only">تم التقاط الزر الأوسط، لكن نظام جهازك (أقدم من Android 15) لا يسمح لأي تطبيق بالتقاطه خارج نوافذه. سيعمل كرجوع عند النقر به على الأيقونة أو القائمة العائمة.</string>
+
+    <!-- القائمة العائمة -->
+    <string name="panel_title">انقر خارج القائمة للإغلاق</string>
+    <string name="panel_empty">لا توجد أزرار ظاهرة. اخترها من إعدادات التطبيق.</string>
+    <string name="need_accessibility">فعّل خدمة إمكانية الوصول من تطبيق «القائمة العائمة» لتشغيل هذا الزر</string>
+
+    <string name="act_volume_up">رفع الصوت</string>
+    <string name="act_volume_down">خفض الصوت</string>
+    <string name="act_mute">كتم الصوت</string>
+    <string name="act_play_pause">تشغيل / إيقاف</string>
+    <string name="act_back">رجوع</string>
+    <string name="act_home">الرئيسية</string>
+    <string name="act_recents">التطبيقات الأخيرة</string>
+
+    <!-- الخدمات والإشعار -->
+    <string name="a11y_label">القائمة العائمة</string>
+    <string name="a11y_description">تُستخدم هذه الخدمة فقط لتنفيذ أوامر الرجوع والشاشة الرئيسية والتطبيقات الأخيرة من القائمة العائمة، ولتحويل الزر الأوسط للماوس إلى رجوع. لا تقرأ محتوى الشاشة ولا ترسل أي بيانات.</string>
+    <string name="notif_channel">تشغيل القائمة العائمة</string>
+    <string name="notif_title">القائمة العائمة تعمل</string>
+    <string name="notif_text">انقر لفتح الإعدادات</string>
+    <string name="notif_stop">إيقاف</string>
+
+    <string name="ok">حسناً</string>
+    <string name="cancel">إلغاء</string>
+</resources>

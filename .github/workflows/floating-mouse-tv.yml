@@ -1,0 +1,47 @@
+name: FloatingMouseTV build
+
+on:
+  push:
+    paths:
+      - "FloatingMouseTV/**"
+      - ".github/workflows/floating-mouse-tv.yml"
+  pull_request:
+    paths:
+      - "FloatingMouseTV/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: FloatingMouseTV
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build APKs
+        run: ./gradlew assembleDebug assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: floating-mouse-tv-apk
+          path: FloatingMouseTV/app/build/outputs/apk/**/*.apk
+      - name: Prepare APK for direct download
+        if: github.event_name != 'pull_request'
+        run: cp app/build/outputs/apk/release/app-release.apk FloatingMouseTV.apk
+      - name: Publish direct-download release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: floating-mouse-tv-latest
+          name: FloatingMouseTV (latest build)
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          body: "القائمة العائمة للتحكم بالماوس على Android TV / TV Box — أحدث نسخة مبنية تلقائياً."
+          files: FloatingMouseTV/FloatingMouseTV.apk

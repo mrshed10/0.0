@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true"
+    android:layoutDirection="rtl">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingStart="48dp"
+        android:paddingTop="28dp"
+        android:paddingEnd="48dp"
+        android:paddingBottom="40dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            android:textColor="@color/text_primary"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="@string/subtitle"
+            android:textColor="@color/text_secondary"
+            android:textSize="17sp" />
+
+        <!-- 1) صلاحية الظهور فوق التطبيقات -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/step_overlay" />
+
+            <LinearLayout style="@style/Row">
+
+                <TextView
+                    android:id="@+id/overlayStatus"
+                    style="@style/StatusPill" />
+
+                <Button
+                    android:id="@+id/overlayButton"
+                    style="@style/SmallButton"
+                    android:text="@string/grant_overlay" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 2) إمكانية الوصول -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/step_a11y" />
+
+            <LinearLayout style="@style/Row">
+
+                <TextView
+                    android:id="@+id/a11yStatus"
+                    style="@style/StatusPill" />
+
+                <Button
+                    android:id="@+id/a11yButton"
+                    style="@style/SmallButton"
+                    android:text="@string/grant_a11y" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/guardStatus"
+                style="@style/Hint"
+                android:layout_marginTop="10dp" />
+
+            <TextView
+                style="@style/Command"
+                android:text="@string/guard_adb_command" />
+        </LinearLayout>
+
+        <!-- 3) زر التشغيل الكبير -->
+        <Button
+            android:id="@+id/toggleButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:background="@drawable/button_primary_bg"
+            android:focusable="true"
+            android:minWidth="460dp"
+            android:paddingStart="40dp"
+            android:paddingTop="20dp"
+            android:paddingEnd="40dp"
+            android:paddingBottom="20dp"
+            android:text="@string/toggle_start"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <!-- 4) الحجم والشفافية -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/appearance" />
+
+            <TextView
+                android:id="@+id/sizeLabel"
+                style="@style/Label" />
+
+            <SeekBar
+                android:id="@+id/sizeSeek"
+                style="@style/Seek" />
+
+            <TextView
+                android:id="@+id/alphaLabel"
+                style="@style/Label"
+                android:layout_marginTop="12dp" />
+
+            <SeekBar
+                android:id="@+id/alphaSeek"
+                style="@style/Seek" />
+        </LinearLayout>
+
+        <!-- 5) الأزرار الظاهرة في القائمة -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/visible_buttons" />
+
+            <LinearLayout
+                android:id="@+id/actionsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <!-- الزر الأوسط للماوس -->
+        <LinearLayout style="@style/Card">
+
+            <TextView style="@style/CardTitle" android:text="@string/middle_title" />
+
+            <CheckBox
+                android:id="@+id/middleCheck"
+                style="@style/Check"
+                android:text="@string/middle_check" />
+
+            <TextView
+                android:id="@+id/middleStatus"
+                style="@style/Hint"
+                android:layout_marginTop="6dp" />
+
+            <Button
+                android:id="@+id/middleTestButton"
+                style="@style/SmallButton"
+                android:layout_marginTop="10dp"
+                android:text="@string/middle_test" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

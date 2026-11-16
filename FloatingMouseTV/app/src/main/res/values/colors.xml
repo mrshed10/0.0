@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF0F1318</color>
+    <color name="card">#FF1A2027</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFAAB4BF</color>
+    <color name="accent">#FF2F80ED</color>
+    <color name="accent_light">#FF5B9BF2</color>
+    <color name="ok_green">#FF2E7D32</color>
+    <color name="bad_red">#FFC62828</color>
+    <color name="stop_red">#FFB3261E</color>
+    <color name="stop_red_light">#FFD9473D</color>
+
+    <!-- الزجاج الداكن -->
+    <color name="glass_bg">#C8141A22</color>
+    <color name="glass_bg_top">#D0222A35</color>
+    <color name="glass_border">#40FFFFFF</color>
+    <color name="glass_item">#26FFFFFF</color>
+    <color name="glass_item_hover">#4DFFFFFF</color>
+    <color name="glass_item_border">#33FFFFFF</color>
+    <color name="glass_text">#FFF2F5F8</color>
+    <color name="glass_text_dim">#B3FFFFFF</color>
+    <color name="bubble_fill">#E61B222C</color>
+</resources>
