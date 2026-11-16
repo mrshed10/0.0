@@ -21,6 +21,10 @@ class MainActivity : Activity() {
     private lateinit var addMappingButton: Button
     private lateinit var mappingsContainer: LinearLayout
     private lateinit var emptyText: TextView
+    private lateinit var guardStatusText: TextView
+    private lateinit var guardHelpText: TextView
+    private lateinit var guardCommandText: TextView
+    private lateinit var guardToggleButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,6 +35,14 @@ class MainActivity : Activity() {
         addMappingButton = findViewById(R.id.addMappingButton)
         mappingsContainer = findViewById(R.id.mappingsContainer)
         emptyText = findViewById(R.id.emptyText)
+        guardStatusText = findViewById(R.id.guardStatusText)
+        guardHelpText = findViewById(R.id.guardHelpText)
+        guardCommandText = findViewById(R.id.guardCommandText)
+        guardToggleButton = findViewById(R.id.guardToggleButton)
+        guardToggleButton.setOnClickListener {
+            ServiceGuard.setGuardEnabled(this, !ServiceGuard.isGuardEnabled(this))
+            updateGuard()
+        }
 
         openSettingsButton.setOnClickListener { openAccessibilitySettings() }
         addMappingButton.setOnClickListener { showCaptureDialog() }
@@ -40,7 +52,10 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         updateStatus()
+        updateGuard()
         renderMappings()
+        ServiceGuard.schedulePeriodic(this)
+        repairInBackground()
     }
 
     override fun onPause() {
@@ -58,6 +73,41 @@ class MainActivity : Activity() {
             statusText.setText(R.string.status_disabled)
             statusText.setBackgroundResource(R.drawable.status_disabled_bg)
         }
+    }
+
+    // ───────────────────────── الحماية التلقائية ─────────────────────────
+
+    private fun updateGuard() {
+        val hasPermission = ServiceGuard.hasPermission(this)
+        val on = ServiceGuard.isGuardEnabled(this)
+        guardStatusText.setText(
+            when {
+                !hasPermission -> R.string.guard_no_permission
+                on -> R.string.guard_on
+                else -> R.string.guard_off
+            }
+        )
+        val showHelp = if (hasPermission) View.GONE else View.VISIBLE
+        guardHelpText.visibility = showHelp
+        guardCommandText.visibility = showHelp
+        guardToggleButton.visibility = if (hasPermission) View.VISIBLE else View.GONE
+        guardToggleButton.setText(if (on) R.string.guard_turn_off else R.string.guard_turn_on)
+    }
+
+    /** إذا كانت الخدمة مُطفأة وعندنا الصلاحية: نعيد تفعيلها فور فتح التطبيق */
+    private fun repairInBackground() {
+        if (!ServiceGuard.canRepair(this)) return
+        val app = applicationContext
+        Thread {
+            if (ServiceGuard.repairIfNeeded(app)) {
+                runOnUiThread {
+                    if (!isFinishing) {
+                        Toast.makeText(app, R.string.guard_repaired, Toast.LENGTH_SHORT).show()
+                        updateStatus()
+                    }
+                }
+            }
+        }.start()
     }
 
     private fun openAccessibilitySettings() {

@@ -66,6 +66,53 @@
             android:textColor="@color/text_secondary"
             android:textSize="16sp" />
 
+        <!-- الحماية التلقائية من الإيقاف -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:background="@color/row_bg"
+            android:orientation="vertical"
+            android:padding="18dp">
+
+            <TextView
+                android:id="@+id/guardStatusText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/guardHelpText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/guard_help"
+                android:textColor="@color/text_secondary"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/guardCommandText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@color/bg"
+                android:padding="10dp"
+                android:text="@string/guard_adb_command"
+                android:textColor="@color/accent_focused"
+                android:textDirection="ltr"
+                android:textIsSelectable="true"
+                android:textSize="15sp"
+                android:typeface="monospace" />
+
+            <Button
+                android:id="@+id/guardToggleButton"
+                style="@style/SmallButton"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/small_button_bg" />
+        </LinearLayout>
+
         <!-- زر إضافة تخصيص جديد -->
         <Button
             android:id="@+id/addMappingButton"

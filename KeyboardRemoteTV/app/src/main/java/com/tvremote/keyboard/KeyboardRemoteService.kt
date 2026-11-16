@@ -1,7 +1,6 @@
 package com.tvremote.keyboard
 
 import android.accessibilityservice.AccessibilityService
-import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -12,7 +11,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.os.Build
-import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
@@ -23,10 +21,12 @@ import android.view.accessibility.AccessibilityNodeInfo
  * خدمة إمكانية الوصول التي تلتقط ضغطات الكيبورد في كل التطبيقات وتنفّذ
  * الوظيفة التي خصّصها المستخدم لكل زر (المحفوظة في KeyMappingStore).
  *
- * الحماية من الإغلاق:
- *  - تعمل كخدمة أمامية (Foreground Service) بإشعار صامت دائم.
- *  - START_STICKY + إعادة تشغيل تلقائية عبر AlarmManager في onTaskRemoved.
- *  - النظام نفسه يعيد ربط خدمات إمكانية الوصول المفعّلة بعد إعادة تشغيل الجهاز.
+ * الحماية من الإغلاق (ثلاث طبقات):
+ *  1) خدمة أمامية حقيقية: الخدمة "مُشغَّلة" (startService) وليست مربوطة فقط،
+ *     مع startForeground وإشعار صامت دائم ⇒ أولوية عالية جداً ضد قاتل الذاكرة.
+ *  2) START_STICKY: لأن الخدمة مُشغَّلة فعلاً، يعيد النظام تشغيلها إن أُغلقت.
+ *  3) ServiceGuard: منبّه كل دقيقة يعيد تفعيل الخدمة في إعدادات إمكانية الوصول
+ *     إذا أطفأها النظام (يحتاج صلاحية WRITE_SECURE_SETTINGS مرة واحدة عبر ADB).
  */
 class KeyboardRemoteService : AccessibilityService() {
 
@@ -43,38 +43,60 @@ class KeyboardRemoteService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         connected = true
+        isRunning = true
+
+        // أولاً: نصبح خدمة أمامية فوراً (ونحن مربوطون من النظام بأولوية عالية)
         startForegroundSafely()
+
+        // ثانياً: نجعل الخدمة "مُشغَّلة" وليست مربوطة فقط، حتى يعمل START_STICKY.
+        // نستخدم startService وليس startForegroundService لأننا أصبحنا أمامية بالفعل،
+        // وهكذا لا يوجد شرط "استدعِ startForeground خلال 5 ثوانٍ" قد يسبب انهياراً.
+        try {
+            startService(Intent(this, KeyboardRemoteService::class.java).setAction(ACTION_STICKY))
+        } catch (e: Exception) {
+            Log.w(TAG, "startService(self) failed", e)
+        }
+
+        // ثالثاً: نشغّل الحارس الدوري
+        ServiceGuard.schedulePeriodic(this)
         Log.i(TAG, "Keyboard remote service connected")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // قد نصل هنا من منبّه إعادة التشغيل؛ يجب استدعاء startForeground خلال 5 ثوانٍ
+        // intent == null يعني أن النظام أعاد تشغيلنا بعد إغلاق (بفضل START_STICKY)
         startForegroundSafely()
+
         if (!connected && !isEnabled(this)) {
-            // المستخدم أوقف الخدمة من الإعدادات: لا داعي للبقاء
-            stopForegroundCompat()
-            stopSelf(startId)
-            return START_NOT_STICKY
+            // الخدمة غير مفعّلة في الإعدادات: نحاول إعادة تفعيلها إن كان مسموحاً
+            ServiceGuard.checkSoon(this)
+            if (!ServiceGuard.canRepair(this)) {
+                stopForegroundCompat()
+                stopSelf(startId)
+                return START_NOT_STICKY
+            }
         }
         return START_STICKY
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // عند إغلاق التطبيق من قائمة التطبيقات الأخيرة: جدولة إعادة تشغيل الخدمة
-        scheduleRestart()
+        // عند إغلاق التطبيق من قائمة التطبيقات الأخيرة: فحص سريع بعد ثانيتين
+        ServiceGuard.checkSoon(this)
         super.onTaskRemoved(rootIntent)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
         connected = false
-        stopForegroundCompat()
+        isRunning = false
+        // لا نوقف الإشعار هنا: إن كان الفصل بسبب إغلاق غير مقصود سيعيد الحارس الربط
+        ServiceGuard.checkSoon(this)
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         connected = false
-        if (isEnabled(this)) scheduleRestart() // أُغلقت رغم أنها مفعّلة: أعدها
+        isRunning = false
         stopForegroundCompat()
+        ServiceGuard.checkSoon(this)
         super.onDestroy()
     }
 
@@ -97,17 +119,22 @@ class KeyboardRemoteService : AccessibilityService() {
     }
 
     private fun perform(action: RemoteAction) {
-        when (action) {
-            RemoteAction.VOLUME_UP -> adjustVolume(AudioManager.ADJUST_RAISE)
-            RemoteAction.VOLUME_DOWN -> adjustVolume(AudioManager.ADJUST_LOWER)
-            RemoteAction.MUTE -> toggleMute()
-            RemoteAction.HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
-            RemoteAction.BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
-            RemoteAction.RECENTS -> performGlobalAction(GLOBAL_ACTION_RECENTS)
-            RemoteAction.NOTIFICATIONS -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
-            RemoteAction.PLAY_PAUSE -> sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-            RemoteAction.MEDIA_NEXT -> sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
-            RemoteAction.MEDIA_PREVIOUS -> sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+        try {
+            when (action) {
+                RemoteAction.VOLUME_UP -> adjustVolume(AudioManager.ADJUST_RAISE)
+                RemoteAction.VOLUME_DOWN -> adjustVolume(AudioManager.ADJUST_LOWER)
+                RemoteAction.MUTE -> toggleMute()
+                RemoteAction.HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
+                RemoteAction.BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
+                RemoteAction.RECENTS -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+                RemoteAction.NOTIFICATIONS -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                RemoteAction.PLAY_PAUSE -> sendMediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+                RemoteAction.MEDIA_NEXT -> sendMediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
+                RemoteAction.MEDIA_PREVIOUS -> sendMediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+            }
+        } catch (e: Exception) {
+            // أي انهيار في خدمة إمكانية الوصول يجعل أندرويد يوقفها، لذلك لا نسمح بأي استثناء
+            Log.e(TAG, "perform($action) failed", e)
         }
     }
 
@@ -123,8 +150,11 @@ class KeyboardRemoteService : AccessibilityService() {
         } catch (e: Exception) {
             false
         } finally {
-            @Suppress("DEPRECATION")
-            node?.recycle()
+            try {
+                @Suppress("DEPRECATION")
+                node?.recycle()
+            } catch (ignored: Exception) {
+            }
         }
     }
 
@@ -171,7 +201,6 @@ class KeyboardRemoteService : AccessibilityService() {
                 startForeground(NOTIFICATION_ID, notification)
             }
         } catch (e: Exception) {
-            // بعض الأنظمة ترفض البدء من الخلفية؛ الخدمة تستمر كخدمة إمكانية وصول عادية
             Log.w(TAG, "startForeground failed", e)
         }
     }
@@ -193,15 +222,16 @@ class KeyboardRemoteService : AccessibilityService() {
         val openApp = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            immutableFlag()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
         )
 
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
             if (manager.getNotificationChannel(CHANNEL_ID) == null) {
-                // IMPORTANCE_MIN = إشعار صامت تماماً: بدون صوت ولا اهتزاز ولا نافذة منبثقة
+                // IMPORTANCE_LOW = إشعار صامت (بدون صوت ولا اهتزاز ولا نافذة منبثقة)
+                // لكنه "مرئي" للنظام، فتعتبر الخدمة أمامية حقيقية ولا يتجاهلها
                 val channel = NotificationChannel(
-                    CHANNEL_ID, getString(R.string.notif_channel), NotificationManager.IMPORTANCE_MIN
+                    CHANNEL_ID, getString(R.string.notif_channel), NotificationManager.IMPORTANCE_LOW
                 ).apply {
                     setShowBadge(false)
                     setSound(null, null)
@@ -214,7 +244,7 @@ class KeyboardRemoteService : AccessibilityService() {
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setPriority(Notification.PRIORITY_MIN)
+                .setPriority(Notification.PRIORITY_LOW)
                 .setSound(null)
                 .setVibrate(null)
         }
@@ -225,35 +255,11 @@ class KeyboardRemoteService : AccessibilityService() {
             .setContentText(getString(R.string.notif_text))
             .setContentIntent(openApp)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setCategory(Notification.CATEGORY_SERVICE)
             .build()
     }
-
-    /** إعادة تشغيل الخدمة بعد ثانيتين عبر AlarmManager */
-    private fun scheduleRestart() {
-        try {
-            val intent = Intent(applicationContext, KeyboardRemoteService::class.java)
-                .setAction(ACTION_KEEP_ALIVE)
-            val flags = PendingIntent.FLAG_ONE_SHOT or immutableFlag()
-            val pending = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                PendingIntent.getForegroundService(applicationContext, 1, intent, flags)
-            } else {
-                PendingIntent.getService(applicationContext, 1, intent, flags)
-            }
-            val alarm = getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarm.set(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                SystemClock.elapsedRealtime() + RESTART_DELAY_MS,
-                pending
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "scheduleRestart failed", e)
-        }
-    }
-
-    private fun immutableFlag(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
@@ -261,10 +267,9 @@ class KeyboardRemoteService : AccessibilityService() {
 
     companion object {
         private const val TAG = "KeyboardRemote"
-        private const val CHANNEL_ID = "keep_alive"
+        private const val CHANNEL_ID = "keep_alive_v2"
         private const val NOTIFICATION_ID = 1001
-        private const val RESTART_DELAY_MS = 2000L
-        private const val ACTION_KEEP_ALIVE = "com.tvremote.keyboard.KEEP_ALIVE"
+        private const val ACTION_STICKY = "com.tvremote.keyboard.STICKY"
 
         private val TEXT_EDITING_KEYS = setOf(
             KeyEvent.KEYCODE_DEL, KeyEvent.KEYCODE_FORWARD_DEL,
@@ -275,13 +280,21 @@ class KeyboardRemoteService : AccessibilityService() {
 
         private var mutedLegacy = false
 
+        /** هل الخدمة متصلة الآن داخل هذه العملية؟ */
+        @Volatile
+        var isRunning = false
+            private set
+
         /** تضبطه الواجهة أثناء التقاط زر جديد حتى لا تبتلع الخدمة الزر */
         @Volatile
         var captureMode = false
 
+        fun component(context: Context) =
+            ComponentName(context, KeyboardRemoteService::class.java)
+
         /** هل الخدمة مفعّلة في إعدادات إمكانية الوصول؟ */
         fun isEnabled(context: Context): Boolean {
-            val expected = ComponentName(context, KeyboardRemoteService::class.java)
+            val expected = component(context)
             val enabled = Settings.Secure.getString(
                 context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
             ) ?: return false

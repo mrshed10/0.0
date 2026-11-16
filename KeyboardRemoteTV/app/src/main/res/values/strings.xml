@@ -45,6 +45,16 @@
     <string name="act_media_previous">المقطع السابق</string>
     <string name="act_notifications">لوحة الإشعارات</string>
 
+    <!-- الحماية التلقائية -->
+    <string name="guard_on">🛡 الحماية التلقائية: تعمل — يعيد التطبيق تفعيل الخدمة تلقائياً إذا أطفأها النظام</string>
+    <string name="guard_off">🛡 الحماية التلقائية: موقوفة</string>
+    <string name="guard_no_permission">⚠ الحماية التلقائية: تحتاج صلاحية لمرة واحدة</string>
+    <string name="guard_help">بعض أجهزة TV Box تُطفئ خدمة إمكانية الوصول عند فتح يوتيوب أو الخروج من التطبيق. لمنع ذلك نهائياً نفّذ هذا الأمر مرة واحدة من كمبيوتر متصل بالجهاز عبر ADB، ثم أعد فتح التطبيق:</string>
+    <string name="guard_adb_command">adb shell pm grant com.tvremote.keyboard android.permission.WRITE_SECURE_SETTINGS</string>
+    <string name="guard_turn_off">إيقاف الحماية</string>
+    <string name="guard_turn_on">تشغيل الحماية</string>
+    <string name="guard_repaired">تمت إعادة تفعيل الخدمة تلقائياً ✔</string>
+
     <!-- الإشعار الدائم -->
     <string name="notif_channel">تشغيل الخدمة في الخلفية</string>
     <string name="notif_title">ريموت الكيبورد يعمل</string>

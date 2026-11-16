@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- التطبيق يعمل على التلفاز والجوال؛ لا نشترط شاشة لمس ولا Leanback -->
     <uses-feature
@@ -12,6 +13,13 @@
     <!-- الخدمة الأمامية (Foreground Service) لحماية الخدمة من الإغلاق -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- لتشغيل الحارس بعد إقلاع الجهاز -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- تُمنح مرة واحدة عبر ADB حتى يعيد التطبيق تفعيل خدمته إذا أطفأها النظام:
+         adb shell pm grant com.tvremote.keyboard android.permission.WRITE_SECURE_SETTINGS -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <application
         android:allowBackup="true"
@@ -51,6 +59,18 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps the keyboard-to-remote accessibility service alive on TV boxes" />
         </service>
+
+        <!-- الحارس: منبّه دوري + بعد الإقلاع + بعد تحديث التطبيق -->
+        <receiver
+            android:name=".GuardReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.tvremote.keyboard.GUARD_CHECK" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>
