@@ -65,7 +65,6 @@ class MainActivity : Activity() {
         middleCheck.isChecked = Prefs.isMiddleBackEnabled(this)
         middleCheck.setOnCheckedChangeListener { _, checked ->
             Prefs.setMiddleBackEnabled(this, checked)
-            ControlAccessibilityService.instance?.configureMouseObserver()
         }
         middleTestButton.setOnClickListener { showMiddleTest() }
 
@@ -218,8 +217,6 @@ class MainActivity : Activity() {
     private fun updateMiddleStatus() {
         val text = when {
             Prefs.middleKeyCode(this) != -1 -> getString(R.string.middle_status_key)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM ->
-                getString(R.string.middle_status_android15)
             else -> getString(R.string.middle_status_floating_only)
         }
         middleStatus.text = text
@@ -261,11 +258,7 @@ class MainActivity : Activity() {
             val decor = dialog.window?.decorView ?: return@setOnShowListener
             val onMotion: (MotionEvent) -> Boolean = { e ->
                 if (e.buttonState and MotionEvent.BUTTON_TERTIARY != 0) {
-                    done(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM)
-                            R.string.middle_result_android15
-                        else R.string.middle_result_floating_only
-                    )
+                    done(R.string.middle_result_floating_only)
                     true
                 } else false
             }

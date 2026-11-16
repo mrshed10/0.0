@@ -40,12 +40,10 @@
     <string name="middle_test_title">اختبار الزر الأوسط</string>
     <string name="middle_test_message">اضغط الآن على الزر الأوسط للماوس (العجلة) والمؤشر داخل هذه النافذة...</string>
     <string name="middle_status_key">✔ يعمل كرجوع في كل النظام (تم تعلّم الزر من جهازك)</string>
-    <string name="middle_status_android15">✔ يعمل كرجوع في كل النظام (Android 15+)</string>
     <string name="middle_status_floating_only">يعمل كرجوع عند النقر به على الأيقونة أو القائمة العائمة. اضغط «اختبار» لمعرفة هل يمكن تشغيله في كل النظام على جهازك.</string>
     <string name="middle_result_key">✔ تم! جهازك يرسل الزر الأوسط كزر، وسيعمل الآن كرجوع في كل النظام (يحتاج تفعيل إمكانية الوصول).</string>
     <string name="middle_result_native_back">✔ جهازك يجعل هذا الزر «رجوع» تلقائياً، لا حاجة لأي إعداد.</string>
-    <string name="middle_result_android15">✔ تم التقاط الزر الأوسط، وسيعمل كرجوع في كل النظام عبر خدمة إمكانية الوصول.</string>
-    <string name="middle_result_floating_only">تم التقاط الزر الأوسط، لكن نظام جهازك (أقدم من Android 15) لا يسمح لأي تطبيق بالتقاطه خارج نوافذه. سيعمل كرجوع عند النقر به على الأيقونة أو القائمة العائمة.</string>
+    <string name="middle_result_floating_only">تم التقاط الزر الأوسط، لكن جهازك يرسله كنقرة ماوس عادية، وأندرويد لا يسمح لأي تطبيق بالتقاطها خارج نوافذه دون تعطيل حركة المؤشر. سيعمل كرجوع عند النقر به على الأيقونة أو القائمة العائمة.</string>
 
     <!-- القائمة العائمة -->
     <string name="panel_title">انقر خارج القائمة للإغلاق</string>

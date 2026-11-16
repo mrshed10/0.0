@@ -3,51 +3,25 @@ package com.tvremote.floating
 import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
-import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import android.view.InputDevice
 import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.accessibility.AccessibilityEvent
 
 /**
  * خدمة إمكانية الوصول: تُستخدم فقط لتنفيذ أوامر النظام (رجوع/رئيسية/الأخيرة)
- * ولتحويل الزر الأوسط للماوس إلى "رجوع" في كل النظام.
+ * ولتحويل الزر الأوسط للماوس إلى "رجوع" في كل النظام (إذا كان الجهاز يرسله كزر KeyEvent).
+ *
+ * ملاحظة: في معظم أجهزة أندرويد يصل الزر الأوسط كنقرة ماوس عادية لا يمكن لأي خدمة
+ * التقاطها خارج نوافذها دون تعطيل حركة المؤشر، لذلك يعمل حينها على الأيقونة واللوحة العائمة.
  */
 class ControlAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        configureMouseObserver()
         Log.i(TAG, "Accessibility service connected")
-    }
-
-    /**
-     * Android 15+: نراقب أحداث الماوس (بدون حجبها عن التطبيقات) لالتقاط الزر الأوسط.
-     * في الإصدارات الأقدم لا يرسل أندرويد نقرات الماوس لخدمات إمكانية الوصول.
-     */
-    fun configureMouseObserver() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
-        try {
-            val info = serviceInfo ?: return
-            val sources = if (Prefs.isMiddleBackEnabled(this)) InputDevice.SOURCE_MOUSE else 0
-            info.setMotionEventSources(sources)
-            info.setObservedMotionEventSources(sources)
-            serviceInfo = info
-        } catch (e: Exception) {
-            Log.w(TAG, "configureMouseObserver failed", e)
-        }
-    }
-
-    override fun onMotionEvent(event: MotionEvent) {
-        if (event.actionMasked == MotionEvent.ACTION_BUTTON_PRESS &&
-            event.actionButton == MotionEvent.BUTTON_TERTIARY &&
-            Prefs.isMiddleBackEnabled(this)
-        ) {
-            performGlobalAction(GLOBAL_ACTION_BACK)
-        }
     }
 
     /** بعض الأجهزة ترسل الزر الأوسط كزر (KeyEvent) — نستخدم الرمز الذي تعلّمه التطبيق */
