@@ -267,6 +267,51 @@ class AppSettings(context: Context) {
         return WidgetContent(type, prefs.getLong("lock_item", -1))
     }
 
+    // --- hourly chime ---
+    private val _chime = MutableStateFlow(readChime())
+    /** Optional "beep-beep" at the top of every hour, like old digital watches. */
+    val chime: StateFlow<ChimeSettings> = _chime.asStateFlow()
+
+    fun updateChime(transform: (ChimeSettings) -> ChimeSettings) {
+        val v = transform(_chime.value).normalized()
+        prefs.edit()
+            .putBoolean("chime_on", v.enabled)
+            .putInt("chime_sound", v.sound.ordinal)
+            .putInt("chime_volume", v.volume)
+            .putBoolean("chime_quiet", v.quietHours)
+            .putInt("chime_quiet_from", v.quietFrom)
+            .putInt("chime_quiet_to", v.quietTo)
+            .putBoolean("chime_silent", v.respectSilent)
+            .apply()
+        _chime.value = v
+    }
+
+    private fun readChime() = ChimeSettings(
+        enabled = prefs.getBoolean("chime_on", false),
+        sound = ChimeSound.entries.getOrElse(prefs.getInt("chime_sound", 0)) { ChimeSound.Classic },
+        volume = prefs.getInt("chime_volume", 45),
+        quietHours = prefs.getBoolean("chime_quiet", true),
+        quietFrom = prefs.getInt("chime_quiet_from", 22),
+        quietTo = prefs.getInt("chime_quiet_to", 7),
+        respectSilent = prefs.getBoolean("chime_silent", true),
+    ).normalized()
+
+    // --- widget management ---
+    private val _hiddenWidgets = MutableStateFlow(prefs.getStringSet("hidden_templates", emptySet())!!.toSet())
+    /** Gallery designs the user removed from the app's widget list. */
+    val hiddenWidgets: StateFlow<Set<String>> = _hiddenWidgets.asStateFlow()
+
+    fun setWidgetHidden(id: String, hidden: Boolean) {
+        val v = if (hidden) _hiddenWidgets.value + id else _hiddenWidgets.value - id
+        prefs.edit().putStringSet("hidden_templates", v).apply()
+        _hiddenWidgets.value = v
+    }
+
+    fun showAllWidgets() {
+        prefs.edit().putStringSet("hidden_templates", emptySet()).apply()
+        _hiddenWidgets.value = emptySet()
+    }
+
     // --- one-off flags ---
     var salariesSeeded: Boolean
         get() = prefs.getBoolean("salaries_seeded", false)

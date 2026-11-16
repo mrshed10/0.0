@@ -43,6 +43,20 @@ class AlarmReceiver : BroadcastReceiver() {
                 androidx.core.app.NotificationManagerCompat.from(context).cancel(SILENT_NOTIFICATION)
             }
             AlarmAction.Refresh -> Unit
+            AlarmAction.Chime -> {
+                val pending = goAsync()
+                val container = (context.applicationContext as AtharApplication).container
+                CoroutineScope(Dispatchers.Default).launch {
+                    try {
+                        container.alarmScheduler.scheduleChime(java.time.LocalDateTime.now().plusMinutes(1))
+                        val chime = container.settings.chime.value
+                        if (chime.enabled && !chime.isQuiet(java.time.LocalTime.now().hour)) HourlyChime.play(context, chime)
+                    } finally {
+                        pending.finish()
+                    }
+                }
+                return
+            }
             AlarmAction.Tick -> {
                 // Only the clocks need redrawing; skip the full re-plan.
                 val pending = goAsync()

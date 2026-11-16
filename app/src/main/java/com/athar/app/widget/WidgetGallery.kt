@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -96,6 +97,7 @@ object WidgetTemplates {
     private val frost = WidgetPresets.frost
     private val aurora = WidgetPresets.aurora
     private val clear = WidgetPresets.glassClear
+    private val glow = WidgetPresets.glow
 
     private val dark = WidgetStyle(kind = BackgroundKind.Gradient, color1 = 0xFF1C1C1E.toInt(), color2 = 0xFF2C2C2E.toInt(), opacity = 92, accentColor = 0xFFE6C27A.toInt())
 
@@ -117,6 +119,12 @@ object WidgetTemplates {
         t("nothing_counter", GalleryTab.Nothing, R.string.widget_type_nothing_counter, WidgetType.NothingCounter, nothingDark, wide = false),
         t("nothing_date", GalleryTab.Nothing, R.string.widget_type_nothing_date, WidgetType.NothingDate, nothingDark, wide = false),
         t("nothing_hijri", GalleryTab.Nothing, R.string.tpl_nothing_hijri, WidgetType.NothingDate, nothingLight.copy(variant = 1), wide = false),
+        // Glowing dots + animated prayer countdowns
+        t("prayer_ring_glow", GalleryTab.Nothing, R.string.tpl_prayer_ring, WidgetType.NextPrayer, glow.copy(variant = PrayerPulse.RING), wide = false, isNew = true),
+        t("prayer_bar_glow", GalleryTab.Nothing, R.string.tpl_prayer_bar, WidgetType.NextPrayer, glow.copy(variant = PrayerPulse.BAR), wide = true, isNew = true),
+        t("nothing_glow_clock", GalleryTab.Nothing, R.string.tpl_glow_clock, WidgetType.NothingClock, glow, wide = false, isNew = true),
+        t("nothing_glow_date", GalleryTab.Nothing, R.string.tpl_glow_date, WidgetType.NothingDate, glow.copy(accentColor = 0xFFE6C27A.toInt()), wide = false, isNew = true),
+        t("glow_big_clock", GalleryTab.Digital, R.string.tpl_glow_big_clock, WidgetType.BigClock, glow.copy(fontId = "bebasneue"), wide = true, isNew = true),
         // From the design file: clocks & world time
         t("wide_clock", GalleryTab.Clock, R.string.widget_type_wide_clock, WidgetType.WideClock, dark, wide = true, isNew = true),
         t("wide_clock_frost", GalleryTab.Clock, R.string.tpl_wide_frost, WidgetType.WideClock, frost.copy(variant = 1), wide = true),
@@ -163,6 +171,8 @@ object WidgetTemplates {
         // Prayer
         t("prayer_table", GalleryTab.Prayer, R.string.tpl_prayer_table, WidgetType.NextPrayer, night, wide = true, isNew = true),
         t("prayer_gold", GalleryTab.Prayer, R.string.tpl_prayer_gold, WidgetType.NextPrayer, gold.copy(fontId = "amiri"), wide = true),
+        t("prayer_ring", GalleryTab.Prayer, R.string.tpl_prayer_ring, WidgetType.NextPrayer, night.copy(variant = PrayerPulse.RING), wide = false, isNew = true),
+        t("prayer_bar", GalleryTab.Prayer, R.string.tpl_prayer_bar, WidgetType.NextPrayer, gold.copy(variant = PrayerPulse.BAR), wide = true, isNew = true),
         t("prayer_small", GalleryTab.Prayer, R.string.tpl_prayer_small, WidgetType.NextPrayer, clear, wide = false),
         t("tasbih", GalleryTab.Prayer, R.string.widget_type_tasbih, WidgetType.Tasbih, aurora, wide = false),
         // Counters
@@ -200,6 +210,7 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
     val pinRequested = stringResource(R.string.pin_requested)
     val pinUnsupported = stringResource(R.string.pin_unsupported)
     val needItem = stringResource(R.string.gallery_need_item)
+    val hidden by (context.applicationContext as AtharApplication).container.settings.hiddenWidgets.collectAsState()
 
     // First record of each kind, so item-based templates show real data.
     val firstItems by produceState(emptyMap<WidgetType, Long>()) {
@@ -274,7 +285,18 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(WidgetTemplates.forTab(tab), key = { it.id }, span = { GridItemSpan(if (it.wide) 2 else 1) }) { template ->
+            val visible = WidgetTemplates.forTab(tab).filterNot { it.id in hidden }
+            if (visible.isEmpty()) {
+                item(span = { GridItemSpan(2) }) {
+                    Text(
+                        stringResource(R.string.gallery_tab_hidden),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AtharColors.TextTertiary,
+                        modifier = Modifier.padding(8.dp),
+                    )
+                }
+            }
+            items(visible, key = { it.id }, span = { GridItemSpan(if (it.wide) 2 else 1) }) { template ->
                 TemplateCell(template, resolved(template)) {
                     val type = template.config.content.type
                     if (type.needsItem && (firstItems[type] ?: -1) < 0) {

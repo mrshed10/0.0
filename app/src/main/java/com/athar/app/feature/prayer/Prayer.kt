@@ -94,4 +94,24 @@ object PrayerSchedule {
         val fajr = tomorrow?.firstOrNull { it.prayer == Prayer.Fajr } ?: obligatory.first()
         return NextPrayer(fajr.prayer, now.toLocalDate().plusDays(1).atTime(fajr.time))
     }
+
+    /**
+     * The obligatory prayer that most recently started (at or before [now]).
+     * Before Fajr it is yesterday's Isha, taken from [yesterday] when given.
+     */
+    fun previous(now: LocalDateTime, times: List<PrayerTime>, yesterday: List<PrayerTime>? = null): NextPrayer {
+        val obligatory = times.filter { it.prayer.isObligatory }.sortedBy { it.time }
+        require(obligatory.isNotEmpty()) { "No prayer times" }
+        val earlier = obligatory.lastOrNull { !it.time.isAfter(now.toLocalTime()) }
+        if (earlier != null) return NextPrayer(earlier.prayer, now.toLocalDate().atTime(earlier.time))
+        val isha = yesterday?.filter { it.prayer.isObligatory }?.maxByOrNull { it.time } ?: obligatory.last()
+        return NextPrayer(isha.prayer, now.toLocalDate().minusDays(1).atTime(isha.time))
+    }
+
+    /** Share of the time between the previous and the next prayer that has passed (0..1). */
+    fun progress(now: LocalDateTime, previous: LocalDateTime, next: LocalDateTime): Float {
+        val total = java.time.Duration.between(previous, next).seconds.toFloat()
+        if (total <= 0f) return 0f
+        return (java.time.Duration.between(previous, now).seconds / total).coerceIn(0f, 1f)
+    }
 }

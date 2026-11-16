@@ -47,6 +47,9 @@ object WidgetUpdater {
         placedWidgetIds(context)
             .filter { store.get(it)?.needsMinuteTick() == true }
             .forEach { id -> runCatching { AtharWidget().update(context, manager.getGlanceIdBy(id)) } }
+        // The prayer card on the lock screen shows progress that moves each minute.
+        val container = (context.applicationContext as AtharApplication).container
+        if (LockCard.isLive(container.settings.lockCard.value)) runCatching { LockCard.update(context) }
     }
 
     /** Reloads every placed widget (live or not) and the lock-screen card. */
@@ -115,10 +118,28 @@ class WidgetPinnedReceiver : BroadcastReceiver() {
  * Samsung phones do not accept third-party lock-screen widgets, so the
  * lock-screen card is a silent ongoing notification (visible on the lock
  * screen) that mirrors a chosen item, with a live countdown for prayers.
+ *
+ * The channel is "default" importance with sound and vibration off: One UI
+ * hides *low*-importance (silent) notifications from the lock screen by
+ * default, which made the card disappear.
  */
 object LockCard {
     private const val NOTIFICATION_ID = 7_770
-    private const val CHANNEL = "lock_card"
+    private const val CHANNEL = "lock_card_v2"
+    private const val OLD_CHANNEL = "lock_card"
+
+    /** Types whose card changes every minute (countdown progress). */
+    fun isLive(content: WidgetContent?) =
+        content?.type == WidgetType.NextPrayer || content?.type == WidgetType.NothingPrayer
+
+    /** Channel settings, where the user can make sure the card shows on the lock screen. */
+    fun channelSettingsIntent(context: Context): Intent {
+        ensureChannel(context)
+        return Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, CHANNEL)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
 
     suspend fun update(context: Context) {
         val container = (context.applicationContext as AtharApplication).container
@@ -138,7 +159,15 @@ object LockCard {
             .setShowWhen(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setColor(0xFFE6C27A.toInt())
+            // Android 14 lets users swipe ongoing cards away: put it straight back.
+            .setDeleteIntent(
+                PendingIntent.getBroadcast(
+                    context, 3, Intent(context, LockCardReceiver::class.java),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+            )
             .setContentIntent(
                 PendingIntent.getActivity(
                     context,
@@ -153,26 +182,36 @@ object LockCard {
                 val now = LocalDateTime.now()
                 val next = PrayerSchedule.next(now, prefs.timesFor(now.toLocalDate()), prefs.timesFor(now.toLocalDate().plusDays(1)))
                 builder.setContentTitle("🕌 ${data.name} · ${data.time}")
-                    .setContentText(data.place)
+                    .setContentText(data.rows.joinToString("  ") { (if (it.isNext) "● " else "") + it.name + " " + it.time.substringBefore(' ') })
+                    .setSubText(data.place)
                     .setWhen(next.at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
                     .setShowWhen(true)
                     .setUsesChronometer(true)
                     .setChronometerCountDown(true)
+                    .setProgress(1000, (data.progress * 1000).toInt(), false)
             }
             is WidgetData.Big -> builder.setContentTitle("${data.title}: ${data.value} ${data.unit}".trim())
                 .setContentText(listOf(data.line1, data.line2).filter { it.isNotBlank() }.joinToString(" · "))
-            is WidgetData.Tasks -> builder.setContentTitle("✅ " + context.getString(R.string.today_tasks) + " · " + data.summary)
-                .setContentText(data.rows.filterNot { it.done }.take(3).joinToString(" • ") { it.title })
+            is WidgetData.Tasks -> {
+                val open = data.rows.filterNot { it.done }
+                builder.setContentTitle("✅ " + context.getString(R.string.today_tasks) + " · " + data.summary)
+                    .setContentText(open.take(3).joinToString(" • ") { it.title })
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(open.take(8).joinToString("\n") { "☐ " + it.title }))
+                if (data.rows.isNotEmpty()) builder.setProgress(data.rows.size, data.rows.count { it.done }, false)
+            }
             is WidgetData.DateInfo -> builder.setContentTitle(data.day).setContentText("${data.gregorian} · ${data.hijri}")
             is WidgetData.Verse -> builder.setContentTitle(data.text).setContentText(data.ref)
             is WidgetData.Tasbih -> builder.setContentTitle("📿 ${data.dhikr}").setContentText("${data.count} / ${data.target} · ${data.today}")
+                .setProgress(data.target.coerceAtLeast(1), data.count.coerceAtMost(data.target.coerceAtLeast(1)), false)
             is WidgetData.Debts -> builder.setContentTitle("💼 ${data.owedLabel} ${data.owed} · ${data.oweLabel} ${data.owe}")
             is WidgetData.Habits -> builder.setContentTitle("🔥 " + context.getString(R.string.habits))
                 .setContentText(data.rows.joinToString(" • ") { "${if (it.doneToday) "✅" else it.emoji} ${it.title} ${it.streak}" })
             is WidgetData.Schedule -> builder.setContentTitle("🗓️ " + context.getString(R.string.widget_type_schedule))
                 .setContentText(data.rows.take(3).joinToString(" • ") { "${it.name}: ${it.daysText}" })
+                .setStyle(NotificationCompat.BigTextStyle().bigText(data.rows.take(8).joinToString("\n") { "${if (it.salary) "💰" else "⏰"} ${it.name} — ${it.daysText}" }))
             is WidgetData.Clock -> builder.setContentTitle(data.day).setContentText(data.hijri)
             is WidgetData.Dots -> builder.setContentTitle("${data.title} · ${data.percent}%")
+                .setProgress(100, data.percent, false)
             is WidgetData.NothingStyle -> builder.setContentTitle(listOfNotNull(data.spec.top, data.spec.big).joinToString(" · "))
                 .setContentText(data.spec.bottom.orEmpty())
             is WidgetData.Custom -> builder.setContentTitle(data.lines.firstOrNull()?.text.orEmpty())
@@ -197,12 +236,30 @@ object LockCard {
 
     private fun ensureChannel(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(OLD_CHANNEL) != null) nm.deleteNotificationChannel(OLD_CHANNEL)
         if (nm.getNotificationChannel(CHANNEL) != null) return
-        val channel = NotificationChannel(CHANNEL, context.getString(R.string.lock_card_channel), NotificationManager.IMPORTANCE_LOW).apply {
+        val channel = NotificationChannel(CHANNEL, context.getString(R.string.lock_card_channel), NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = context.getString(R.string.lock_card_body)
             setShowBadge(false)
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             setSound(null, null)
+            enableVibration(false)
+            enableLights(false)
         }
         nm.createNotificationChannel(channel)
+    }
+}
+
+/** Re-posts the lock-screen card when it is swiped away. */
+class LockCardReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                runCatching { LockCard.update(context) }
+            } finally {
+                pending.finish()
+            }
+        }
     }
 }

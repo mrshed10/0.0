@@ -14,7 +14,16 @@ import com.athar.app.R
 object LiveClockViews {
     fun isLiveClock(data: WidgetData) = data is WidgetData.Clock || data is WidgetData.WideClock || data is WidgetData.WorldClock
 
+    /** Widgets drawn entirely by native views (clocks and the animated prayer designs). */
+    fun isLive(data: WidgetData, ws: WidgetStyle) = isLiveClock(data) || PrayerPulse.isAnimated(data, ws)
+
     fun build(context: Context, data: WidgetData, ws: WidgetStyle, wDp: Float, hDp: Float): RemoteViews? = when (data) {
+        is WidgetData.NextPrayer -> if (PrayerPulse.isAnimated(data, ws)) {
+            val pad = paddingDp(wDp, hDp)
+            PrayerPulse.build(context, data, ws, wDp - 2 * pad, hDp - 2 * pad)
+        } else {
+            null
+        }
         is WidgetData.Clock -> if (data.analog) {
             RemoteViews(context.packageName, if (ws.variant == 1) R.layout.widget_analog_dark else R.layout.widget_analog_light)
         } else {

@@ -33,12 +33,16 @@ class AppContainer(context: Context) {
     fun keepAlarmsInSync(scope: CoroutineScope) {
         scope.launch {
             combine(
-                settings.prayer,
-                settings.general,
-                plannerRepository.salaries,
-                plannerRepository.reminders,
-                com.athar.app.widget.WidgetStore.changes, // minute tick for new clock widgets
-            ) { a, b, c, d, e -> listOf(a, b, c, d, e) }
+                listOf(
+                    settings.prayer,
+                    settings.general,
+                    plannerRepository.salaries,
+                    plannerRepository.reminders,
+                    com.athar.app.widget.WidgetStore.changes, // minute tick for new clock widgets
+                    settings.lockCard, // the prayer card moves every minute
+                    settings.chime,
+                ),
+            ) { it.toList() }
                 .collectLatest {
                     delay(300) // coalesce bursts of edits
                     runCatching { alarmScheduler.rescheduleAll() }

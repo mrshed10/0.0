@@ -118,7 +118,9 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
     val density = context.resources.displayMetrics.density
     val widthPx = (size.width.value * density).toInt().coerceAtLeast(1)
     val heightPx = (size.height.value * density).toInt().coerceAtLeast(1)
-    val backdrop = remember(style, widthPx, heightPx) { WidgetBackground.render(context, style, widthPx, heightPx) }
+    val backdrop = remember(style, widthPx, heightPx) {
+        if (WidgetBackground.isInvisible(style)) null else WidgetBackground.render(context, style, widthPx, heightPx)
+    }
     val wDp = size.width.value
     val hDp = size.height.value
     val small = wDp < 170f || hDp < 100f
@@ -146,12 +148,16 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
         LocalSizeDp provides (wDp to hDp),
     ) {
     Box(GlanceModifier.fillMaxSize()) {
-        Image(
-            provider = ImageProvider(backdrop),
-            contentDescription = null,
-            modifier = GlanceModifier.fillMaxSize(),
-            contentScale = ContentScale.FillBounds,
-        )
+        // A fully transparent design draws no backdrop at all, so no edge or
+        // corner can show around the widget on the home screen.
+        if (backdrop != null) {
+            Image(
+                provider = ImageProvider(backdrop),
+                contentDescription = null,
+                modifier = GlanceModifier.fillMaxSize(),
+                contentScale = ContentScale.FillBounds,
+            )
+        }
         Box(GlanceModifier.fillMaxSize().padding(padDp.dp)) {
             when (data) {
                 WidgetData.Unconfigured -> Message(
@@ -167,7 +173,7 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
                     ),
                 )
                 WidgetData.Missing -> Message(context.getString(R.string.widget_item_missing), text, GlanceModifier.tapOpen("home"))
-                is WidgetData.NextPrayer -> PrayerContent(data, small, text, accent)
+                is WidgetData.NextPrayer -> PrayerContent(data, style, small, text, accent)
                 is WidgetData.Big -> BigContent(data, small, text, accent)
                 is WidgetData.Tasks -> TasksContent(data, small, text, accent)
                 is WidgetData.Habits -> HabitsContent(data, small, text, accent)
@@ -325,8 +331,18 @@ private fun Header(title: String, color: Color, accent: Color, trailing: String?
 }
 
 @Composable
-private fun PrayerContent(d: WidgetData.NextPrayer, small: Boolean, text: Color, accent: Color) {
+private fun PrayerContent(d: WidgetData.NextPrayer, ws: WidgetStyle, small: Boolean, text: Color, accent: Color) {
     val context = LocalContext.current
+    if (PrayerPulse.isAnimated(d, ws)) {
+        val density = context.resources.displayMetrics.density
+        val wDp = LocalTextWidth.current / density
+        val hDp = LocalContentHeight.current / density
+        val views = remember(d, ws, wDp, hDp) { PrayerPulse.build(context, d, ws, wDp, hDp) }
+        Box(GlanceModifier.fillMaxSize().tapOpen("prayer")) {
+            AndroidRemoteViews(views, GlanceModifier.fillMaxSize())
+        }
+        return
+    }
     Column(GlanceModifier.fillMaxSize().tapOpen("prayer")) {
         val (w, h) = LocalSizeDp.current
         if (LocalTiny.current) {
@@ -338,7 +354,18 @@ private fun PrayerContent(d: WidgetData.NextPrayer, small: Boolean, text: Color,
         }
         Header("🕌 " + context.getString(R.string.next_prayer), text, accent, if (small) null else d.place)
         WText(d.name, style = style(text, if (small) 24.sp else 28.sp, bold = true), maxLines = 1)
-        WText(d.time, style = style(accent, if (small) 14.sp else 16.sp, bold = true), maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            WText(d.time, style = style(accent, if (small) 14.sp else 16.sp, bold = true), maxLines = 1)
+            if (d.atMillis > 0 && w >= 140f) {
+                // Live countdown to the adhan.
+                Spacer(GlanceModifier.width(8.dp))
+                val scale = LocalScale.current
+                val line = remember(d, ws, scale) {
+                    PrayerPulse.countdownLine(context, d, ws.textColor, (if (small) 13f else 15f) * scale.coerceIn(0.8f, 1.4f))
+                }
+                AndroidRemoteViews(line)
+            }
+        }
         if (!small && w >= 230f && h >= 115f) {
             Spacer(GlanceModifier.height(6.dp))
             Row(GlanceModifier.fillMaxWidth()) {
@@ -500,6 +527,10 @@ private fun VerseContent(d: WidgetData.Verse, small: Boolean, text: Color, accen
 @Composable
 private fun DateContent(d: WidgetData.DateInfo, ws: WidgetStyle, small: Boolean, text: Color, accent: Color) {
     val center = GlanceModifier.fillMaxSize().tapOpen("home")
+    if (ws.dateStyle == DateStyle.Numeric) {
+        NumericDateContent(d, ws, small, text, accent, center)
+        return
+    }
     when (ws.variant) {
         // Simple square: day / big number / month
         1 -> Column(center, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
@@ -532,6 +563,36 @@ private fun DateContent(d: WidgetData.DateInfo, ws: WidgetStyle, small: Boolean,
             WText(d.day, style = style(text, if (small) 22.sp else 28.sp, bold = true, align = TextAlign.Center), maxLines = 1)
             if (!LocalTiny.current) WText(d.gregorian, style = style(text.copy(alpha = 0.8f), 13.sp, align = TextAlign.Center), maxLines = 1)
             WText(d.hijri, style = style(accent, 14.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+        }
+    }
+}
+
+/** The same date designs, written with numbers only (e.g. 15/11/2026). */
+@Composable
+private fun NumericDateContent(d: WidgetData.DateInfo, ws: WidgetStyle, small: Boolean, text: Color, accent: Color, center: GlanceModifier) {
+    fun two(n: Int) = n.toString().padStart(2, '0')
+    val greg = "${two(d.dayNum)}/${two(d.monthNum)}/${d.year}"
+    val hij = "${two(d.hDay)}/${two(d.hMonthNum)}/${d.hYear}"
+    when (ws.variant) {
+        1 -> Column(center, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+            WText(d.day, style = style(text.copy(alpha = 0.75f), 15.sp, align = TextAlign.Center), maxLines = 1)
+            WText(two(d.dayNum), style = style(text, if (small) 44.sp else 56.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+            WText("${two(d.monthNum)}/${d.year}", style = style(accent, 15.sp, align = TextAlign.Center), maxLines = 1)
+        }
+        2 -> Box(center, contentAlignment = Alignment.Center) {
+            WText("${d.day}  $greg", style = style(text, 16.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+        }
+        4 -> Row(center, verticalAlignment = Alignment.CenterVertically, horizontalAlignment = Alignment.CenterHorizontally) {
+            WText("${two(d.dayNum)}/${two(d.monthNum)}", style = style(text, 26.sp, bold = true), maxLines = 1)
+            Spacer(GlanceModifier.width(10.dp))
+            WText("|", style = style(text.copy(alpha = 0.3f), 22.sp), maxLines = 1)
+            Spacer(GlanceModifier.width(10.dp))
+            WText("${two(d.hDay)}/${two(d.hMonthNum)}", style = style(accent, 26.sp, bold = true), maxLines = 1)
+        }
+        else -> Column(center, horizontalAlignment = Alignment.CenterHorizontally, verticalAlignment = Alignment.CenterVertically) {
+            WText(d.day, style = style(text, if (small) 22.sp else 28.sp, bold = true, align = TextAlign.Center), maxLines = 1)
+            if (!LocalTiny.current) WText(greg, style = style(text.copy(alpha = 0.8f), 14.sp, align = TextAlign.Center), maxLines = 1)
+            WText(hij, style = style(accent, 14.sp, bold = true, align = TextAlign.Center), maxLines = 1)
         }
     }
 }

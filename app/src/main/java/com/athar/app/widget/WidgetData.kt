@@ -30,7 +30,16 @@ sealed interface WidgetData {
     data object Unconfigured : WidgetData
     data object Missing : WidgetData
     data class PrayerRow(val name: String, val time: String, val isNext: Boolean)
-    data class NextPrayer(val name: String, val time: String, val place: String, val rows: List<PrayerRow>) : WidgetData
+    data class NextPrayer(
+        val name: String,
+        val time: String,
+        val place: String,
+        val rows: List<PrayerRow>,
+        /** Wall-clock time of the next prayer (epoch millis), for live countdowns. */
+        val atMillis: Long = 0,
+        /** Share of the time since the previous prayer that has passed (0..1), in 1/120 steps. */
+        val progress: Float = 0f,
+    ) : WidgetData
     data class Big(val title: String, val value: String, val unit: String, val line1: String, val line2: String, val tab: String) : WidgetData
     data class TaskRow(val id: Long, val title: String, val done: Boolean)
     data class Tasks(val rows: List<TaskRow>, val summary: String) : WidgetData
@@ -114,6 +123,7 @@ object WidgetDataLoader {
                 val prefs = c.settings.prayer.value
                 val times = prefs.timesFor(today)
                 val next = PrayerSchedule.next(now, times, prefs.timesFor(today.plusDays(1)))
+                val previous = PrayerSchedule.previous(now, times, prefs.timesFor(today.minusDays(1)))
                 WidgetData.NextPrayer(
                     name = s(next.prayer.label),
                     time = clock(next.at.toLocalTime()),
@@ -121,6 +131,9 @@ object WidgetDataLoader {
                     rows = times.map {
                         WidgetData.PrayerRow(s(it.prayer.label), clock(it.time), it.prayer == next.prayer)
                     },
+                    atMillis = next.at.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
+                    // Quantized so a minute tick only redraws when a dot actually changes.
+                    progress = (PrayerSchedule.progress(now, previous.at, next.at) * 120).toInt() / 120f,
                 )
             }
             WidgetType.Counter -> {
@@ -251,7 +264,11 @@ object WidgetDataLoader {
                         top = CalendarNames.dayEnShort(today.dayOfWeek),
                         big = "$hh:$mm",
                         bigAccent = setOf(2),
-                        bottom = if (config.style.variant == 1) hijri(today) else "${today.dayOfMonth} ${CalendarNames.monthsEn[today.monthValue - 1].take(3)}",
+                        bottom = when {
+                            config.style.variant == 1 -> hijri(today)
+                            numeric -> String.format(java.util.Locale.ENGLISH, "%02d/%02d", today.dayOfMonth, today.monthValue)
+                            else -> "${today.dayOfMonth} ${CalendarNames.monthsEn[today.monthValue - 1].take(3)}"
+                        },
                     ),
                 )
             }
@@ -274,7 +291,6 @@ object WidgetDataLoader {
                 val prefs = c.settings.prayer.value
                 val times = prefs.timesFor(today)
                 val next = PrayerSchedule.next(now, times, prefs.timesFor(today.plusDays(1)))
-                val left = java.time.Duration.between(now, next.at).toMinutes().coerceAtLeast(0)
                 val previous = times.filter { it.prayer.isObligatory }.map { today.atTime(it.time) }.filter { !it.isAfter(now) }.maxOrNull()
                     ?: next.at.minusHours(6)
                 val total = java.time.Duration.between(previous, next.at).toMinutes().coerceAtLeast(1)
@@ -306,11 +322,21 @@ object WidgetDataLoader {
             }
             WidgetType.NothingDate -> if (config.style.variant == 1) {
                 val h = HijriCalendar.fromGregorian(today)
-                WidgetData.NothingStyle(NothingSpec(top = CalendarNames.hijriEn[h.month - 1], big = h.day.toString(), bottom = "${h.year} AH"))
+                WidgetData.NothingStyle(
+                    NothingSpec(
+                        top = if (numeric) String.format(java.util.Locale.ENGLISH, "%02d/%d", h.month, h.year) else CalendarNames.hijriEn[h.month - 1],
+                        big = h.day.toString(),
+                        bottom = if (numeric) "AH" else "${h.year} AH",
+                    ),
+                )
             } else {
                 WidgetData.NothingStyle(
                     NothingSpec(
-                        top = CalendarNames.monthsEn[today.monthValue - 1],
+                        top = if (numeric) {
+                            String.format(java.util.Locale.ENGLISH, "%02d/%d", today.monthValue, today.year)
+                        } else {
+                            CalendarNames.monthsEn[today.monthValue - 1]
+                        },
                         big = today.dayOfMonth.toString(),
                         bottom = CalendarNames.dayEn(today.dayOfWeek),
                     ),

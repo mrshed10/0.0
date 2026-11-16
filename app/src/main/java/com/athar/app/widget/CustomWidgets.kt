@@ -160,4 +160,6 @@ object CustomWidgets {
 
 /** True if this widget must be redrawn every minute. */
 fun WidgetConfig.needsMinuteTick(): Boolean =
-    content.type.minuteClock || (content.type == WidgetType.Custom && CustomWidgets.needsTick(CustomSpecJson.decode(content.extra)))
+    content.type.minuteClock ||
+        (content.type == WidgetType.NextPrayer && (style.variant == PrayerPulse.RING || style.variant == PrayerPulse.BAR)) ||
+        (content.type == WidgetType.Custom && CustomWidgets.needsTick(CustomSpecJson.decode(content.extra)))

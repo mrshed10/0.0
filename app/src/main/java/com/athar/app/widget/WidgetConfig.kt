@@ -46,7 +46,8 @@ enum class WidgetType(@StringRes val label: Int, val emoji: String, val needsIte
  */
 data class WidgetContent(val type: WidgetType, val itemId: Long = -1, val extra: String = "")
 
-enum class BackgroundKind { Color, Gradient, Image, DotGrid }
+/** [GlowDots] = dark dot matrix lit by a soft glow in the accent colour (Nothing-inspired). */
+enum class BackgroundKind { Color, Gradient, Image, DotGrid, GlowDots }
 
 /** What tapping the widget does. */
 enum class ClickBehavior { None, Quick, OpenApp }
@@ -97,8 +98,13 @@ object WidgetPresets {
     )
     val aurora = WidgetStyle(kind = BackgroundKind.Gradient, color1 = 0xFF2EC4B6.toInt(), color2 = 0xFF8B7CF6.toInt(), opacity = 70)
     val invisible = WidgetStyle(kind = BackgroundKind.Color, opacity = 0, border = false)
+    /** Dark dot matrix lit by a red glow. */
+    val glow = WidgetStyle(
+        kind = BackgroundKind.GlowDots, color1 = 0xFF050507.toInt(), opacity = 100, border = false, cornerDp = 28,
+        textColor = 0xFFFFFFFF.toInt(), accentColor = 0xFFD71921.toInt(),
+    )
 
-    val all = listOf(glassNight, glassClear, frost, gold, aurora, invisible)
+    val all = listOf(glassNight, glassClear, frost, gold, aurora, invisible, glow)
 }
 
 object WidgetJson {

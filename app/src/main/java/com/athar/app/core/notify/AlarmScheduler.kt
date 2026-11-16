@@ -23,7 +23,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /** What happens when an alarm fires. */
-enum class AlarmAction { Notify, Adhan, SilentOn, SilentOff, Refresh, Tick }
+enum class AlarmAction { Notify, Adhan, SilentOn, SilentOff, Refresh, Tick, Chime }
 
 /** One scheduled alarm. */
 data class Alarm(
@@ -55,7 +55,7 @@ class AlarmScheduler(
     suspend fun rescheduleAll(now: LocalDateTime = LocalDateTime.now()) {
         // Silent mode turned off while a window was running: give the phone its sound back.
         if (!settings.prayer.value.silent.enabled) RingerControl.restore(context)
-        val alarms = prayerAlarms(now) + salaryAlarms(now) + reminderAlarms(now) + refreshAlarms(now) + listOfNotNull(clockTick(now))
+        val alarms = prayerAlarms(now) + salaryAlarms(now) + reminderAlarms(now) + refreshAlarms(now) + listOfNotNull(clockTick(now), chimeAlarm(now))
         val codes = alarms.map { it.code }.toSet()
         (settings.scheduledAlarmCodes - codes).forEach { cancel(it) }
         alarms.forEach { schedule(it) }
@@ -164,10 +164,20 @@ class AlarmScheduler(
     private fun clockTick(now: LocalDateTime): Alarm? {
         val store = com.athar.app.widget.WidgetStore(context)
         val needed = com.athar.app.widget.WidgetUpdater.placedWidgetIds(context)
-            .any { store.get(it)?.needsMinuteTick() == true }
+            .any { store.get(it)?.needsMinuteTick() == true } ||
+            com.athar.app.widget.LockCard.isLive(settings.lockCard.value)
         if (!needed) return null
         val next = now.withSecond(0).withNano(0).plusMinutes(1).plusSeconds(1)
         return Alarm(CLOCK_TICK, next, null, null, "", "", AlarmAction.Tick, wakeup = false)
+    }
+
+    /** The hourly chime's next sounding (if turned on). */
+    private fun chimeAlarm(now: LocalDateTime): Alarm? =
+        HourlyChime.nextAt(now, settings.chime.value)?.let { Alarm(CHIME, it, null, null, "", "", AlarmAction.Chime) }
+
+    /** After a chime: schedule only the next one. */
+    fun scheduleChime(now: LocalDateTime = LocalDateTime.now()) {
+        chimeAlarm(now)?.let { schedule(it) } ?: cancel(CHIME)
     }
 
     /** Called on every tick: schedule only the next one (cheap). */
@@ -253,5 +263,6 @@ class AlarmScheduler(
 
     private companion object {
         const val CLOCK_TICK = 9_002
+        const val CHIME = 9_003
     }
 }

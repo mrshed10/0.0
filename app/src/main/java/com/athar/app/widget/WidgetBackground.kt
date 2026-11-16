@@ -60,6 +60,39 @@ object WidgetBackground {
                     y += step
                 }
             }
+            BackgroundKind.GlowDots -> {
+                // Base colour, then a dot matrix whose dots light up near a soft accent glow.
+                canvas.drawRect(rect, Paint().apply { color = style.color1; this.alpha = alpha })
+                val gx = w * 0.78f
+                val gy = h * 0.22f
+                val reach = max(w, h) * 0.85f
+                canvas.drawCircle(
+                    gx, gy, reach,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        shader = android.graphics.RadialGradient(
+                            gx, gy, reach,
+                            (style.accentColor and 0x00FFFFFF) or ((alpha * 0.22f).toInt() shl 24),
+                            style.accentColor and 0x00FFFFFF,
+                            Shader.TileMode.CLAMP,
+                        )
+                    },
+                )
+                val step = 8f * density
+                val dot = Paint(Paint.ANTI_ALIAS_FLAG)
+                var y = step / 2
+                while (y < h) {
+                    var x = step / 2
+                    while (x < w) {
+                        val d = kotlin.math.hypot(x - gx, y - gy) / reach
+                        val light = (1f - d).coerceIn(0f, 1f)
+                        dot.color = if (light > 0.45f) style.accentColor else style.textColor
+                        dot.alpha = ((0.06f + 0.5f * light * light) * alpha).toInt().coerceIn(if (alpha == 0) 0 else 6, 255)
+                        canvas.drawCircle(x, y, (0.9f + 0.7f * light) * density, dot)
+                        x += step
+                    }
+                    y += step
+                }
+            }
             BackgroundKind.Gradient -> canvas.drawRect(rect, gradientPaint(style, w, h, alpha))
             BackgroundKind.Image -> {
                 val image = style.imagePath?.let { loadImage(it, w, h) }
@@ -74,18 +107,36 @@ object WidgetBackground {
             }
         }
 
-        if (style.border) {
+        // The glass rim fades with the background, so a transparent widget has no visible edge.
+        if (hasRim(style)) {
+            val rimAlpha = (style.opacity.coerceIn(0, 100) / 100f).coerceAtLeast(0.35f)
             val stroke = 1.5f * density
             val inset = RectF(stroke / 2, stroke / 2, w - stroke / 2, h - stroke / 2)
             val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.style = Paint.Style.STROKE
                 strokeWidth = stroke
-                shader = LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), 0x55FFFFFF, 0x10FFFFFF, Shader.TileMode.CLAMP)
+                shader = LinearGradient(
+                    0f, 0f, w.toFloat(), h.toFloat(),
+                    ((0x55 * rimAlpha).toInt() shl 24) or 0xFFFFFF,
+                    ((0x10 * rimAlpha).toInt() shl 24) or 0xFFFFFF,
+                    Shader.TileMode.CLAMP,
+                )
             }
             canvas.drawRoundRect(inset, radius, radius, rim)
         }
         return bitmap
     }
+
+    /**
+     * No rim on a (nearly) invisible background: otherwise a faint outline stays
+     * on the home screen around a widget that should blend into the wallpaper.
+     */
+    fun hasRim(style: WidgetStyle): Boolean = style.border &&
+        (style.opacity >= 8 || (style.kind == BackgroundKind.Image && style.imagePath != null))
+
+    /** True when nothing at all is drawn behind the content. */
+    fun isInvisible(style: WidgetStyle): Boolean = style.opacity == 0 && !hasRim(style) &&
+        style.kind != BackgroundKind.Image
 
     private fun gradientPaint(style: WidgetStyle, w: Int, h: Int, alpha: Int): Paint {
         val rad = Math.toRadians(style.angle.toDouble())

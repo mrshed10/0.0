@@ -176,6 +176,10 @@
             android:name=".widget.WidgetActionReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".widget.LockCardReceiver"
+            android:exported="false" />
+
         <service
             android:name=".core.notify.AdhanService"
             android:exported="false"

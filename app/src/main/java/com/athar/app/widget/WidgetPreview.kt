@@ -81,7 +81,7 @@ fun WidgetPreview(
     val ratio = size?.let { (it.width.value / it.height.value).coerceIn(0.5f, 4f) } ?: if (wide) 2.1f else 1f
     BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(ratio)) {
         val target = size ?: DpSize(maxWidth, maxHeight)
-        if (LiveClockViews.isLiveClock(data)) {
+        if (LiveClockViews.isLive(data, config.style)) {
             // Clocks: the widget's own backdrop + the same live clock views, drawn directly.
             LiveClockPreview(config, data, target)
         } else {

@@ -1,6 +1,16 @@
 package com.athar.app.feature.settings
 
+import android.Manifest
 import android.appwidget.AppWidgetManager
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tune
+import com.athar.app.core.notify.Notifier
+import com.athar.app.widget.LockCard
 import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -66,6 +76,7 @@ fun WidgetsSettingsCard(onMessage: (String) -> Unit, onOpenGallery: () -> Unit) 
         val store = WidgetStore(context)
         WidgetUpdater.placedWidgetIds(context).map { it to store.get(it) }
     }
+    var managing by remember { mutableStateOf(false) }
     val pinRequested = stringResource(R.string.pin_requested)
     val pinUnsupported = stringResource(R.string.pin_unsupported)
 
@@ -109,48 +120,109 @@ fun WidgetsSettingsCard(onMessage: (String) -> Unit, onOpenGallery: () -> Unit) 
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
+        GlassButton(
+            stringResource(R.string.widgets_manage),
+            { managing = true },
+            color = AtharColors.Violet,
+            filled = false,
+            icon = Icons.Rounded.Tune,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.widgets_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
     }
+    if (managing) WidgetManagerSheet(onDismiss = { managing = false })
 
     Spacer(Modifier.height(12.dp))
 
-    // Lock-screen card
+    LockCardSettings()
+}
+
+/** The lock-screen card: what it shows, and the permissions it needs to appear. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun LockCardSettings() {
+    val context = LocalContext.current
+    val container = (context.applicationContext as AtharApplication).container
+    val lifecycle = LocalLifecycleOwner.current
+    var resumed by remember { mutableIntStateOf(0) }
+    LaunchedEffect(lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { resumed++ } }
+    val canPost = remember(resumed) { Notifier.canPost(context) }
+    val requestPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { resumed++ }
+
     val lockCard by container.settings.lockCard.collectAsState()
-    val counters by produceState(emptyList<Pair<Long, String>>()) {
-        value = container.counterRepository.counters.first().map { it.id to it.title }
+    val items by produceState(LockItems()) {
+        value = LockItems(
+            counters = container.counterRepository.counters.first().map { it.id to it.title },
+            habits = container.habitRepository.habits.first().map { it.id to it.title },
+            people = container.debtRepository.people.first().map { it.id to it.name },
+        )
     }
     val lockTypes = listOf(
-        WidgetType.NextPrayer, WidgetType.Salary, WidgetType.Schedule, WidgetType.TodayTasks, WidgetType.Habits,
-        WidgetType.Date, WidgetType.Verse, WidgetType.Tasbih,
+        WidgetType.NextPrayer, WidgetType.Schedule, WidgetType.Salary, WidgetType.TodayTasks, WidgetType.Habits,
+        WidgetType.Debts, WidgetType.Date, WidgetType.YearDots, WidgetType.Verse, WidgetType.Dhikr, WidgetType.Tasbih,
     )
     GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Gold) {
         CardHeader(stringResource(R.string.lock_card_title), Icons.Rounded.Lock)
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.lock_card_body), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextSecondary)
-        Spacer(Modifier.height(10.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            GlassChip(
-                stringResource(R.string.off),
-                if (lockCard == null) AtharColors.Gold else AtharColors.TextSecondary,
-                Modifier.clickable { container.settings.setLockCard(null) },
+        if (!canPost) {
+            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.lock_card_need_permission), style = MaterialTheme.typography.bodyMedium, color = AtharColors.Rose)
+            Spacer(Modifier.height(6.dp))
+            GlassButton(
+                stringResource(R.string.allow_notifications),
+                {
+                    if (Build.VERSION.SDK_INT >= 33) {
+                        requestPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        context.startActivity(
+                            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                },
+                color = AtharColors.Rose,
+                icon = Icons.Rounded.NotificationsActive,
+                modifier = Modifier.fillMaxWidth(),
             )
-            lockTypes.forEach { type ->
+        }
+        Spacer(Modifier.height(10.dp))
+        val choices: List<Pair<String, WidgetContent?>> = buildList {
+            add(stringResource(R.string.off) to null)
+            lockTypes.forEach { type -> add("${type.emoji} " + stringResource(type.label) to WidgetContent(type)) }
+            items.counters.forEach { (id, title) -> add("⏳ $title" to WidgetContent(WidgetType.Counter, id)) }
+            items.habits.forEach { (id, title) -> add("🔥 $title" to WidgetContent(WidgetType.Habit, id)) }
+            items.people.forEach { (id, name) -> add("👤 $name" to WidgetContent(WidgetType.DebtPerson, id)) }
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            choices.forEach { (label, content) ->
+                val selected = if (content == null) lockCard == null else lockCard?.type == content.type && lockCard?.itemId == content.itemId
                 GlassChip(
-                    "${type.emoji} " + stringResource(type.label),
-                    if (lockCard?.type == type) AtharColors.Gold else AtharColors.TextSecondary,
-                    Modifier.clickable { container.settings.setLockCard(WidgetContent(type)) },
+                    label,
+                    if (selected) AtharColors.Gold else AtharColors.TextSecondary,
+                    Modifier.clickable { container.settings.setLockCard(content) },
                 )
             }
-            counters.forEach { (id, title) ->
-                GlassChip(
-                    "⏳ $title",
-                    if (lockCard?.type == WidgetType.Counter && lockCard?.itemId == id) AtharColors.Gold else AtharColors.TextSecondary,
-                    Modifier.clickable { container.settings.setLockCard(WidgetContent(WidgetType.Counter, id)) },
-                )
-            }
+        }
+        if (lockCard != null) {
+            Spacer(Modifier.height(10.dp))
+            GlassButton(
+                stringResource(R.string.lock_card_settings),
+                { runCatching { context.startActivity(LockCard.channelSettingsIntent(context)) } },
+                filled = false,
+                icon = Icons.Rounded.Settings,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.lock_card_note), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
     }
 }
+
+private data class LockItems(
+    val counters: List<Pair<Long, String>> = emptyList(),
+    val habits: List<Pair<Long, String>> = emptyList(),
+    val people: List<Pair<Long, String>> = emptyList(),
+)
