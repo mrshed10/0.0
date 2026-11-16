@@ -293,6 +293,7 @@ object WidgetDataLoader {
                 val next = PrayerSchedule.next(now, times, prefs.timesFor(today.plusDays(1)))
                 val previous = times.filter { it.prayer.isObligatory }.map { today.atTime(it.time) }.filter { !it.isAfter(now) }.maxOrNull()
                     ?: next.at.minusHours(6)
+                val left = java.time.Duration.between(now, next.at).toMinutes().coerceAtLeast(0)
                 val total = java.time.Duration.between(previous, next.at).toMinutes().coerceAtLeast(1)
                 WidgetData.NothingStyle(
                     NothingSpec(
