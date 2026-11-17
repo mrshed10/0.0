@@ -69,6 +69,7 @@ class WidgetConfigActivity : ComponentActivity() {
                             wide = wide,
                             previewSize = previewSize,
                             onCancel = { finish() },
+                            designs = (application as com.athar.app.AtharApplication).container.settings.savedDesigns.value,
                             onSaveAsDesign = { config, name ->
                                 (application as com.athar.app.AtharApplication).container.settings.saveDesign(name, config, wide)
                                 android.widget.Toast.makeText(this@WidgetConfigActivity, getString(R.string.design_saved), android.widget.Toast.LENGTH_SHORT).show()

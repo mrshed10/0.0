@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -40,7 +43,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.sp
+import com.athar.app.core.designsystem.component.ColorChoices
+import com.athar.app.core.fonts.FontRegistry
+import com.athar.app.core.fonts.FontScript
+import com.athar.app.core.format.currentLocale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.athar.app.AtharApplication
@@ -67,6 +78,8 @@ fun CustomDesigner(spec: CustomSpec, onChange: (CustomSpec) -> Unit) {
     var editing by remember { mutableStateOf<Int?>(null) }
     GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Violet) {
         CardHeader(stringResource(R.string.designer_title), Icons.Rounded.Palette, tint = AtharColors.Violet)
+        Spacer(Modifier.height(4.dp))
+        Text(stringResource(R.string.designer_tap_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
         Spacer(Modifier.height(10.dp))
         FieldLabel(stringResource(R.string.designer_align))
         Spacer(Modifier.height(6.dp))
@@ -91,7 +104,12 @@ fun CustomDesigner(spec: CustomSpec, onChange: (CustomSpec) -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(e.kind.label), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                     Text(
-                        (if (e.kind == ElementKind.Text) e.text else "") + " · ${e.sizeSp}sp" + (if (e.dots) " · ⠿" else ""),
+                        listOfNotNull(
+                            e.text.takeIf { e.kind == ElementKind.Text && it.isNotBlank() },
+                            "${e.sizeSp}sp",
+                            e.fontId?.let { id -> FontRegistry.bundled.firstOrNull { it.id == id }?.nameEn ?: id },
+                            "B".takeIf { e.bold }, "I".takeIf { e.italic }, "U".takeIf { e.underline }, "⠿".takeIf { e.dots },
+                        ).joinToString(" · "),
                         style = MaterialTheme.typography.labelSmall,
                         color = AtharColors.TextTertiary,
                         maxLines = 1,
@@ -143,12 +161,46 @@ private fun <T> List<T>.swap(i: Int, j: Int): List<T> {
     return toMutableList().also { val t = it[i]; it[i] = it[j]; it[j] = t }
 }
 
+/**
+ * Settings of ONE element: its content, font, size, colour, opacity, style and
+ * alignment. Nothing here changes the other elements of the widget.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ElementEditor(e: CustomElement, onChange: (CustomElement) -> Unit) {
     val context = LocalContext.current
+    val locale = currentLocale()
+    val fonts = remember { FontRegistry.all(context) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.designer_element), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+
+        // Live sample of this element only.
+        val sampleFamily = remember(e.fontId) { e.fontId?.let { FontRegistry.composeFamily(context, it) } ?: FontFamily.Default }
+        val sampleColor = (e.color?.let { Color(it) } ?: if (e.accent) AtharColors.Gold else Color.White)
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.Black.copy(alpha = 0.35f))
+                .padding(14.dp),
+            contentAlignment = when (e.align) {
+                0 -> Alignment.CenterStart
+                2 -> Alignment.CenterEnd
+                else -> Alignment.Center
+            },
+        ) {
+            Text(
+                if (e.kind == ElementKind.Text) e.text.ifBlank { "…" } else stringResource(e.kind.label),
+                fontFamily = sampleFamily,
+                fontSize = e.sizeSp.coerceAtMost(40).sp,
+                fontWeight = if (e.bold) FontWeight.Bold else FontWeight.Normal,
+                fontStyle = if (e.italic) FontStyle.Italic else FontStyle.Normal,
+                textDecoration = if (e.underline) TextDecoration.Underline else null,
+                color = sampleColor.copy(alpha = e.opacity / 100f),
+                maxLines = 2,
+            )
+        }
+
         FieldLabel(stringResource(R.string.designer_kind))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             ElementKind.entries.forEach { kind ->
@@ -177,12 +229,36 @@ private fun ElementEditor(e: CustomElement, onChange: (CustomElement) -> Unit) {
                 }
             }
         }
+
+        // Font of this element only.
+        FieldLabel(stringResource(R.string.element_font))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FontPill(stringResource(R.string.element_font_widget), FontFamily.Default, e.fontId == null) { onChange(e.copy(fontId = null)) }
+            fonts.forEach { info ->
+                val family = remember(info.id) { FontRegistry.composeFamily(context, info.id) }
+                FontPill(
+                    if (info.script == FontScript.Arabic) info.name(locale) else info.nameEn,
+                    family,
+                    e.fontId == info.id,
+                ) { onChange(e.copy(fontId = info.id)) }
+            }
+        }
+
+        // Size: quick stepper + slider.
         Stepper(
             stringResource(R.string.designer_size),
             "${e.sizeSp}sp",
             { n -> onChange(e.copy(sizeSp = (e.sizeSp + n.toInt()).coerceIn(8, 96))) },
             Modifier.fillMaxWidth(),
         )
+        Slider(
+            value = e.sizeSp.toFloat(),
+            onValueChange = { onChange(e.copy(sizeSp = it.toInt().coerceIn(8, 96))) },
+            valueRange = 8f..96f,
+            colors = SliderDefaults.colors(thumbColor = AtharColors.Violet, activeTrackColor = AtharColors.Violet, inactiveTrackColor = Color.White.copy(alpha = 0.15f)),
+        )
+
+        // Colour of this element only.
         FieldLabel(stringResource(R.string.designer_color))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GlassChip(
@@ -195,22 +271,88 @@ private fun ElementEditor(e: CustomElement, onChange: (CustomElement) -> Unit) {
                 if (e.color == null && e.accent) AtharColors.Gold else AtharColors.TextSecondary,
                 Modifier.clickable { onChange(e.copy(color = null, accent = true)) },
             )
-            ElementColors.forEach { argb ->
-                Box(
-                    Modifier
-                        .size(30.dp)
-                        .clip(CircleShape)
-                        .background(Color(argb))
-                        .border(2.dp, if (e.color == argb) AtharColors.Gold else Color.White.copy(alpha = 0.25f), CircleShape)
-                        .clickable { onChange(e.copy(color = argb, accent = false)) },
-                )
-            }
         }
-        ToggleRow(stringResource(R.string.designer_bold), e.bold) { onChange(e.copy(bold = it)) }
-        ToggleRow(stringResource(R.string.designer_dots), e.dots) { onChange(e.copy(dots = it)) }
+        ColorChoices(ElementColors, e.color, { onChange(e.copy(color = it, accent = false)) })
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.element_opacity), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text("${e.opacity}%", style = MaterialTheme.typography.labelLarge, color = AtharColors.Violet)
+        }
+        Slider(
+            value = e.opacity.toFloat(),
+            onValueChange = { onChange(e.copy(opacity = it.toInt().coerceIn(10, 100))) },
+            valueRange = 10f..100f,
+            colors = SliderDefaults.colors(thumbColor = AtharColors.Violet, activeTrackColor = AtharColors.Violet, inactiveTrackColor = Color.White.copy(alpha = 0.15f)),
+        )
+
+        // Formatting.
+        FieldLabel(stringResource(R.string.element_format))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FormatChip("B", stringResource(R.string.designer_bold), e.bold, FontWeight.Bold) { onChange(e.copy(bold = !e.bold)) }
+            FormatChip("I", stringResource(R.string.element_italic), e.italic, style = FontStyle.Italic) { onChange(e.copy(italic = !e.italic)) }
+            FormatChip("U", stringResource(R.string.element_underline), e.underline, underline = true) { onChange(e.copy(underline = !e.underline)) }
+            FormatChip("⠿", stringResource(R.string.designer_dots), e.dots) { onChange(e.copy(dots = !e.dots)) }
+        }
         if (e.dots) {
             Text(stringResource(R.string.designer_dots_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
         }
+        FieldLabel(stringResource(R.string.designer_align))
+        GlassSegmented(
+            options = listOf(
+                stringResource(R.string.element_align_widget),
+                stringResource(R.string.align_start),
+                stringResource(R.string.align_center),
+                stringResource(R.string.align_end),
+            ),
+            selectedIndex = (e.align ?: -1) + 1,
+            onSelect = { onChange(e.copy(align = if (it == 0) null else it - 1)) },
+            accent = AtharColors.Violet,
+        )
+    }
+}
+
+@Composable
+private fun FontPill(name: String, family: FontFamily, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        name,
+        fontFamily = family,
+        fontSize = 15.sp,
+        color = if (selected) AtharColors.Gold else AtharColors.TextSecondary,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (selected) AtharColors.Gold.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    )
+}
+
+@Composable
+private fun FormatChip(
+    symbol: String,
+    label: String,
+    on: Boolean,
+    weight: FontWeight = FontWeight.Normal,
+    style: FontStyle = FontStyle.Normal,
+    underline: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (on) AtharColors.Violet.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.06f))
+            .border(1.dp, if (on) AtharColors.Violet else Color.Transparent, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            symbol,
+            fontWeight = if (weight == FontWeight.Normal) FontWeight.Bold else weight,
+            fontStyle = style,
+            textDecoration = if (underline) TextDecoration.Underline else null,
+            color = if (on) Color.White else AtharColors.TextSecondary,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium, color = if (on) Color.White else AtharColors.TextSecondary)
     }
 }
 

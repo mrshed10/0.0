@@ -23,18 +23,27 @@ object TextBitmap {
         maxWidthPx: Int,
         maxLines: Int,
         center: Boolean,
+        underline: Boolean = false,
+        alignEnd: Boolean = false,
     ): Bitmap {
         val metrics = context.resources.displayMetrics
         val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG or TextPaint.SUBPIXEL_TEXT_FLAG).apply {
             this.typeface = typeface
             this.color = color
             textSize = sizeSp * metrics.density * context.resources.configuration.fontScale
+            isUnderlineText = underline
         }
         val content = text.ifEmpty { " " }
         val desired = ceil(StaticLayout.getDesiredWidth(content, paint)).toInt()
         val width = max(1, min(desired, maxWidthPx.coerceAtLeast(1)))
         val layout = StaticLayout.Builder.obtain(content, 0, content.length, paint, width)
-            .setAlignment(if (center) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL)
+            .setAlignment(
+                when {
+                    center -> Layout.Alignment.ALIGN_CENTER
+                    alignEnd -> Layout.Alignment.ALIGN_OPPOSITE
+                    else -> Layout.Alignment.ALIGN_NORMAL
+                },
+            )
             .setMaxLines(maxLines.coerceAtLeast(1))
             .setEllipsize(TextUtils.TruncateAt.END)
             .setIncludePad(false)

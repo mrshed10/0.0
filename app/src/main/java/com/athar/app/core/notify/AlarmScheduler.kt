@@ -39,6 +39,8 @@ data class Alarm(
     val wakeup: Boolean = true,
     /** Sentence spoken aloud (prayer announcements), if voice is on. */
     val speech: String? = null,
+    /** Recorded announcement played instead of [speech]. */
+    val voiceFile: String? = null,
 )
 
 /**
@@ -98,6 +100,7 @@ class AlarmScheduler(
                         text = "${clock(adhan.toLocalTime())} · $place",
                         action = AlarmAction.Adhan,
                         speech = if (prefs.voice.adhan) PrayerSpeech.adhan(context, name) else null,
+                        voiceFile = if (prefs.voice.adhan) prefs.voice.adhanFile else null,
                     )
                 }
             }
@@ -111,6 +114,7 @@ class AlarmScheduler(
                         title = context.getString(R.string.notif_pre_title, name, minutes.toString()),
                         text = "${clock(adhan.toLocalTime())} · $place",
                         speech = if (prefs.voice.pre) PrayerSpeech.pre(context, name, minutes) else null,
+                        voiceFile = if (prefs.voice.pre) prefs.voice.preFile else null,
                     )
                 }
             }
@@ -124,6 +128,7 @@ class AlarmScheduler(
                         title = context.getString(R.string.notif_iqama_title, name),
                         text = clock(at.toLocalTime()),
                         speech = if (prefs.voice.iqama) PrayerSpeech.iqama(context, name) else null,
+                        voiceFile = if (prefs.voice.iqama) prefs.voice.iqamaFile else null,
                     )
                 }
             }
@@ -255,6 +260,7 @@ class AlarmScheduler(
                 .putExtra(AlarmReceiver.EXTRA_TITLE, alarm.title)
                 .putExtra(AlarmReceiver.EXTRA_TEXT, alarm.text)
                 .putExtra(AlarmReceiver.EXTRA_SPEECH, alarm.speech)
+                .putExtra(AlarmReceiver.EXTRA_VOICE_FILE, alarm.voiceFile)
         }
         return PendingIntent.getBroadcast(
             context,

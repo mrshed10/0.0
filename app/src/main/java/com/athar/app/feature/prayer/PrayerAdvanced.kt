@@ -323,38 +323,103 @@ fun AdhanAudioCard(prefs: PrayerPrefs, viewModel: PrayerViewModel) {
     LockScreenStopCard()
 }
 
-/** Spoken announcements before the prayer, at the adhan and at iqama. */
+/**
+ * Spoken announcements before the prayer, at the adhan and at iqama: which
+ * ones, the voice (engine, natural voices, speed, pitch) or a recorded file.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun VoiceAlertsCard(prefs: PrayerPrefs, viewModel: PrayerViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val voice = prefs.voice
     var speaking by remember { mutableStateOf(false) }
-    val speaker = remember { mutableStateOf<Speaker?>(null) }
-    DisposableEffect(Unit) { onDispose { speaker.value?.shutdown() } }
+    // One engine instance for listing voices and testing; rebuilt when the engine changes.
+    val speaker = remember(voice.engine) { Speaker(context, voice.engine) }
+    DisposableEffect(speaker) { onDispose { speaker.shutdown() } }
+    var engines by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
+    var voices by remember(voice.engine) { mutableStateOf(emptyList<android.speech.tts.Voice>()) }
+    LaunchedEffect(speaker) {
+        if (speaker.awaitReady()) {
+            engines = speaker.engines()
+            voices = speaker.voices()
+        }
+    }
     val dhuhr = stringResource(Prayer.Dhuhr.label)
+    val natural = stringResource(R.string.voice_natural)
+    val network = stringResource(R.string.voice_network)
+    val local = stringResource(R.string.voice_local)
+
     GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Teal) {
         CardHeader(stringResource(R.string.voice_title), Icons.Rounded.RecordVoiceOver, tint = AtharColors.Teal)
         Spacer(Modifier.height(6.dp))
         Text(stringResource(R.string.voice_body), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextSecondary)
-        Spacer(Modifier.height(8.dp))
-        SwitchRow(
-            stringResource(R.string.voice_pre_switch),
-            prefs.voice.pre,
-            { on -> viewModel.setVoice { it.copy(pre = on) } },
-            subtitle = PrayerSpeech.pre(context, dhuhr, 10),
-        )
-        SwitchRow(
-            stringResource(R.string.voice_adhan_switch),
-            prefs.voice.adhan,
-            { on -> viewModel.setVoice { it.copy(adhan = on) } },
-            subtitle = PrayerSpeech.adhan(context, dhuhr),
-        )
-        SwitchRow(
-            stringResource(R.string.voice_iqama_switch),
-            prefs.voice.iqama,
-            { on -> viewModel.setVoice { it.copy(iqama = on) } },
-            subtitle = PrayerSpeech.iqama(context, dhuhr),
-        )
+
+        // Which alerts speak, and an optional recorded file for each.
+        listOf(
+            Triple(R.string.voice_pre_switch, voice.pre, PrayerSpeech.pre(context, dhuhr, 10)),
+            Triple(R.string.voice_adhan_switch, voice.adhan, PrayerSpeech.adhan(context, dhuhr)),
+            Triple(R.string.voice_iqama_switch, voice.iqama, PrayerSpeech.iqama(context, dhuhr)),
+        ).forEachIndexed { i, (label, on, sample) ->
+            Spacer(Modifier.height(10.dp))
+            SwitchRow(
+                stringResource(label),
+                on,
+                { v -> viewModel.setVoice { when (i) { 0 -> it.copy(pre = v); 1 -> it.copy(adhan = v); else -> it.copy(iqama = v) } } },
+                subtitle = sample,
+            )
+            if (on) {
+                Spacer(Modifier.height(6.dp))
+                ToneRow(
+                    stringResource(R.string.voice_file_label),
+                    when (i) { 0 -> voice.preFile; 1 -> voice.adhanFile; else -> voice.iqamaFile },
+                    { f -> viewModel.setVoice { when (i) { 0 -> it.copy(preFile = f); 1 -> it.copy(adhanFile = f); else -> it.copy(iqamaFile = f) } } },
+                    defaultLabel = stringResource(R.string.voice_file_none),
+                )
+            }
+        }
+
+        // The synthetic voice: engine, voice, speed and pitch.
+        Spacer(Modifier.height(14.dp))
+        FieldLabel(stringResource(R.string.voice_engine))
+        Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            GlassChip(
+                stringResource(R.string.voice_engine_default),
+                if (voice.engine == null) AtharColors.Gold else AtharColors.TextSecondary,
+                Modifier.clickable { viewModel.setVoice { it.copy(engine = null, voiceName = null) } },
+            )
+            engines.forEach { (pkg, label) ->
+                GlassChip(
+                    label,
+                    if (voice.engine == pkg) AtharColors.Gold else AtharColors.TextSecondary,
+                    Modifier.clickable { viewModel.setVoice { it.copy(engine = pkg, voiceName = null) } },
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        FieldLabel(stringResource(R.string.voice_choose))
+        Spacer(Modifier.height(6.dp))
+        if (voices.isEmpty()) {
+            Text(stringResource(R.string.voice_none_found), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            GlassChip(
+                stringResource(R.string.voice_best),
+                if (voice.voiceName == null) AtharColors.Gold else AtharColors.TextSecondary,
+                Modifier.clickable { viewModel.setVoice { it.copy(voiceName = null) } },
+            )
+            voices.take(12).forEachIndexed { i, v ->
+                GlassChip(
+                    stringResource(R.string.voice_item, Speaker.describe(i, v, natural, network, local)),
+                    if (voice.voiceName == v.name) AtharColors.Gold else AtharColors.TextSecondary,
+                    Modifier.clickable { viewModel.setVoice { it.copy(voiceName = v.name) } },
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        VoiceSlider(stringResource(R.string.voice_rate), voice.rate) { r -> viewModel.setVoice { it.copy(rate = r) } }
+        VoiceSlider(stringResource(R.string.voice_pitch), voice.pitch) { p -> viewModel.setVoice { it.copy(pitch = p) } }
         Spacer(Modifier.height(10.dp))
         GlassButton(
             stringResource(R.string.voice_test),
@@ -362,8 +427,7 @@ private fun VoiceAlertsCard(prefs: PrayerPrefs, viewModel: PrayerViewModel) {
                 if (!speaking) {
                     speaking = true
                     scope.launch {
-                        val s = speaker.value ?: Speaker(context).also { speaker.value = it }
-                        s.speak(PrayerSpeech.pre(context, dhuhr, 10), alarmStream = false, volume = 1f)
+                        speaker.speak(PrayerSpeech.pre(context, dhuhr, 10), alarmStream = false, volume = 1f, voice.voiceName, voice.rate, voice.pitch)
                         speaking = false
                     }
                 }
@@ -376,7 +440,40 @@ private fun VoiceAlertsCard(prefs: PrayerPrefs, viewModel: PrayerViewModel) {
         )
         Spacer(Modifier.height(6.dp))
         Text(stringResource(R.string.voice_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+        Spacer(Modifier.height(6.dp))
+        GlassButton(
+            stringResource(R.string.voice_install),
+            {
+                runCatching {
+                    context.startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }.recoverCatching {
+                    context.startActivity(
+                        Intent(android.speech.tts.TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+            filled = false,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
+}
+
+@Composable
+private fun VoiceSlider(label: String, value: Float, onChange: (Float) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(String.format(Locale.ENGLISH, "%.2f×", value), style = MaterialTheme.typography.labelLarge, color = AtharColors.Teal)
+    }
+    androidx.compose.material3.Slider(
+        value = value,
+        onValueChange = { onChange((it * 20).toInt() / 20f) },
+        valueRange = 0.5f..1.5f,
+        colors = androidx.compose.material3.SliderDefaults.colors(
+            thumbColor = AtharColors.Teal,
+            activeTrackColor = AtharColors.Teal,
+            inactiveTrackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.15f),
+        ),
+    )
 }
 
 /**

@@ -51,6 +51,17 @@ data class VoicePrefs(
     val pre: Boolean = true,
     val adhan: Boolean = true,
     val iqama: Boolean = true,
+    /** Text-to-speech engine package (e.g. Google or Samsung); null = phone default. */
+    val engine: String? = null,
+    /** Chosen voice name; null = the best-quality voice for the language. */
+    val voiceName: String? = null,
+    /** Speaking speed (0.5–1.5) and pitch (0.5–1.5); slightly slow and calm by default. */
+    val rate: Float = 0.85f,
+    val pitch: Float = 1f,
+    /** Recorded audio (e.g. a human voice MP3) played instead of the synthetic voice. */
+    val preFile: String? = null,
+    val adhanFile: String? = null,
+    val iqamaFile: String? = null,
 )
 
 object IqamaMath {

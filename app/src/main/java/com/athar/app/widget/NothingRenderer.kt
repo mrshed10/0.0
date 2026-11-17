@@ -34,10 +34,23 @@ data class NothingSpec(
 object NothingRenderer {
     private fun alpha(color: Int, a: Float) = Color.argb((255 * a).toInt(), Color.red(color), Color.green(color), Color.blue(color))
 
-    fun render(w: Int, h: Int, spec: NothingSpec, text: Int, accent: Int, fallback: Typeface?): Bitmap {
+    /** Unlit dot colour for the current render (null = faint text colour). */
+    private var unlit: Int? = null
+
+    /**
+     * [dotOn]/[dotOff]: the user's lit/unlit dot colours (null = white dots and
+     * faint unlit dots, the original look).
+     */
+    @Synchronized
+    fun render(
+        w: Int, h: Int, spec: NothingSpec, textColor: Int, accent: Int, fallback: Typeface?,
+        dotOn: Int? = null, dotOff: Int? = null,
+    ): Bitmap {
         val bmp = Bitmap.createBitmap(max(8, w), max(8, h), Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
-        val ghost = alpha(text, 0.07f)
+        val text = dotOn ?: textColor
+        val ghost = dotOff?.let { Color.argb((Color.alpha(it) * 0.4f).toInt(), Color.red(it), Color.green(it), Color.blue(it)) } ?: alpha(text, 0.07f)
+        unlit = dotOff
         if (spec.ring != null) {
             drawRing(canvas, w, h, spec, text, accent, ghost, fallback)
             return bmp
@@ -118,7 +131,7 @@ object NothingRenderer {
             paint.color = when {
                 i < lit -> text
                 i == lit -> accent
-                else -> alpha(text, 0.18f)
+                else -> unlit ?: alpha(text, 0.18f)
             }
             canvas.drawCircle(x + i * step + step / 2, y + h / 2, h * 0.38f, paint)
         }
@@ -137,7 +150,7 @@ object NothingRenderer {
             paint.color = when {
                 i < lit -> text
                 i == lit -> accent
-                else -> alpha(text, 0.18f)
+                else -> unlit ?: alpha(text, 0.18f)
             }
             canvas.drawCircle(cx + (radius * cos(a)).toFloat(), cy + (radius * sin(a)).toFloat(), if (i % 5 == 0) dotR * 1.3f else dotR, paint)
         }

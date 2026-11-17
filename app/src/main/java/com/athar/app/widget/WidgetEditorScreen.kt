@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Grain
+import com.athar.app.core.designsystem.component.ColorChoices
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.ViewAgenda
@@ -94,6 +96,25 @@ private val TextPalette = listOf(
     0xFFFFFFFF, 0xFF111111, 0xFFD71921, 0xFFE6C27A, 0xFF2EC4B6, 0xFF8B7CF6, 0xFFF28AB2, 0xFF7FD1FF, 0xFFB8F2A0, 0xFFFFB86B,
 ).map { it.toInt() }
 
+/** Lit dots: blue, white, green, red, gold, teal, violet, pink, orange. */
+private val LitDotPalette = listOf(
+    0xFF3D8BFF, 0xFFFFFFFF, 0xFF34D058, 0xFFD71921, 0xFFE6C27A, 0xFF2EC4B6, 0xFF8B7CF6, 0xFFF28AB2, 0xFFFF9F43,
+).map { it.toInt() }
+
+/** Unlit dots: faint and dark tones (transparency kept). */
+private val UnlitDotPalette = listOf(
+    0x2EFFFFFF, 0x55FFFFFF, 0x553D8BFF, 0x5534D058, 0x55D71921, 0xFF1B2A4A, 0xFF16321F, 0xFF2A2A2A, 0x00000000,
+).map { it.toInt() }
+
+/** True if the design draws dots whose colours can be chosen. */
+private fun usesDots(config: WidgetConfig): Boolean {
+    val type = config.content.type
+    val style = config.style
+    return style.kind == BackgroundKind.DotGrid || style.kind == BackgroundKind.GlowDots ||
+        type == WidgetType.YearDots || type.name.startsWith("Nothing") ||
+        (type == WidgetType.NextPrayer && PrayerPulse.isAnimatedVariant(style.variant))
+}
+
 /** Looks offered in the editor (label, style). */
 private val EditorPresets: List<Pair<Int, WidgetStyle>> = listOf(
     R.string.preset_nothing_dark to WidgetTemplates.nothingDark,
@@ -127,6 +148,8 @@ fun WidgetEditorScreen(
     previewSize: androidx.compose.ui.unit.DpSize? = null,
     /** Saves the current look as a custom design in "My designs" (name chosen by the user). */
     onSaveAsDesign: ((WidgetConfig, String) -> Unit)? = null,
+    /** The user's saved designs, offered as one-tap starting points. */
+    designs: List<SavedDesign> = emptyList(),
 ) {
     val context = LocalContext.current
     var config by remember { mutableStateOf(initial) }
@@ -199,6 +222,25 @@ fun WidgetEditorScreen(
         item {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 WidgetPreview(config, data, wide, Modifier.fillMaxWidth(if (wide || previewSize != null) 1f else 0.55f), size = previewSize)
+            }
+        }
+
+        // One tap: use one of "My designs" for this widget.
+        if (designs.isNotEmpty()) {
+            item {
+                GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Violet) {
+                    CardHeader(stringResource(R.string.gallery_mine), Icons.Rounded.BookmarkAdd, tint = AtharColors.Violet)
+                    Spacer(Modifier.height(8.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        designs.forEach { d ->
+                            GlassChip(
+                                "${d.config.content.type.emoji} ${d.name}",
+                                if (config == d.config) AtharColors.Gold else AtharColors.TextSecondary,
+                                Modifier.clickable { config = d.config },
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -366,6 +408,7 @@ fun WidgetEditorScreen(
                                             preset.copy(
                                                 imagePath = style.imagePath, fontId = style.fontId, variant = style.variant,
                                                 dateStyle = style.dateStyle, click = style.click, arabicDigits = style.arabicDigits,
+                                                dotOn = style.dotOn, dotOff = style.dotOff,
                                             ),
                                         )
                                     },
@@ -412,14 +455,14 @@ fun WidgetEditorScreen(
                 Spacer(Modifier.height(12.dp))
                 FieldLabel(stringResource(if (style.kind == BackgroundKind.Image) R.string.bg_veil_color else R.string.bg_color_1))
                 Spacer(Modifier.height(6.dp))
-                Swatches(BackgroundPalette, style.color1) {
-                    setStyle(if (style.kind == BackgroundKind.Gradient) style.copy(color1 = it) else style.copy(color1 = it, color2 = it))
-                }
+                ColorChoices(BackgroundPalette, style.color1, { picked ->
+                    picked?.let { setStyle(if (style.kind == BackgroundKind.Gradient) style.copy(color1 = it) else style.copy(color1 = it, color2 = it)) }
+                })
                 if (style.kind == BackgroundKind.Gradient) {
                     Spacer(Modifier.height(10.dp))
                     FieldLabel(stringResource(R.string.bg_color_2))
                     Spacer(Modifier.height(6.dp))
-                    Swatches(BackgroundPalette, style.color2) { setStyle(style.copy(color2 = it)) }
+                    ColorChoices(BackgroundPalette, style.color2, { c -> c?.let { setStyle(style.copy(color2 = it)) } })
                     Spacer(Modifier.height(10.dp))
                     FieldLabel(stringResource(R.string.bg_direction))
                     Spacer(Modifier.height(6.dp))
@@ -475,13 +518,38 @@ fun WidgetEditorScreen(
                 Spacer(Modifier.height(10.dp))
                 FieldLabel(stringResource(R.string.text_color))
                 Spacer(Modifier.height(6.dp))
-                Swatches(TextPalette, style.textColor) { setStyle(style.copy(textColor = it)) }
+                ColorChoices(TextPalette, style.textColor, { c -> c?.let { setStyle(style.copy(textColor = it)) } })
                 Spacer(Modifier.height(12.dp))
                 FieldLabel(stringResource(R.string.accent_color))
                 Spacer(Modifier.height(6.dp))
-                Swatches(TextPalette, style.accentColor) { setStyle(style.copy(accentColor = it)) }
+                ColorChoices(TextPalette, style.accentColor, { c -> c?.let { setStyle(style.copy(accentColor = it)) } })
             }
         }
+        // Dot colours (dot-matrix designs, dot backgrounds, animated prayer dots).
+        if (usesDots(config)) {
+            item {
+                GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Teal) {
+                    CardHeader(stringResource(R.string.dot_colors), Icons.Rounded.Grain, tint = AtharColors.Teal)
+                    Spacer(Modifier.height(10.dp))
+                    FieldLabel(stringResource(R.string.dot_lit))
+                    Spacer(Modifier.height(6.dp))
+                    ColorChoices(LitDotPalette, style.dotOn, { setStyle(style.copy(dotOn = it)) }, defaultLabel = stringResource(R.string.dot_default))
+                    Spacer(Modifier.height(12.dp))
+                    FieldLabel(stringResource(R.string.dot_unlit))
+                    Spacer(Modifier.height(6.dp))
+                    ColorChoices(
+                        UnlitDotPalette,
+                        style.dotOff,
+                        { setStyle(style.copy(dotOff = it)) },
+                        defaultLabel = stringResource(R.string.dot_default),
+                        allowAlpha = true,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.dot_colors_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+                }
+            }
+        }
+
         item {
             GlassCard(Modifier.fillMaxWidth()) {
                 CardHeader(stringResource(R.string.widget_date_style), Icons.Rounded.CalendarMonth, tint = AtharColors.Gold)

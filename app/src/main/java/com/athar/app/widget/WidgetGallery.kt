@@ -32,6 +32,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AddToHomeScreen
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.runtime.rememberCoroutineScope
+import com.athar.app.core.designsystem.component.ConfirmButton
+import com.athar.app.core.designsystem.component.GlassButton
+import com.athar.app.core.designsystem.component.GlassTextField
+import com.athar.app.core.designsystem.glass.GlassSheet
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.size
@@ -253,6 +264,48 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
         return if (type.needsItem) t.config.copy(content = t.config.content.copy(itemId = firstItems[type] ?: -1)) else t.config
     }
 
+    var actionsFor by remember { mutableStateOf<SavedDesign?>(null) }
+    var editingSaved by remember { mutableStateOf<SavedDesign?>(null) }
+    val updatedMsg = stringResource(R.string.design_updated)
+
+    editingSaved?.let { design ->
+        BackHandler { editingSaved = null }
+        WidgetEditorScreen(
+            initial = design.config,
+            wide = design.wide,
+            saveLabel = stringResource(R.string.save_changes),
+            onCancel = { editingSaved = null },
+            onSave = { config ->
+                settings.updateDesign(design.id, config)
+                Toast.makeText(context, updatedMsg, Toast.LENGTH_SHORT).show()
+                editingSaved = null
+            },
+            onSaveAsDesign = { config, name ->
+                settings.saveDesign(name, config, design.wide)
+                Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+                editingSaved = null
+            },
+        )
+        return
+    }
+    actionsFor?.let { design ->
+        DesignActionsSheet(
+            design = design,
+            onDismiss = { actionsFor = null },
+            onPlace = {
+                val ok = WidgetPinner.pin(context, design.config, small = !design.wide)
+                Toast.makeText(context, if (ok) pinRequested else pinUnsupported, Toast.LENGTH_LONG).show()
+                actionsFor = null
+            },
+            onEdit = { editingSaved = design; actionsFor = null },
+            onDelete = {
+                settings.deleteDesign(design.id)
+                Toast.makeText(context, deletedMsg, Toast.LENGTH_SHORT).show()
+                actionsFor = null
+            },
+        )
+    }
+
     customizing?.let { template ->
         BackHandler { customizing = null }
         WidgetEditorScreen(
@@ -351,6 +404,11 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
             }
             items(visible, key = { it.id }, span = { GridItemSpan(if (it.wide) 2 else 1) }) { template ->
                 TemplateCell(template, resolved(template), onRemove = { remove(template) }) {
+                    val savedDesign = template.savedId?.let { id -> saved.firstOrNull { it.id == id } }
+                    if (savedDesign != null) {
+                        actionsFor = savedDesign
+                        return@TemplateCell
+                    }
                     val type = template.config.content.type
                     if (type.needsItem && (firstItems[type] ?: -1) < 0) {
                         Toast.makeText(context, needItem, Toast.LENGTH_LONG).show()
@@ -438,5 +496,88 @@ private fun TemplateCell(template: WidgetTemplate, config: WidgetConfig, onRemov
                 )
             }
         }
+    }
+}
+
+/** What to do with one of "My designs". */
+@Composable
+private fun DesignActionsSheet(
+    design: SavedDesign,
+    onDismiss: () -> Unit,
+    onPlace: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val context = LocalContext.current
+    val settings = (context.applicationContext as AtharApplication).container.settings
+    var renaming by remember { mutableStateOf(false) }
+    var name by remember(design.id) { mutableStateOf(design.name) }
+    var applying by remember { mutableStateOf(false) }
+    val copySuffix = stringResource(R.string.design_copy_suffix)
+    val appliedMsg = stringResource(R.string.design_applied)
+    val placed = remember(applying) {
+        val store = WidgetStore(context)
+        WidgetUpdater.placedWidgetIds(context).map { it to store.get(it) }
+    }
+    val scope = rememberCoroutineScope()
+
+    GlassSheet(onDismiss = onDismiss) {
+        Text(design.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        GlassButton(stringResource(R.string.add_to_home_screen), onPlace, icon = Icons.Rounded.AddToHomeScreen, modifier = Modifier.fillMaxWidth())
+        GlassButton(stringResource(R.string.design_edit), onEdit, filled = false, icon = Icons.Rounded.Edit, modifier = Modifier.fillMaxWidth())
+        GlassButton(
+            stringResource(R.string.design_apply),
+            { applying = !applying },
+            filled = false,
+            icon = Icons.Rounded.Widgets,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (applying) {
+            if (placed.isEmpty()) {
+                Text(stringResource(R.string.widgets_none), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextTertiary)
+            }
+            placed.forEachIndexed { i, (id, current) ->
+                Text(
+                    "${i + 1}. " + (current?.let { "${it.content.type.emoji} " + stringResource(it.content.type.label) } ?: stringResource(R.string.widget_tap_to_setup)),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
+                        .clickable {
+                            WidgetStore(context).put(id, design.config)
+                            scope.launch { WidgetUpdater.refresh(context, id) }
+                            Toast.makeText(context, appliedMsg, Toast.LENGTH_SHORT).show()
+                            onDismiss()
+                        }
+                        .padding(12.dp),
+                )
+            }
+        }
+        if (renaming) {
+            GlassTextField(name, { name = it.take(40) }, stringResource(R.string.design_name_hint), Modifier.fillMaxWidth())
+            GlassButton(
+                stringResource(R.string.save),
+                { settings.updateDesign(design.id, name = name); renaming = false; onDismiss() },
+                icon = Icons.Rounded.Check,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlassButton(stringResource(R.string.design_rename), { renaming = true }, filled = false, modifier = Modifier.weight(1f))
+                GlassButton(
+                    stringResource(R.string.design_duplicate),
+                    { settings.duplicateDesign(design.id, copySuffix); onDismiss() },
+                    filled = false,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        ConfirmButton(
+            text = stringResource(R.string.delete),
+            confirmText = stringResource(R.string.tap_to_confirm),
+            onConfirm = onDelete,
+            icon = Icons.Rounded.DeleteOutline,
+        )
     }
 }

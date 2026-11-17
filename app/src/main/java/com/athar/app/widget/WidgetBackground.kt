@@ -47,8 +47,15 @@ object WidgetBackground {
                 canvas.drawRect(rect, Paint().apply { color = style.color1; this.alpha = alpha })
                 val step = 9f * density
                 val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = style.textColor
-                    this.alpha = (alpha * 0.07f).toInt().coerceAtLeast(8)
+                    // The user's unlit-dot colour, if chosen; otherwise a faint text colour.
+                    val off = style.dotOff
+                    if (off != null) {
+                        color = off
+                        this.alpha = (android.graphics.Color.alpha(off) * alpha / 255f * 0.6f).toInt().coerceAtLeast(if (alpha == 0) 0 else 6)
+                    } else {
+                        color = style.textColor
+                        this.alpha = (alpha * 0.07f).toInt().coerceAtLeast(8)
+                    }
                 }
                 var y = step / 2
                 while (y < h) {
@@ -71,8 +78,8 @@ object WidgetBackground {
                     Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         shader = android.graphics.RadialGradient(
                             gx, gy, reach,
-                            (style.accentColor and 0x00FFFFFF) or ((alpha * 0.22f).toInt() shl 24),
-                            style.accentColor and 0x00FFFFFF,
+                            (style.litDots(style.accentColor) and 0x00FFFFFF) or ((alpha * 0.22f).toInt() shl 24),
+                            style.litDots(style.accentColor) and 0x00FFFFFF,
                             Shader.TileMode.CLAMP,
                         )
                     },
@@ -85,7 +92,7 @@ object WidgetBackground {
                     while (x < w) {
                         val d = kotlin.math.hypot(x - gx, y - gy) / reach
                         val light = (1f - d).coerceIn(0f, 1f)
-                        dot.color = if (light > 0.45f) style.accentColor else style.textColor
+                        dot.color = if (light > 0.45f) style.litDots(style.accentColor) else style.dotOff ?: style.textColor
                         dot.alpha = ((0.06f + 0.5f * light * light) * alpha).toInt().coerceIn(if (alpha == 0) 0 else 6, 255)
                         canvas.drawCircle(x, y, (0.9f + 0.7f * light) * density, dot)
                         x += step

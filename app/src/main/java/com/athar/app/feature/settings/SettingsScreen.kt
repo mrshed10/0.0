@@ -164,6 +164,8 @@ fun SettingsRoute(onBack: () -> Unit, onOpenGallery: () -> Unit, viewModel: Sett
 
             item(key = "chime") { ChimeCard() }
 
+            item(key = "sounds") { com.athar.app.core.notify.MySoundsCard() }
+
             item(key = "security") {
                 val available = remember { BiometricAuth.isAvailable(context) }
                 GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Gold) {

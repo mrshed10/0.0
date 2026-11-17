@@ -329,12 +329,12 @@ private fun PreviewContent(d: WidgetData, style: WidgetStyle, small: Boolean) {
             }
             Spacer(Modifier.height(6.dp))
             Box(Modifier.weight(1f)) {
-                RenderedPreview(style) { w, h, _ -> WidgetRenderers.dots(w, h, d.filled, d.total, style.textColor) }
+                RenderedPreview(style) { w, h, _ -> WidgetRenderers.dots(w, h, d.filled, d.total, style.litDots(), style.dotOff) }
             }
         }
         is WidgetData.WorldClock -> WorldPreview(d, style, text, accent)
         is WidgetData.NothingStyle -> RenderedPreview(style) { w, h, tf ->
-            NothingRenderer.render(w, h, d.spec, style.textColor, style.accentColor, tf)
+            NothingRenderer.render(w, h, d.spec, style.textColor, style.accentColor, tf, style.dotOn, style.dotOff)
         }
         is WidgetData.Custom -> Column(
             Modifier.fillMaxSize(),
@@ -346,8 +346,25 @@ private fun PreviewContent(d: WidgetData, style: WidgetStyle, small: Boolean) {
             verticalArrangement = Arrangement.Center,
         ) {
             d.lines.forEach { line ->
-                val color = line.color?.let { Color(it) } ?: if (line.accent) accent else text
-                PText(line.text, color, line.sizeSp.sp, bold = line.bold, center = d.align == 1, maxLines = 2)
+                val base = line.color?.let { Color(it) } ?: if (line.accent) accent else text
+                val family = remember(line.fontId) { line.fontId?.let { FontRegistry.composeFamily(context, it) } }
+                Text(
+                    line.text,
+                    color = base.copy(alpha = base.alpha * line.opacity / 100f),
+                    fontSize = line.sizeSp.sp,
+                    fontFamily = family ?: LocalPreviewFont.current,
+                    fontWeight = if (line.bold) FontWeight.Bold else FontWeight.Normal,
+                    fontStyle = if (line.italic) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal,
+                    textDecoration = if (line.underline) androidx.compose.ui.text.style.TextDecoration.Underline else null,
+                    textAlign = when (line.align) {
+                        0 -> TextAlign.Start
+                        2 -> TextAlign.End
+                        else -> TextAlign.Center
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         }
         is WidgetData.WideClock -> WidePreview(style.variant == 1, text)

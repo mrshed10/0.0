@@ -65,7 +65,7 @@ object PrayerPulse {
             countDp = (side * 0.15f).coerceIn(13f, 34f)
             timeDp = (side * 0.075f).coerceIn(9f, 16f)
             val px = (side * density).roundToInt().coerceIn(48, 260)
-            frames = ringFrames(px, data.progress, ws.textColor, ws.accentColor)
+            frames = ringFrames(px, data.progress, ws.unlitDots(fadedAlpha = 40), ws.litDots(ws.accentColor))
         } else {
             nameDp = (hDp * 0.17f).coerceIn(12f, 26f)
             countDp = (hDp * 0.22f).coerceIn(14f, 36f)
@@ -73,7 +73,7 @@ object PrayerPulse {
             val barH = (hDp * 0.3f).coerceIn(12f, 40f)
             val wPx = (wDp * density).roundToInt().coerceIn(48, 520)
             val hPx = (barH * density).roundToInt().coerceIn(10, 60)
-            frames = barFrames(wPx, hPx, data.progress, ws.textColor, ws.accentColor)
+            frames = barFrames(wPx, hPx, data.progress, ws.unlitDots(fadedAlpha = 38), ws.litDots(ws.accentColor))
         }
         frames.forEachIndexed { i, bitmap -> views.setImageViewBitmap(frameIds[i], bitmap) }
 
@@ -160,7 +160,7 @@ object PrayerPulse {
         val barH = (hDp * 0.22f).coerceIn(10f, 32f)
         val wPx = (wDp * density).roundToInt().coerceIn(48, 520)
         val hPx = (barH * density).roundToInt().coerceIn(10, 48)
-        val frames = barFrames(wPx, hPx, if (data.inIqama) data.iqamaProgress else data.progress, ws.textColor, ws.accentColor)
+        val frames = barFrames(wPx, hPx, if (data.inIqama) data.iqamaProgress else data.progress, ws.unlitDots(fadedAlpha = 38), ws.litDots(ws.accentColor))
         frames.forEachIndexed { i, bitmap -> views.setImageViewBitmap(frameIds[i], bitmap) }
         return views
     }
@@ -194,6 +194,7 @@ object PrayerPulse {
 
     internal fun litCount(progress: Float, total: Int): Int = ceil(progress.coerceIn(0f, 1f) * total).toInt().coerceIn(1, total)
 
+    /** [base] = unlit dot colour (alpha used as is), [accent] = lit dots. */
     fun ringFrames(sizePx: Int, progress: Float, base: Int, accent: Int): List<Bitmap> {
         val n = 48
         val lit = litCount(progress, n)
@@ -217,7 +218,6 @@ object PrayerPulse {
                     canvas.drawCircle(x, y, dot * (1f + 0.3f * boost), paint)
                 } else {
                     paint.color = base
-                    paint.alpha = 40
                     canvas.drawCircle(x, y, dot * 0.75f, paint)
                 }
             }
@@ -260,7 +260,6 @@ object PrayerPulse {
                         canvas.drawCircle(x, y, dot * (1f + 0.25f * boost), paint)
                     } else {
                         paint.color = base
-                        paint.alpha = 38
                         canvas.drawCircle(x, y, dot * 0.8f, paint)
                     }
                 }

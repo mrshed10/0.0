@@ -190,7 +190,7 @@ internal fun WidgetRoot(appWidgetId: Int, style: WidgetStyle, data: WidgetData) 
                 }
                 is WidgetData.Dots -> DotsContent(data, style, text, accent)
                 is WidgetData.NothingStyle -> BitmapContent("home") { w, h ->
-                    NothingRenderer.render(w, h, data.spec, style.textColor, style.accentColor, font?.first)
+                    NothingRenderer.render(w, h, data.spec, style.textColor, style.accentColor, font?.first, style.dotOn, style.dotOff)
                 }
                 is WidgetData.Custom -> CustomContent(data, text, accent)
                 is WidgetData.MonthGrid -> BitmapContent("dates") { w, h ->
@@ -602,7 +602,7 @@ private fun DotsContent(d: WidgetData.Dots, ws: WidgetStyle, text: Color, accent
     val w = LocalTextWidth.current
     val density = LocalContext.current.resources.displayMetrics.density
     val h = (LocalContentHeight.current - 26 * density).toInt().coerceAtLeast(20)
-    val dots = remember(d, w, h, ws.textColor) { WidgetRenderers.dots(w, h, d.filled, d.total, ws.textColor) }
+    val dots = remember(d, w, h, ws) { WidgetRenderers.dots(w, h, d.filled, d.total, ws.litDots(), ws.dotOff) }
     Column(GlanceModifier.fillMaxSize().tapOpen("home")) {
         Row(GlanceModifier.fillMaxWidth()) {
             WText(d.title, style = style(text.copy(alpha = 0.8f), 13.sp), maxLines = 1, modifier = GlanceModifier.defaultWeight())
@@ -707,36 +707,71 @@ private fun ClockContent(d: WidgetData.Clock, ws: WidgetStyle, small: Boolean, t
     }
 }
 
-/** A widget the user designed: stacked lines, each with its own size, colour and style. */
+/**
+ * A widget the user designed: stacked elements, each with its own font, size,
+ * colour, opacity, style (bold/italic/underline/dots) and alignment.
+ */
 @Composable
 private fun CustomContent(d: WidgetData.Custom, text: Color, accent: Color) {
     val context = LocalContext.current
     val density = context.resources.displayMetrics.density
     val scale = LocalScale.current
     val width = LocalTextWidth.current
-    val align = when (d.align) {
-        0 -> Alignment.Start
-        2 -> Alignment.End
-        else -> Alignment.CenterHorizontally
-    }
-    val textAlign = when (d.align) {
-        0 -> TextAlign.Start
-        2 -> TextAlign.End
-        else -> TextAlign.Center
-    }
+    val widgetFont = LocalWidgetFont.current
     Column(
         GlanceModifier.fillMaxSize().tapOpen("home"),
-        horizontalAlignment = align,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         d.lines.forEach { line ->
-            val color = line.color?.let { Color(it) } ?: if (line.accent) accent else text
-            if (line.dots && DotMatrix.supports(line.text)) {
-                val heightPx = (line.sizeSp * scale * density * 0.9f).toInt().coerceAtLeast(8)
-                val bitmap = remember(line, heightPx, width, color) { WidgetRenderers.dotText(line.text, heightPx, width, color.toArgb()) }
-                Image(ImageProvider(bitmap), contentDescription = line.text)
-            } else {
-                WText(line.text, style = style(color, line.sizeSp.sp, bold = line.bold, align = textAlign), maxLines = 2)
+            val base = line.color?.let { Color(it) } ?: if (line.accent) accent else text
+            val color = base.copy(alpha = base.alpha * line.opacity / 100f)
+            val boxAlign = when (line.align) {
+                0 -> Alignment.CenterStart
+                2 -> Alignment.CenterEnd
+                else -> Alignment.Center
+            }
+            Box(GlanceModifier.fillMaxWidth(), contentAlignment = boxAlign) {
+                if (line.dots && DotMatrix.supports(line.text)) {
+                    val heightPx = (line.sizeSp * scale * density * 0.9f).toInt().coerceAtLeast(8)
+                    val bitmap = remember(line, heightPx, width, color) { WidgetRenderers.dotText(line.text, heightPx, width, color.toArgb()) }
+                    Image(ImageProvider(bitmap), contentDescription = line.text)
+                } else {
+                    // Each element can use its own font; otherwise the widget's font.
+                    val own = remember(line.fontId) { line.fontId?.let { FontRegistry.typeface(context, it) } }
+                    val regular = own ?: widgetFont?.first
+                    if (regular == null && !line.italic && !line.underline) {
+                        Text(
+                            line.text,
+                            style = TextStyle(
+                                color = c(color),
+                                fontSize = line.sizeSp.sp * scale,
+                                fontWeight = if (line.bold) FontWeight.Bold else FontWeight.Normal,
+                                textAlign = when (line.align) {
+                                    0 -> TextAlign.Start
+                                    2 -> TextAlign.End
+                                    else -> TextAlign.Center
+                                },
+                            ),
+                            maxLines = 2,
+                        )
+                    } else {
+                        val bitmap = remember(line, scale, width, color, regular) {
+                            val baseFace = regular ?: Typeface.DEFAULT
+                            val boldFace = when {
+                                !line.bold -> baseFace
+                                own != null -> FontRegistry.boldTypeface(context, line.fontId, own)
+                                widgetFont != null && regular === widgetFont.first -> widgetFont.second
+                                else -> Typeface.create(baseFace, Typeface.BOLD)
+                            }
+                            val face = if (line.italic) Typeface.create(boldFace, if (line.bold) Typeface.BOLD_ITALIC else Typeface.ITALIC) else boldFace
+                            TextBitmap.render(
+                                context, line.text, face, line.sizeSp * scale, color.toArgb(), width, 2,
+                                center = line.align == 1, underline = line.underline, alignEnd = line.align == 2,
+                            )
+                        }
+                        Image(ImageProvider(bitmap), contentDescription = line.text)
+                    }
+                }
             }
         }
     }

@@ -36,7 +36,7 @@ object WidgetRenderers {
     }
 
     /** [filled] of [total] dots (days of the year or month) in a grid that fills the box. */
-    fun dots(w: Int, h: Int, filled: Int, total: Int, on: Int): Bitmap {
+    fun dots(w: Int, h: Int, filled: Int, total: Int, on: Int, off: Int? = null): Bitmap {
         val bmp = bitmap(w, h)
         val canvas = Canvas(bmp)
         val cols = max(1, ceil(sqrt(total * w.toFloat() / h)).toInt())
@@ -51,7 +51,7 @@ object WidgetRenderers {
             when {
                 i < filled -> { paint.style = Paint.Style.FILL; paint.color = on }
                 i == filled -> { paint.style = Paint.Style.FILL; paint.color = withAlpha(on, 0.55f) }
-                else -> { paint.style = Paint.Style.FILL; paint.color = withAlpha(on, 0.18f) }
+                else -> { paint.style = Paint.Style.FILL; paint.color = off ?: withAlpha(on, 0.18f) }
             }
             canvas.drawCircle(cx, cy, r, paint)
         }

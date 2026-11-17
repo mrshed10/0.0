@@ -30,22 +30,23 @@ class AlarmReceiver : BroadcastReceiver() {
         val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()
         val tone = intent.getStringExtra(EXTRA_TONE)
         val speech = intent.getStringExtra(EXTRA_SPEECH)
+        val voiceFile = intent.getStringExtra(EXTRA_VOICE_FILE)
         val prefs = (context.applicationContext as AtharApplication).container.settings.prayer.value
 
         when (action) {
             AlarmAction.Notify -> if (kind != null) {
                 val audio = context.getSystemService(android.media.AudioManager::class.java)
-                val canSpeak = speech != null && Notifier.canPost(context) &&
+                val canSpeak = (speech != null || voiceFile != null) && Notifier.canPost(context) &&
                     audio.ringerMode == android.media.AudioManager.RINGER_MODE_NORMAL
                 if (canSpeak) {
                     // Tone + spoken sentence, with a stop button on the lock screen.
-                    AdhanService.announce(context, id, kind, tone, prefs.volume.coerceAudible(), title, text, speech!!)
+                    AdhanService.announce(context, id, kind, tone, prefs.volume.coerceAudible(), title, text, speech.orEmpty(), voiceFile)
                 } else {
                     Notifier.post(context, id, kind, tone, title, text)
                 }
             }
             AlarmAction.Adhan -> if (Notifier.canPost(context)) {
-                AdhanService.start(context, kind == AlertKind.Fajr, tone, prefs.volume, prefs.adhanInSilent, title, text, speech)
+                AdhanService.start(context, kind == AlertKind.Fajr, tone, prefs.volume, prefs.adhanInSilent, title, text, speech, voiceFile)
             }
             AlarmAction.SilentOn -> if (RingerControl.enable(context, prefs.silent.mode)) {
                 Notifier.post(context, SILENT_NOTIFICATION, AlertKind.Status, null, title, text)
@@ -95,6 +96,7 @@ class AlarmReceiver : BroadcastReceiver() {
         const val EXTRA_TEXT = "text"
         const val EXTRA_ACTION = "action"
         const val EXTRA_SPEECH = "speech"
+        const val EXTRA_VOICE_FILE = "voiceFile"
         private const val SILENT_NOTIFICATION = 5_151
     }
 }
@@ -112,6 +114,7 @@ private fun BroadcastReceiver.rescheduleAsync(context: Context) {
     val container = (context.applicationContext as AtharApplication).container
     CoroutineScope(Dispatchers.IO).launch {
         try {
+            Tones.grantAll(context)
             container.alarmScheduler.rescheduleAll()
             WidgetUpdater.refreshAll(context)
         } finally {

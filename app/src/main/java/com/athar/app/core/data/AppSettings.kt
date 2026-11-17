@@ -148,6 +148,13 @@ class AppSettings(context: Context) {
             .putBoolean("voice_pre", value.voice.pre)
             .putBoolean("voice_adhan", value.voice.adhan)
             .putBoolean("voice_iqama", value.voice.iqama)
+            .putString("voice_engine", value.voice.engine)
+            .putString("voice_name", value.voice.voiceName)
+            .putFloat("voice_rate", value.voice.rate)
+            .putFloat("voice_pitch", value.voice.pitch)
+            .putString("voice_pre_file", value.voice.preFile)
+            .putString("voice_adhan_file", value.voice.adhanFile)
+            .putString("voice_iqama_file", value.voice.iqamaFile)
             .apply()
         _prayer.value = value
     }
@@ -170,6 +177,13 @@ class AppSettings(context: Context) {
                 pre = prefs.getBoolean("voice_pre", true),
                 adhan = prefs.getBoolean("voice_adhan", true),
                 iqama = prefs.getBoolean("voice_iqama", true),
+                engine = prefs.getString("voice_engine", null),
+                voiceName = prefs.getString("voice_name", null),
+                rate = prefs.getFloat("voice_rate", 0.85f).coerceIn(0.5f, 1.5f),
+                pitch = prefs.getFloat("voice_pitch", 1f).coerceIn(0.5f, 1.5f),
+                preFile = prefs.getString("voice_pre_file", null),
+                adhanFile = prefs.getString("voice_adhan_file", null),
+                iqamaFile = prefs.getString("voice_iqama_file", null),
             ),
         )
     }
@@ -333,6 +347,21 @@ class AppSettings(context: Context) {
     }
 
     fun deleteDesign(id: String) = writeDesigns(_savedDesigns.value.filterNot { it.id == id })
+
+    fun updateDesign(id: String, config: com.athar.app.widget.WidgetConfig? = null, name: String? = null) =
+        writeDesigns(
+            _savedDesigns.value.map {
+                if (it.id == id) it.copy(config = config ?: it.config, name = name?.trim()?.take(40)?.ifBlank { null } ?: it.name) else it
+            },
+        )
+
+    fun duplicateDesign(id: String, copySuffix: String) {
+        val list = _savedDesigns.value
+        val i = list.indexOfFirst { it.id == id }
+        if (i < 0) return
+        val copy = list[i].copy(id = "d" + System.currentTimeMillis(), name = (list[i].name + " " + copySuffix).take(40))
+        writeDesigns(list.toMutableList().also { it.add(i + 1, copy) })
+    }
 
     private fun writeDesigns(list: List<com.athar.app.widget.SavedDesign>) {
         prefs.edit().putString("saved_designs", com.athar.app.widget.SavedDesignsJson.encode(list)).apply()

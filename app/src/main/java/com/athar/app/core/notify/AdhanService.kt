@@ -63,6 +63,7 @@ class AdhanService : Service() {
         val volume: AdhanVolume,
         val alarmStream: Boolean,
         val speech: String?,
+        val voiceFile: String?,
         val notificationId: Int,
     )
 
@@ -100,7 +101,8 @@ class AdhanService : Service() {
             tone = intent.getStringExtra(EXTRA_TONE),
             volume = AdhanVolume.entries.firstOrNull { it.name == intent.getStringExtra(EXTRA_VOLUME) } ?: AdhanVolume.Alarm,
             alarmStream = intent.getBooleanExtra(EXTRA_IN_SILENT, true),
-            speech = intent.getStringExtra(EXTRA_SPEECH),
+            speech = intent.getStringExtra(EXTRA_SPEECH)?.takeIf { it.isNotBlank() },
+            voiceFile = intent.getStringExtra(EXTRA_VOICE_FILE),
             notificationId = intent.getIntExtra(EXTRA_ID, NOTIFICATION_ID),
         )
         current = request
@@ -124,10 +126,10 @@ class AdhanService : Service() {
                 if (announcement) {
                     // Pre-alert / iqama: short tone, then the spoken sentence.
                     if (request.tone != null) play(request.tone, request.volume, request.alarmStream, limitMs = 15_000)
-                    request.speech?.let { speak(it, request) }
+                    announce(request)
                 } else {
                     // Adhan: the spoken announcement first, then the adhan itself.
-                    request.speech?.let { speak(it, request) }
+                    announce(request)
                     play(request.tone, request.volume, request.alarmStream, limitMs = MAX_PLAY_MS)
                 }
             }
@@ -136,9 +138,21 @@ class AdhanService : Service() {
         return START_NOT_STICKY
     }
 
+    /** A recorded announcement if the user chose one, otherwise the spoken sentence. */
+    private suspend fun announce(request: Request) {
+        val file = request.voiceFile
+        if (file != null) {
+            play(file, request.volume, request.alarmStream, limitMs = 60_000)
+            delay(250)
+            return
+        }
+        request.speech?.let { speak(it, request) }
+    }
+
     private suspend fun speak(text: String, request: Request) {
-        val s = speaker ?: Speaker(this).also { speaker = it }
-        s.speak(text, request.alarmStream, request.volume.factor)
+        val voice = (application as com.athar.app.AtharApplication).container.settings.prayer.value.voice
+        val s = speaker ?: Speaker(this, voice.engine).also { speaker = it }
+        s.speak(text, request.alarmStream, request.volume.factor, voice.voiceName, voice.rate, voice.pitch)
         delay(250)
     }
 
@@ -223,6 +237,7 @@ class AdhanService : Service() {
         private const val EXTRA_IN_SILENT = "inSilent"
         private const val EXTRA_TONE = "tone"
         private const val EXTRA_SPEECH = "speech"
+        private const val EXTRA_VOICE_FILE = "voiceFile"
         private const val EXTRA_ANNOUNCE = "announce"
         private const val EXTRA_KIND = "kind"
         private const val EXTRA_ID = "id"
@@ -255,8 +270,10 @@ class AdhanService : Service() {
             title: String,
             text: String,
             speech: String? = null,
+            voiceFile: String? = null,
         ) {
             val intent = Intent(context, AdhanService::class.java)
+                .putExtra(EXTRA_VOICE_FILE, voiceFile)
                 .putExtra(EXTRA_TITLE, title)
                 .putExtra(EXTRA_TEXT, text)
                 .putExtra(EXTRA_FAJR, fajr)
@@ -285,8 +302,10 @@ class AdhanService : Service() {
             title: String,
             text: String,
             speech: String,
+            voiceFile: String? = null,
         ) {
             val intent = Intent(context, AdhanService::class.java)
+                .putExtra(EXTRA_VOICE_FILE, voiceFile)
                 .putExtra(EXTRA_ANNOUNCE, true)
                 .putExtra(EXTRA_KIND, kind.name)
                 .putExtra(EXTRA_ID, id)

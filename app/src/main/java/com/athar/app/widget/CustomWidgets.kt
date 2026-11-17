@@ -56,6 +56,14 @@ data class CustomElement(
     val dots: Boolean = false,
     /** Record id for Counter (‑1 = nearest). */
     val ref: Long = -1,
+    /** This element's own font; null = the widget's font. */
+    val fontId: String? = null,
+    val italic: Boolean = false,
+    val underline: Boolean = false,
+    /** 0 start, 1 centre, 2 end; null = the widget's alignment. */
+    val align: Int? = null,
+    /** Opacity of this element, 10–100 %. */
+    val opacity: Int = 100,
 )
 
 /** [align]: 0 start, 1 centre, 2 end. */
@@ -79,7 +87,9 @@ object CustomSpecJson {
                 put(
                     JSONObject().put("kind", e.kind.name).put("text", e.text).put("size", e.sizeSp)
                         .put("color", e.color ?: JSONObject.NULL).put("accent", e.accent).put("bold", e.bold)
-                        .put("dots", e.dots).put("ref", e.ref),
+                        .put("dots", e.dots).put("ref", e.ref)
+                        .put("font", e.fontId ?: JSONObject.NULL).put("italic", e.italic).put("underline", e.underline)
+                        .put("align", e.align ?: JSONObject.NULL).put("opacity", e.opacity),
                 )
             }
         })
@@ -101,6 +111,11 @@ object CustomSpecJson {
                     bold = e.optBoolean("bold", false),
                     dots = e.optBoolean("dots", false),
                     ref = e.optLong("ref", -1),
+                    fontId = if (!e.has("font") || e.isNull("font")) null else e.optString("font"),
+                    italic = e.optBoolean("italic", false),
+                    underline = e.optBoolean("underline", false),
+                    align = if (!e.has("align") || e.isNull("align")) null else e.optInt("align").coerceIn(0, 2),
+                    opacity = e.optInt("opacity", 100).coerceIn(10, 100),
                 )
             }.take(MAX_ELEMENTS),
             align = o.optInt("align", 1).coerceIn(0, 2),
@@ -205,7 +220,11 @@ object CustomWidgets {
                     }
                 }
             }.getOrDefault("—")
-            CustomLine(text, e.sizeSp, e.color, e.accent, e.bold, e.dots)
+            CustomLine(
+                text, e.sizeSp, e.color, e.accent, e.bold, e.dots,
+                fontId = e.fontId, italic = e.italic, underline = e.underline,
+                align = e.align ?: spec.align, opacity = e.opacity,
+            )
         }
         return WidgetData.Custom(lines, spec.align)
     }

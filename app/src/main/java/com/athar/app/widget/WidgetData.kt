@@ -90,7 +90,21 @@ sealed interface WidgetData {
 }
 
 /** One resolved line of a custom widget. */
-data class CustomLine(val text: String, val sizeSp: Int, val color: Int?, val accent: Boolean, val bold: Boolean, val dots: Boolean)
+data class CustomLine(
+    val text: String,
+    val sizeSp: Int,
+    val color: Int?,
+    val accent: Boolean,
+    val bold: Boolean,
+    val dots: Boolean,
+    /** Element's own font (null = the widget's font). */
+    val fontId: String? = null,
+    val italic: Boolean = false,
+    val underline: Boolean = false,
+    /** 0 start, 1 centre, 2 end. */
+    val align: Int = 1,
+    val opacity: Int = 100,
+)
 
 object WidgetDataLoader {
     /** Never throws: a failure shows "item missing" instead of a broken widget. */

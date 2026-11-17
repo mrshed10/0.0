@@ -15,6 +15,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,10 +43,19 @@ import kotlinx.coroutines.launch
  * audio file (e.g. a full adhan mp3), or go back to the default.
  */
 @Composable
-fun ToneRow(label: String, tone: String?, onChange: (String?) -> Unit, modifier: Modifier = Modifier) {
+fun ToneRow(
+    label: String,
+    tone: String?,
+    onChange: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+    /** Shown when no tone is chosen (default: "Default"). */
+    defaultLabel: String? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val title = remember(tone) { Tones.title(context, tone) }
+    val title = remember(tone, defaultLabel) { Tones.title(context, tone, defaultLabel) }
+    var library by remember { mutableStateOf(false) }
+    val importFailed = stringResource(R.string.sound_import_failed)
 
     val systemPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
@@ -52,7 +66,12 @@ fun ToneRow(label: String, tone: String?, onChange: (String?) -> Unit, modifier:
         }
     }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch { Tones.import(context, uri)?.let(onChange) }
+        if (uri != null) {
+            scope.launch {
+                val saved = Tones.import(context, uri)
+                if (saved != null) onChange(saved) else android.widget.Toast.makeText(context, importFailed, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -102,5 +121,22 @@ fun ToneRow(label: String, tone: String?, onChange: (String?) -> Unit, modifier:
                 modifier = Modifier.weight(1f),
             )
         }
+        GlassButton(
+            stringResource(R.string.sounds_mine),
+            { library = true },
+            filled = false,
+            icon = Icons.Rounded.LibraryMusic,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    if (library) {
+        SoundLibrarySheet(
+            selected = tone,
+            onDismiss = { library = false },
+            onPick = {
+                onChange(it)
+                library = false
+            },
+        )
     }
 }

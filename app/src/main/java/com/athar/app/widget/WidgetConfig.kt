@@ -81,7 +81,18 @@ data class WidgetStyle(
     val variant: Int = 0,
     /** Use Arabic-Indic digits (١٢٣) in bitmap clocks. */
     val arabicDigits: Boolean = false,
-)
+    /** Colour of lit dots in dot designs (ARGB); null = the design's own colour. */
+    val dotOn: Int? = null,
+    /** Colour of unlit dots in dot designs (ARGB, alpha respected); null = a faint text colour. */
+    val dotOff: Int? = null,
+) {
+    /** Lit-dot colour, falling back to [fallback]. */
+    fun litDots(fallback: Int = textColor): Int = dotOn ?: fallback
+
+    /** Unlit-dot colour: the chosen one, or [fallback] at [fadedAlpha] (0–255). */
+    fun unlitDots(fallback: Int = textColor, fadedAlpha: Int = 46): Int =
+        dotOff ?: ((fallback and 0x00FFFFFF) or (fadedAlpha.coerceIn(0, 255) shl 24))
+}
 
 data class WidgetConfig(val content: WidgetContent, val style: WidgetStyle = WidgetStyle())
 
@@ -136,6 +147,8 @@ object WidgetJson {
         .put("click", s.click.name)
         .put("variant", s.variant)
         .put("arabicDigits", s.arabicDigits)
+        .put("dotOn", s.dotOn ?: JSONObject.NULL)
+        .put("dotOff", s.dotOff ?: JSONObject.NULL)
 
     private fun decodeStyle(o: JSONObject?): WidgetStyle {
         val d = WidgetStyle()
@@ -158,6 +171,8 @@ object WidgetJson {
             click = ClickBehavior.entries.firstOrNull { it.name == o.optString("click") } ?: d.click,
             variant = o.optInt("variant", d.variant).coerceIn(0, 5),
             arabicDigits = o.optBoolean("arabicDigits", d.arabicDigits),
+            dotOn = if (!o.has("dotOn") || o.isNull("dotOn")) null else o.optInt("dotOn"),
+            dotOff = if (!o.has("dotOff") || o.isNull("dotOff")) null else o.optInt("dotOff"),
         )
     }
 }
