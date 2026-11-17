@@ -1,6 +1,5 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 val geckoviewVersion: String = providers.gradleProperty("geckoviewVersion").getOrElse("+")
@@ -9,7 +8,7 @@ val appMinSdk: Int = providers.gradleProperty("appMinSdk").getOrElse("21").toInt
 
 android {
     namespace = "com.tvbrowser.aosp"
-    compileSdk = 35
+    compileSdk = 37  // required by GeckoView 160+
 
     defaultConfig {
         applicationId = "com.tvbrowser.aosp"
@@ -62,7 +61,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
 }
 
 dependencies {
