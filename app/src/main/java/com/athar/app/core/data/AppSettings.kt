@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.athar.app.core.fonts.FontRegistry
 import com.athar.app.core.region.Cities
 import com.athar.app.core.region.Country
+import com.athar.app.feature.prayer.VoicePrefs
 import com.athar.app.feature.prayer.AdhanVolume
 import com.athar.app.feature.prayer.AdhkarJson
 import com.athar.app.feature.prayer.AdhkarLists
