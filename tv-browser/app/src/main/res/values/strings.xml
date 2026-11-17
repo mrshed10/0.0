@@ -72,11 +72,6 @@
     <string name="tab_close">إغلاق التبويب</string>
 
     <!-- settings -->
-    <string name="set_home_title">الصفحة الرئيسية</string>
-    <string name="set_search_title">محرك البحث</string>
-    <string name="set_max_tabs_title">أقصى عدد للتبويبات</string>
-    <string name="set_live_tabs_title">تبويبات نشطة في الذاكرة</string>
-    <string name="set_cursor_speed_title">سرعة المؤشر</string>
     <string name="data_cleared">تم مسح البيانات</string>
     <string name="memory_freed">تم تحرير الذاكرة</string>
 

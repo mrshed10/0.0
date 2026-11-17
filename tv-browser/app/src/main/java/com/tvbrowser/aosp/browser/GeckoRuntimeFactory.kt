@@ -36,6 +36,8 @@ object GeckoRuntimeFactory {
             .aboutConfigEnabled(true)
             .extensionsWebAPIEnabled(true)        // AMO "Add to Firefox" button works
             .extensionsProcessEnabled(false)      // run add-ons in the main process: one process less
+            .fissionEnabled(false)                // no site-isolation processes
+            .lowMemoryDetection(true)             // engine reacts to Android memory pressure itself
             .inputAutoZoomEnabled(false)
             .doubleTapZoomingEnabled(false)
             .contentBlocking(contentBlocking(prefs.builtInAdBlock))
