@@ -49,7 +49,7 @@ class PopupHost(private val activity: Activity) {
         }
         dialog.show()
         gecko.requestFocus()
-        SessionAttacher.attach(gecko, session, app.runtime, { dialog.isShowing })
+        SessionAttacher.attach(gecko, session, Color.WHITE, { dialog.isShowing })
         return GeckoResult.fromValue(session)
     }
 }
