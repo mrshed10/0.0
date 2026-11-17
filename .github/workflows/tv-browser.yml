@@ -28,15 +28,16 @@ jobs:
           chmod +x gradlew
           ./gradlew -q :app:dependencies --configuration stableReleaseRuntimeClasspath | grep -i geckoview | head -3 || true
           ./gradlew -q :app:dependencies --configuration unsignedReleaseRuntimeClasspath | grep -i geckoview | head -3 || true
-      - name: Dump GeckoView extension API (diagnostics)
-        run: |
-          ./gradlew -q :app:dependencies --configuration stableReleaseCompileClasspath > /dev/null || true
-          AAR=$(find ~/.gradle/caches -name 'geckoview-160*.aar' | head -1)
-          mkdir -p /tmp/gv && cd /tmp/gv && unzip -oq "$AAR" classes.jar && \
-          javap -cp classes.jar 'org.mozilla.geckoview.WebExtensionController$PromptDelegate' \
-            'org.mozilla.geckoview.WebExtension$PermissionPromptResponse' || true
       - name: Build release APKs (both engines, R8-minified)
         run: ./gradlew assembleStableRelease assembleUnsignedRelease --stacktrace
+      - name: Dump GeckoView extension API (diagnostics)
+        if: failure()
+        run: |
+          AAR=$(find / -name 'geckoview-1*.aar' 2>/dev/null | head -1); echo "AAR=$AAR"
+          JAR=$(find / -path '*geckoview*' -name 'classes.jar' 2>/dev/null | head -1); echo "JAR=$JAR"
+          if [ -z "$JAR" ] && [ -n "$AAR" ]; then mkdir -p /tmp/gv && unzip -oq "$AAR" classes.jar -d /tmp/gv && JAR=/tmp/gv/classes.jar; fi
+          javap -cp "$JAR" 'org.mozilla.geckoview.WebExtensionController$PromptDelegate' \
+            'org.mozilla.geckoview.WebExtension$PermissionPromptResponse' || true
       - uses: actions/upload-artifact@v4
         with:
           name: tv-browser-apks
