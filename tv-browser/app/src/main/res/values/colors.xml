@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF121417</color>
+    <color name="toolbar">#FF1E2227</color>
+    <color name="url_bg">#FF2B3038</color>
+    <color name="accent">#FF1E88E5</color>
+    <color name="accent_dark">#FF1565C0</color>
+    <color name="install">#FF2E7D32</color>
+    <color name="text">#FFECEFF1</color>
+    <color name="text_dim">#FF9AA4AE</color>
+    <color name="osd_bg">#DD000000</color>
+</resources>

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "TV Device Bridge",
+  "version": "1.0.0",
+  "description": "Built-in bridge: desktop fingerprint + window.tvDevice volume API",
+  "browser_specific_settings": {
+    "gecko": { "id": "tvbridge@tvbrowser.aosp" }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+  "permissions": [
+    "nativeMessaging",
+    "nativeMessagingFromContent",
+    "geckoViewAddons",
+    "<all_urls>"
+  ]
+}

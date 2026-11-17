@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:orientation="vertical">
+
+    <!-- Top navigation bar: every control is focusable for D-pad navigation -->
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/toolbar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <ImageButton android:id="@+id/btn_back" style="@style/ToolbarButton"
+            android:contentDescription="@string/back" android:src="@drawable/ic_back" />
+        <ImageButton android:id="@+id/btn_forward" style="@style/ToolbarButton"
+            android:contentDescription="@string/forward" android:src="@drawable/ic_forward" />
+        <ImageButton android:id="@+id/btn_reload" style="@style/ToolbarButton"
+            android:contentDescription="@string/reload" android:src="@drawable/ic_reload" />
+        <ImageButton android:id="@+id/btn_home" style="@style/ToolbarButton"
+            android:contentDescription="@string/home" android:src="@drawable/ic_home" />
+
+        <EditText
+            android:id="@+id/url_bar"
+            android:layout_width="0dp"
+            android:layout_height="42dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_url_bar"
+            android:hint="@string/hint_url"
+            android:imeOptions="actionGo|flagNoExtractUi|flagNoFullscreen"
+            android:inputType="textUri"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:textColor="@color/text"
+            android:textColorHint="@color/text_dim"
+            android:textDirection="ltr"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/btn_install_here"
+            android:layout_width="wrap_content"
+            android:layout_height="42dp"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_install_button"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="@string/install_here"
+            android:textColor="@android:color/white"
+            android:visibility="gone" />
+
+        <ImageButton android:id="@+id/btn_store" style="@style/ToolbarButton"
+            android:contentDescription="@string/store" android:src="@drawable/ic_store" />
+        <ImageButton android:id="@+id/btn_extensions" style="@style/ToolbarButton"
+            android:contentDescription="@string/extensions_title" android:src="@drawable/ic_extension" />
+        <ImageButton android:id="@+id/btn_tabs" style="@style/ToolbarButton"
+            android:contentDescription="@string/tabs" android:src="@drawable/ic_tabs" />
+        <ImageButton android:id="@+id/btn_vol_down" style="@style/ToolbarButton"
+            android:contentDescription="@string/volume_down" android:src="@drawable/ic_volume_down" />
+        <ImageButton android:id="@+id/btn_mute" style="@style/ToolbarButton"
+            android:contentDescription="@string/mute" android:src="@drawable/ic_volume_off" />
+        <ImageButton android:id="@+id/btn_vol_up" style="@style/ToolbarButton"
+            android:contentDescription="@string/volume_up" android:src="@drawable/ic_volume_up" />
+        <ImageButton android:id="@+id/btn_cursor" style="@style/ToolbarButton"
+            android:contentDescription="@string/cursor_toggle" android:src="@drawable/ic_mouse" />
+        <ImageButton android:id="@+id/btn_menu" style="@style/ToolbarButton"
+            android:contentDescription="@string/settings" android:src="@drawable/ic_more" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        style="@android:style/Widget.Material.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:max="100"
+        android:progressTint="@color/accent"
+        android:visibility="invisible" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <org.mozilla.geckoview.GeckoView
+            android:id="@+id/gecko_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusUp="@id/btn_back" />
+
+        <com.tvbrowser.aosp.ui.CursorView
+            android:id="@+id/cursor_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:id="@+id/focus_hint"
+            style="@style/Osd"
+            android:layout_gravity="top|start"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/volume_osd"
+            style="@style/Osd"
+            android:layout_gravity="top|end"
+            android:textSize="22sp"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

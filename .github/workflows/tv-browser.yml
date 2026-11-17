@@ -1,0 +1,36 @@
+name: TV Browser build
+
+on:
+  push:
+    paths:
+      - "tv-browser/**"
+      - ".github/workflows/tv-browser.yml"
+  pull_request:
+    paths:
+      - "tv-browser/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tv-browser
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Resolved GeckoView versions
+        run: |
+          chmod +x gradlew
+          ./gradlew -q :app:dependencies --configuration stableReleaseRuntimeClasspath | grep -i geckoview | head -3 || true
+          ./gradlew -q :app:dependencies --configuration unsignedReleaseRuntimeClasspath | grep -i geckoview | head -3 || true
+      - name: Build release APKs (both engines, R8-minified)
+        run: ./gradlew assembleStableRelease assembleUnsignedRelease --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tv-browser-apks
+          path: tv-browser/app/build/outputs/apk/**/*.apk

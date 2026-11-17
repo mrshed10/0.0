@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">متصفح الشاشة</string>
+
+    <!-- toolbar -->
+    <string name="back">رجوع</string>
+    <string name="forward">تقدّم</string>
+    <string name="reload">تحديث</string>
+    <string name="home">الصفحة الرئيسية</string>
+    <string name="hint_url">ابحث أو اكتب عنواناً</string>
+    <string name="install_here">⬇ تثبيت هذه الإضافة</string>
+    <string name="store">متجر الإضافات</string>
+    <string name="tabs">التبويبات</string>
+    <string name="tabs_count">التبويبات (%1$d)</string>
+    <string name="volume_down">خفض الصوت</string>
+    <string name="volume_up">رفع الصوت</string>
+    <string name="mute">كتم الصوت</string>
+    <string name="cursor_toggle">تشغيل/إيقاف مؤشر الماوس</string>
+    <string name="settings">الإعدادات</string>
+    <string name="close">إغلاق</string>
+
+    <string name="cursor_on">وضع المؤشر: يعمل</string>
+    <string name="cursor_off">وضع المؤشر: متوقف (الأسهم تُرسل للصفحة)</string>
+    <string name="press_back_to_exit">اضغط رجوع مرة أخرى للخروج</string>
+    <string name="volume_level">🔊 %1$d%%</string>
+    <string name="volume_muted">🔇 مكتوم</string>
+    <string name="downloads_unsupported">تنزيل الملفات غير مدعوم في هذا المتصفح</string>
+    <string name="username">اسم المستخدم</string>
+    <string name="password">كلمة المرور</string>
+
+    <!-- store -->
+    <string name="store_title">متجر الإضافات (إضافات Firefox الموقّعة)</string>
+    <string name="store_title_unsigned">متجر الإضافات (Firefox + Chrome/Brave/Kiwi/Edge)</string>
+    <string name="store_add">➕  إضافة متجر خارجي</string>
+    <string name="store_remove">🗑  حذف متجر مضاف</string>
+    <string name="store_install_url">🔗  تثبيت من رابط / معرّف إضافة</string>
+    <string name="store_install_url_hint">رابط xpi أو crx أو صفحة متجر، أو معرّف Chrome</string>
+    <string name="store_install_file">📁  تثبيت من ملف (xpi / crx / zip)</string>
+    <string name="store_name">اسم المتجر</string>
+    <string name="store_added">تمت إضافة المتجر</string>
+    <string name="grant_then_retry">امنح الإذن ثم أعد المحاولة</string>
+    <string name="no_packages_found">لا توجد ملفات xpi/crx في %1$s</string>
+
+    <!-- extensions -->
+    <string name="extensions_title">الإضافات المثبتة</string>
+    <string name="ext_empty">لا توجد إضافات بعد. افتح \"متجر الإضافات\" من الشريط العلوي وثبّت uBlock Origin بضغطة واحدة.</string>
+    <string name="ext_info">الإصدار %1$s · %2$s · %3$s</string>
+    <string name="ext_state_on">مفعّلة</string>
+    <string name="ext_state_off">معطّلة</string>
+    <string name="ext_popup">فتح لوحة الإضافة</string>
+    <string name="ext_options">إعدادات الإضافة</string>
+    <string name="ext_enable">تفعيل</string>
+    <string name="ext_disable">تعطيل</string>
+    <string name="ext_uninstall">إزالة</string>
+    <string name="ext_uninstall_confirm">إزالة %1$s؟</string>
+    <string name="ext_installing">جارٍ تثبيت الإضافة…</string>
+    <string name="ext_downloading">جارٍ تنزيل الإضافة وتحويلها…</string>
+    <string name="ext_installed">تم تثبيت %1$s ✓</string>
+    <string name="ext_error_unsigned">هذه الإضافة غير موقّعة من Mozilla (مثل إضافات Chrome). استخدم نسخة \"unsigned\" من المتصفح لتثبيتها.</string>
+    <string name="ext_error_corrupt">ملف الإضافة تالف أو غير صالح</string>
+    <string name="ext_error_incompatible">الإضافة غير متوافقة مع هذا المحرك</string>
+    <string name="ext_error_network">تعذّر الاتصال بالشبكة</string>
+    <string name="ext_error_blocked">هذه الإضافة محظورة من Mozilla</string>
+    <string name="ext_error_generic">فشل التثبيت: %1$s</string>
+    <string name="ext_error_download">فشل التنزيل: %1$s</string>
+    <string name="ext_error_source">مصدر غير معروف</string>
+
+    <!-- tabs -->
+    <string name="tabs_title">التبويبات (%1$d من %2$d)</string>
+    <string name="tab_new">➕  تبويب جديد</string>
+    <string name="tab_switch">انتقال</string>
+    <string name="tab_close">إغلاق التبويب</string>
+
+    <!-- settings -->
+    <string name="set_home">الصفحة الرئيسية: %1$s</string>
+    <string name="set_home_title">الصفحة الرئيسية</string>
+    <string name="set_search">محرك البحث: %1$s</string>
+    <string name="set_search_title">محرك البحث</string>
+    <string name="set_max_tabs">أقصى عدد للتبويبات: %1$d</string>
+    <string name="set_max_tabs_title">أقصى عدد للتبويبات</string>
+    <string name="set_live_tabs">تبويبات نشطة في الذاكرة: %1$d (الباقي يُجمَّد)</string>
+    <string name="set_live_tabs_title">تبويبات نشطة في الذاكرة</string>
+    <string name="set_cursor_speed">سرعة المؤشر: %1$d</string>
+    <string name="set_cursor_speed_title">سرعة المؤشر</string>
+    <string name="set_click_mouse">طريقة النقر: ماوس (يدعم التمرير فوق القوائم)</string>
+    <string name="set_click_touch">طريقة النقر: لمس</string>
+    <string name="set_page_volume_on">السماح للمواقع بالتحكم بالصوت (tvDevice): نعم</string>
+    <string name="set_page_volume_off">السماح للمواقع بالتحكم بالصوت (tvDevice): لا</string>
+    <string name="set_system_volume_ui">إظهار شريط صوت النظام أيضاً: %1$s</string>
+    <string name="set_clear_data">مسح بيانات التصفح (الكوكيز والذاكرة المؤقتة)</string>
+    <string name="set_about_config">إعدادات المحرك المتقدمة (about:config)</string>
+    <string name="set_memory">الذاكرة: %1$d / %2$d MB متاحة · %3$d من %4$d تبويب نشط · اضغط للتحرير</string>
+    <string name="data_cleared">تم مسح البيانات</string>
+    <string name="memory_freed">تم تجميد التبويبات الخلفية</string>
+
+    <string-array name="search_engines">
+        <item>Google</item>
+        <item>DuckDuckGo</item>
+        <item>Bing</item>
+    </string-array>
+</resources>
