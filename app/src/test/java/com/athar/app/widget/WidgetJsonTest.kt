@@ -53,7 +53,8 @@ class WidgetJsonTest {
 
     @Test
     fun everyGalleryTabHasDesignsAndIdsAreUnique() {
-        GalleryTab.entries.forEach { tab ->
+        // "My designs" holds the user's own designs, so it starts empty.
+        GalleryTab.entries.filter { it != GalleryTab.Mine }.forEach { tab ->
             assertEquals("tab $tab is empty", true, WidgetTemplates.forTab(tab).isNotEmpty())
         }
         assertEquals(WidgetTemplates.all.size, WidgetTemplates.all.map { it.id }.toSet().size)
