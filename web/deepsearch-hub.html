@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--CONTENT-START-->
+<title>DeepSearch Hub</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working column of instrument-like panels under a sticky tab rail; search splits into source | engines on wide screens. */
+:root {
+  --bg: #f2f3f7;
+  --panel: #ffffff;
+  --panel-2: #eceef4;
+  --ink: #141821;
+  --muted: #5b6273;
+  --line: #d8dbe4;
+  --accent: #2a4fd6;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3e9fd;
+  --warn: #9a5b06;
+  --warn-soft: #fbeedb;
+  --ok: #1c7446;
+  --ok-soft: #ddf2e6;
+  --danger: #b3242d;
+  --stage: #191c24;
+  --stage-line: #2c303c;
+  --f-body: "IBM Plex Sans Arabic", "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1116; --panel: #171a22; --panel-2: #1f2330; --ink: #e6e8ee; --muted: #9aa1b3;
+    --line: #2a2f3d; --accent: #8199ff; --accent-ink: #0f1116; --accent-soft: #222b4d;
+    --warn: #f0b04d; --warn-soft: #382a12; --ok: #5ccf90; --ok-soft: #15301f; --danger: #ff7a83;
+    --stage: #0b0d12; --stage-line: #262a35;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1116; --panel: #171a22; --panel-2: #1f2330; --ink: #e6e8ee; --muted: #9aa1b3;
+  --line: #2a2f3d; --accent: #8199ff; --accent-ink: #0f1116; --accent-soft: #222b4d;
+  --warn: #f0b04d; --warn-soft: #382a12; --ok: #5ccf90; --ok-soft: #15301f; --danger: #ff7a83;
+  --stage: #0b0d12; --stage-line: #262a35;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body { margin: 0; font-family: var(--f-body); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+[hidden] { display: none !important; }
+button, input, select { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--f-mono); direction: ltr; unicode-bidi: isolate; }
+.wrap { max-width: 1140px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Header + tabs */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--panel); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-inline-end: auto; }
+.brand svg { flex: none; }
+.brand b { font-size: 17px; letter-spacing: .2px; }
+.brand small { display: block; color: var(--muted); font-size: 12px; line-height: 1.2; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.tabs button { border: 0; background: transparent; padding: 8px 14px; border-radius: 999px; cursor: pointer; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+.tabs button:hover { color: var(--ink); }
+
+.notice { margin-top: 14px; padding: 10px 14px; border-radius: var(--r); background: var(--warn-soft); color: var(--ink); font-size: 13.5px; border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); }
+.notice b { color: var(--warn); }
+
+main { padding-block: 18px 48px; }
+.view { display: grid; gap: 16px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+h2 { font-size: 20px; }
+h3 { font-size: 15.5px; }
+.lede { color: var(--muted); margin: 4px 0 0; max-width: 68ch; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.panel > h3 { margin-bottom: 10px; }
+.label { font-size: 12px; font-weight: 600; letter-spacing: .4px; color: var(--muted); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.grow { flex: 1 1 220px; min-width: 0; }
+.split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); padding: 8px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; text-decoration: none; color: var(--ink); font-size: 14px; line-height: 1.3; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { border-color: transparent; background: var(--panel-2); }
+.btn.sm { padding: 5px 10px; font-size: 13px; border-radius: 8px; }
+.btn[disabled], .btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.input { width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); min-width: 0; }
+.input:focus { border-color: var(--accent); outline: none; }
+input[type="url"].input, .input.ltr { direction: ltr; text-align: left; }
+
+.seg { display: inline-flex; background: var(--panel-2); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+
+/* Search: source */
+.drop { display: grid; place-items: center; text-align: center; gap: 4px; padding: 22px 16px; border: 1.5px dashed var(--line); border-radius: var(--r); background: var(--bg); cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop strong { font-size: 15px; }
+.drop span { color: var(--muted); font-size: 13px; }
+.preview { position: relative; margin-top: 12px; background: var(--stage); border-radius: var(--r); min-height: 220px; display: grid; place-items: center; overflow: hidden; }
+.preview canvas, .preview img, .preview video { max-width: 100%; max-height: 420px; display: block; }
+.preview .empty { color: #a7adbb; padding: 30px 16px; text-align: center; font-size: 14px; }
+.tag { position: absolute; top: 10px; inset-inline-start: 10px; background: rgb(0 0 0 / .55); color: #fff; font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+.meta { display: flex; gap: 8px 16px; flex-wrap: wrap; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 600; }
+.frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 10px; }
+.frames button { border: 2px solid transparent; padding: 0; border-radius: 8px; overflow: hidden; cursor: pointer; background: var(--stage); position: relative; }
+.frames button:hover, .frames button.on { border-color: var(--accent); }
+.frames canvas { width: 100%; display: block; aspect-ratio: 16 / 9; object-fit: cover; }
+.frames span { position: absolute; bottom: 3px; inset-inline-end: 4px; font: 11px var(--f-mono); color: #fff; background: rgb(0 0 0 / .55); padding: 0 4px; border-radius: 4px; }
+
+/* Search: engines */
+.engines { display: grid; gap: 8px; }
+.engine { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.engine .name { font-weight: 700; }
+.engine .note { grid-column: 1; color: var(--muted); font-size: 13px; }
+.engine .acts { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.mode-pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
+.mode-pill.url { background: var(--ok-soft); color: var(--ok); }
+.mode-pill.up { background: var(--accent-soft); color: var(--accent); }
+.tips { margin: 0; padding-inline-start: 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 4px; }
+.tips b { color: var(--ink); }
+
+/* Editor */
+.ed-grid { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .ed-grid { grid-template-columns: 1fr; } }
+.stage { background: var(--stage); border-radius: var(--r); border: 1px solid var(--stage-line); overflow: hidden; touch-action: none; }
+.stage canvas { display: block; width: 100%; cursor: crosshair; }
+.toolbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.tool { display: grid; place-items: center; gap: 2px; padding: 8px 4px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 12px; color: var(--ink); }
+.tool:hover { border-color: var(--accent); }
+.tool svg { width: 20px; height: 20px; }
+.slider { display: grid; gap: 2px; margin-top: 12px; }
+.slider .row { justify-content: space-between; }
+.slider output { font: 12px var(--f-mono); color: var(--muted); min-width: 3ch; text-align: end; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.crop-read { font: 12px var(--f-mono); color: var(--muted); margin-top: 8px; direction: ltr; text-align: right; }
+
+/* DNS */
+.providers { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 12px; }
+.prov { border: 1px solid var(--line); border-radius: var(--r); padding: 14px; background: var(--panel); display: grid; gap: 8px; align-content: start; }
+.prov.rec { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.prov header { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.prov header span { color: var(--muted); font-size: 12.5px; }
+.kv { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; font-size: 13px; }
+.kv dt { color: var(--muted); font-size: 12px; font-weight: 600; }
+.kv dd { margin: 0; font-family: var(--f-mono); direction: ltr; text-align: left; overflow-wrap: anywhere; }
+.copy { border: 0; background: var(--panel-2); color: var(--muted); border-radius: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer; }
+.copy:hover { color: var(--accent); }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.lookup-out { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-top: 12px; }
+.res { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); min-width: 0; }
+.res h4 { margin: 0 0 6px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; }
+.res table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.res td { padding: 3px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.res td.v { font-family: var(--f-mono); direction: ltr; text-align: left; overflow-wrap: anywhere; }
+.res td.t { color: var(--muted); font-family: var(--f-mono); width: 54px; }
+.verdict { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; }
+.verdict.ok { background: var(--ok-soft); }
+.verdict.warn { background: var(--warn-soft); }
+details.guide { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+details.guide + details.guide { margin-top: 8px; }
+details.guide summary { cursor: pointer; padding: 12px 14px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+details.guide summary::-webkit-details-marker { display: none; }
+details.guide summary::after { content: "+"; color: var(--muted); font-family: var(--f-mono); }
+details.guide[open] summary::after { content: "−"; }
+details.guide ol { margin: 0; padding: 0 34px 14px 14px; display: grid; gap: 4px; font-size: 14px; }
+details.guide p { margin: 0; padding: 0 14px 14px; color: var(--muted); font-size: 13px; }
+.tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.tool-card { display: grid; gap: 4px; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); text-decoration: none; color: var(--ink); }
+.tool-card:hover { border-color: var(--accent); }
+.tool-card span { color: var(--muted); font-size: 13px; }
+
+/* Browser */
+.bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.chip { border: 1px solid var(--line); background: var(--panel); padding: 5px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.viewer { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: #fff; position: relative; }
+.viewer iframe { display: block; width: 100%; height: min(70vh, 720px); border: 0; background: #fff; }
+.viewer .vhint { position: absolute; bottom: 0; inset-inline: 0; padding: 8px 12px; font-size: 12.5px; background: color-mix(in srgb, var(--panel) 92%, transparent); color: var(--muted); border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.viewer-off { padding: 28px 16px; text-align: center; color: var(--muted); background: var(--panel-2); }
+.hist { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.hist li { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.hist li:first-child { border-top: 0; }
+.hist a { font-family: var(--f-mono); direction: ltr; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; text-align: left; }
+
+.toast { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); z-index: 20; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<!--LOCAL-ONLY--></head><body><!--/LOCAL-ONLY-->
+<div id="app">
+  <header class="top">
+    <div class="wrap">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+          <rect width="34" height="34" rx="9" fill="var(--accent)"/>
+          <circle cx="15" cy="15" r="7" fill="none" stroke="var(--accent-ink)" stroke-width="2.4"/>
+          <circle cx="15" cy="15" r="2.6" fill="var(--accent-ink)"/>
+          <path d="M20.5 20.5 L26 26" stroke="var(--accent-ink)" stroke-width="2.6" stroke-linecap="round"/>
+        </svg>
+        <div><b>DeepSearch Hub</b><small>بحث عكسي عميق · DNS آمن · تصفح حر</small></div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="الأقسام">
+        <button role="tab" data-tab="search" aria-selected="true">البحث العكسي</button>
+        <button role="tab" data-tab="editor" aria-selected="false">المحرر</button>
+        <button role="tab" data-tab="dns" aria-selected="false">DNS وتجاوز الحجب</button>
+        <button role="tab" data-tab="browser" aria-selected="false">المتصفح</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="notice" id="embedNotice" hidden>
+      <b>أنت تشاهد نسخة معاينة.</b> الرفع المباشر للمحركات، والمتصفح المدمج، وفحص DNS المباشر تعمل عند فتح ملف
+      <span class="mono">deepsearch-hub.html</span> في متصفحك. هنا يعمل البحث بالرابط والمحرر، وزر "نسخ ولصق" ينسخ صورتك لتلصقها في موقع المحرك.
+    </div>
+  </div>
+
+  <main class="wrap">
+    <!-- ============ SEARCH ============ -->
+    <section class="view" id="view-search" role="tabpanel">
+      <div>
+        <h2>البحث العكسي العميق</h2>
+        <p class="lede">ارفع صورة أو فيديو، أو ضع رابطاً مباشراً، ثم ابحث في ستة محركات مختلفة. كل محرك يملك فهرساً مختلفاً، لذلك تظهر نتائج لا يجدها Google.</p>
+      </div>
+      <div class="split">
+        <div class="panel">
+          <div class="row" style="justify-content: space-between">
+            <div class="seg" role="group" aria-label="مصدر الوسائط">
+              <button type="button" id="srcFileBtn" aria-pressed="true">ملف من جهازك</button>
+              <button type="button" id="srcUrlBtn" aria-pressed="false">رابط</button>
+            </div>
+            <button class="btn sm ghost" id="sampleBtn" type="button">صورة تجريبية</button>
+          </div>
+
+          <div id="fileBox" style="margin-top: 12px">
+            <label class="drop" id="drop" for="fileInput">
+              <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true"><path fill="var(--accent)" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+              <strong>اختر صورة أو فيديو</strong>
+              <span>أو اسحبه وأفلته هنا، أو الصق صورة بـ Ctrl+V</span>
+            </label>
+            <input type="file" id="fileInput" accept="image/*,video/*" hidden>
+          </div>
+
+          <div id="urlBox" style="margin-top: 12px" hidden>
+            <div class="bar">
+              <input class="input" type="url" id="srcUrl" placeholder="https://example.com/photo.jpg" autocomplete="off">
+              <button class="btn primary" id="srcUrlGo" type="button">تحميل</button>
+            </div>
+            <p class="lede" style="font-size: 13px">رابط مباشر لصورة (ينتهي غالباً بـ jpg أو png أو webp) أو لملف فيديو mp4. البحث بالرابط هو الأدق لأن المحرك يجلب الصورة الأصلية بنفسه.</p>
+          </div>
+
+          <div class="preview" id="preview">
+            <canvas id="previewCanvas" hidden></canvas>
+            <img id="previewImg" alt="معاينة الصورة من الرابط" referrerpolicy="no-referrer" hidden>
+            <video id="vid" controls playsinline muted preload="metadata" hidden></video>
+            <div class="empty" id="previewEmpty">لم تختر صورة بعد</div>
+            <span class="tag" id="previewTag" hidden></span>
+          </div>
+
+          <div id="videoTools" hidden>
+            <div class="row" style="margin-top: 10px">
+              <button class="btn primary" id="grabBtn" type="button">التقاط الإطار الحالي للبحث</button>
+              <button class="btn" id="thumbsBtn" type="button">اقتراح 8 إطارات</button>
+            </div>
+            <div class="frames" id="frames"></div>
+          </div>
+
+          <div class="meta" id="meta"></div>
+
+          <div class="row" style="margin-top: 12px">
+            <button class="btn" id="toEditor" type="button">تعديل الصورة</button>
+            <button class="btn" id="copyImg" type="button">نسخ الصورة</button>
+            <button class="btn" id="saveImg" type="button">حفظ الصورة</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="row" style="justify-content: space-between; margin-bottom: 10px">
+            <h3>المحركات</h3>
+            <span class="mode-pill" id="modePill">—</span>
+          </div>
+          <div class="engines" id="engines"></div>
+          <h3 style="margin-top: 16px">لنتائج أعمق</h3>
+          <ul class="tips" style="margin-top: 6px">
+            <li><b>قصّ الجزء المهم</b> (وجه، شعار، مبنى). المحركات تطابق الأجزاء الصغيرة أفضل من صورة مزدحمة.</li>
+            <li><b>اقلب الصورة أفقياً</b> وابحث مرة أخرى؛ كثير من النسخ المعاد نشرها معكوسة.</li>
+            <li><b>للفيديو</b> جرّب عدة إطارات: مشهد الافتتاح، ولقطة واضحة للوجه، والصورة المصغرة.</li>
+            <li><b>TinEye</b> يرتب النتائج حسب "الأقدم" ليقودك للمصدر الأول، و<b>Yandex</b> الأقوى في الوجوه والأماكن.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ EDITOR ============ -->
+    <section class="view" id="view-editor" role="tabpanel" hidden>
+      <div>
+        <h2>تعديل قبل البحث</h2>
+        <p class="lede">اسحب زوايا الإطار أو حوافه للقص، أو اسحب من داخله لتحريكه. التعديل يطبَّق على الصورة التي ستُرسل للمحركات.</p>
+      </div>
+      <div class="ed-grid">
+        <div class="stage" id="stageWrap"><canvas id="stage"></canvas></div>
+        <div class="panel">
+          <div class="label">تحويل</div>
+          <div class="toolbar" style="margin-top: 6px">
+            <button class="tool" id="rotL" type="button" title="تدوير 90° عكس عقارب الساعة"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M7.11 8.53 5.7 7.11C4.8 8.27 4.24 9.61 4.07 11h2.02c.14-.87.49-1.72 1.02-2.47zM6.09 13H4.07c.17 1.39.72 2.73 1.62 3.89l1.41-1.42c-.52-.75-.87-1.59-1.01-2.47zm1.01 5.32c1.16.9 2.51 1.44 3.9 1.61V17.9c-.87-.15-1.71-.49-2.46-1.03L7.1 18.32zM13 4.07V1L8.45 5.55 13 10V6.09c2.84.48 5 2.94 5 5.91s-2.16 5.43-5 5.91v2.02c3.95-.49 7-3.85 7-7.93s-3.05-7.44-7-7.93z"/></svg>يسار</button>
+            <button class="tool" id="rotR" type="button" title="تدوير 90° مع عقارب الساعة"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.55 5.55 11 1v3.07C7.06 4.56 4 7.92 4 12s3.05 7.44 7 7.93v-2.02c-2.84-.48-5-2.94-5-5.91s2.16-5.43 5-5.91V10l4.55-4.45zM19.93 11a7.906 7.906 0 0 0-1.62-3.89l-1.42 1.42c.54.75.88 1.6 1.02 2.47h2.02zM13 17.9v2.02c1.39-.17 2.74-.71 3.9-1.61l-1.44-1.44c-.75.54-1.59.89-2.46 1.03zm3.89-2.42 1.42 1.41c.9-1.16 1.45-2.5 1.62-3.89h-2.02c-.14.87-.48 1.72-1.02 2.48z"/></svg>يمين</button>
+            <button class="tool" id="flipH" type="button" title="قلب أفقي"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z"/></svg>أفقي</button>
+            <button class="tool" id="flipV" type="button" title="قلب عمودي"><svg viewBox="0 0 24 24" style="transform: rotate(90deg)"><path fill="currentColor" d="M15 21h2v-2h-2v2zm4-12h2V7h-2v2zM3 5v14c0 1.1.9 2 2 2h4v-2H5V5h4V3H5c-1.1 0-2 .9-2 2zm16-2v2h2c0-1.1-.9-2-2-2zm-8 20h2V1h-2v22zm8-6h2v-2h-2v2zM15 5h2V3h-2v2zm4 8h2v-2h-2v2zm0 8c1.1 0 2-.9 2-2h-2v2z"/></svg>عمودي</button>
+          </div>
+
+          <div class="label" style="margin-top: 14px">القص</div>
+          <div class="row" style="margin-top: 6px">
+            <div class="seg" role="group" aria-label="نسبة القص">
+              <button type="button" data-ratio="0" aria-pressed="true">حر</button>
+              <button type="button" data-ratio="1" aria-pressed="false">1:1</button>
+              <button type="button" data-ratio="1.7778" aria-pressed="false">16:9</button>
+              <button type="button" data-ratio="0.75" aria-pressed="false">3:4</button>
+            </div>
+          </div>
+          <div class="crop-read" id="cropRead"></div>
+
+          <div class="label" style="margin-top: 14px">الألوان</div>
+          <div class="slider"><div class="row"><label for="edB">السطوع</label><output id="edBo">0</output></div><input type="range" id="edB" min="-100" max="100" value="0"></div>
+          <div class="slider"><div class="row"><label for="edC">التباين</label><output id="edCo">0</output></div><input type="range" id="edC" min="-100" max="100" value="0"></div>
+          <div class="slider"><div class="row"><label for="edS">التشبع</label><output id="edSo">0</output></div><input type="range" id="edS" min="-100" max="100" value="0"></div>
+
+          <div class="row" style="margin-top: 16px">
+            <button class="btn primary grow" id="edApply" type="button">تطبيق والعودة للبحث</button>
+          </div>
+          <div class="row" style="margin-top: 8px">
+            <button class="btn ghost grow" id="edReset" type="button">إعادة الضبط</button>
+            <button class="btn ghost grow" id="edCancel" type="button">إلغاء</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DNS ============ -->
+    <section class="view" id="view-dns" role="tabpanel" hidden>
+      <div>
+        <h2>DNS آمن وتجاوز الحجب</h2>
+        <p class="lede">مزوّد الإنترنت يحجب كثيراً من المواقع ويفرض "البحث الآمن" عبر خوادم DNS الخاصة به. عند استخدام DNS مشفّر مثل Cloudflare على جهازك، تُحل أسماء المواقع مباشرة ولا يستطيع المزوّد رؤيتها أو تبديلها. هذا لا يتجاوز الحجب القائم على عنوان IP؛ لذلك ستجد في الأسفل أدوات أقوى.</p>
+      </div>
+
+      <div class="panel">
+        <h3>هل الموقع محجوب عبر DNS؟</h3>
+        <p class="lede" style="font-size: 13.5px; margin-bottom: 10px">يحل الاسم عبر Cloudflare وGoogle بشكل مشفّر (DoH). إذا ظهرت عناوين هنا والموقع لا يفتح عندك، فالحجب غالباً من DNS مزوّدك وسيحله تفعيل DNS آمن.</p>
+        <div class="bar">
+          <input class="input ltr" id="dnsName" value="wikipedia.org" placeholder="example.com" autocomplete="off" spellcheck="false">
+          <button class="btn primary" id="dnsGo" type="button">فحص</button>
+        </div>
+        <div class="lookup-out" id="dnsOut"></div>
+        <div id="dnsVerdict"></div>
+      </div>
+
+      <div>
+        <h3 style="margin-bottom: 10px">المزوّدون</h3>
+        <div class="providers" id="providers"></div>
+      </div>
+
+      <div class="panel">
+        <h3>التفعيل خطوة بخطوة</h3>
+        <p class="lede" style="font-size: 13.5px; margin-bottom: 10px">لا يستطيع أي موقع تغيير إعدادات جهازك بنفسه؛ هذه الخطوات تأخذ دقيقة. القيم أدناه لـ Cloudflare، ويمكنك نسخ قيم أي مزوّد آخر من البطاقات بالأعلى.</p>
+        <details class="guide" open>
+          <summary>Android 9 وأحدث (مشفّر لكل التطبيقات)</summary>
+          <ol>
+            <li>الإعدادات ← الشبكة والإنترنت ← <b>DNS الخاص</b> (في Samsung: الاتصالات ← إعدادات اتصال إضافية ← DNS خاص).</li>
+            <li>اختر <b>اسم مضيف مزوّد DNS الخاص</b>.</li>
+            <li>اكتب <span class="mono">one.one.one.one</span> <button class="copy" data-copy="one.one.one.one" type="button">نسخ</button> ثم احفظ.</li>
+          </ol>
+        </details>
+        <details class="guide">
+          <summary>iPhone و iPad</summary>
+          <ol>
+            <li>الأسهل: ثبّت تطبيق <a href="https://apps.apple.com/app/id1423538627" target="_blank" rel="noopener">1.1.1.1 من App Store</a> واضغط زر التفعيل. يشفّر DNS (أو كل الاتصال مع WARP).</li>
+            <li>بدون تطبيق: الإعدادات ← Wi-Fi ← (i) بجانب الشبكة ← تكوين DNS ← يدوي.</li>
+            <li>احذف الخوادم الموجودة وأضف <span class="mono">1.1.1.1</span> و <span class="mono">1.0.0.1</span>. هذه الطريقة غير مشفّرة وتنطبق على شبكة Wi-Fi هذه فقط.</li>
+          </ol>
+        </details>
+        <details class="guide">
+          <summary>Windows 11</summary>
+          <ol>
+            <li>الإعدادات ← الشبكة والإنترنت ← Wi-Fi أو Ethernet ← خصائص الأجهزة.</li>
+            <li>بجانب "تعيين خادم DNS" اضغط تحرير ← يدوي ← فعّل IPv4.</li>
+            <li>المفضّل <span class="mono">1.1.1.1</span> والبديل <span class="mono">1.0.0.1</span>، ثم اجعل "DNS عبر HTTPS" على <b>تشغيل (قالب تلقائي)</b>.</li>
+            <li>كرر نفس الشيء لـ IPv6 بالقيمتين <span class="mono">2606:4700:4700::1111</span> و <span class="mono">2606:4700:4700::1001</span>.</li>
+          </ol>
+        </details>
+        <details class="guide">
+          <summary>macOS</summary>
+          <ol>
+            <li>إعدادات النظام ← الشبكة ← اختر الاتصال ← التفاصيل ← DNS.</li>
+            <li>اضغط + وأضف <span class="mono">1.1.1.1</span> و <span class="mono">1.0.0.1</span>.</li>
+            <li>للتشفير الكامل ثبّت تطبيق <a href="https://one.one.one.one/" target="_blank" rel="noopener">1.1.1.1 / WARP</a>.</li>
+          </ol>
+        </details>
+        <details class="guide">
+          <summary>Chrome و Edge و Brave (المتصفح فقط)</summary>
+          <ol>
+            <li>افتح <span class="mono">chrome://settings/security</span> <button class="copy" data-copy="chrome://settings/security" type="button">نسخ</button> (في Edge: <span class="mono">edge://settings/privacy</span>).</li>
+            <li>فعّل <b>استخدام DNS آمن</b> واختر <b>Cloudflare (1.1.1.1)</b> من القائمة.</li>
+          </ol>
+          <p>إذا كان الخيار رمادياً فالمتصفح تديره جهة (عمل أو مدرسة) ولا يمكن تغييره من هنا.</p>
+        </details>
+        <details class="guide">
+          <summary>Firefox (المتصفح فقط)</summary>
+          <ol>
+            <li>الإعدادات ← الخصوصية والأمان ← انزل إلى <b>DNS عبر HTTPS</b>.</li>
+            <li>اختر <b>حماية قصوى</b> ثم المزوّد Cloudflare.</li>
+          </ol>
+        </details>
+        <details class="guide">
+          <summary>الراوتر (كل أجهزة البيت)</summary>
+          <ol>
+            <li>افتح صفحة الراوتر (غالباً <span class="mono">192.168.1.1</span>) وسجّل الدخول.</li>
+            <li>ابحث عن إعدادات DHCP أو DNS وضع <span class="mono">1.1.1.1</span> و <span class="mono">1.0.0.1</span>.</li>
+          </ol>
+          <p>هذه الطريقة غير مشفّرة، وبعض مزوّدي الإنترنت يعيدون توجيه منفذ 53 رغماً عنها. الطرق المشفّرة أعلاه أضمن.</p>
+        </details>
+        <div class="row" style="margin-top: 12px">
+          <a class="btn" href="https://one.one.one.one/help/" target="_blank" rel="noopener">تحقق أنك تستخدم 1.1.1.1</a>
+          <a class="btn" href="https://www.dnsleaktest.com/" target="_blank" rel="noopener">اختبار تسرّب DNS</a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>عندما لا يكفي DNS</h3>
+        <p class="lede" style="font-size: 13.5px; margin-bottom: 10px">إذا بقي الموقع محجوباً بعد تفعيل DNS آمن، فالحجب على مستوى عنوان IP أو اسم الموقع في الاتصال. هذه أدوات موثوقة تمرر الاتصال كله عبر نفق مشفّر:</p>
+        <div class="tools-grid">
+          <a class="tool-card" href="https://one.one.one.one/" target="_blank" rel="noopener"><b>Cloudflare WARP</b><span>مجاني وسريع، يشفّر كل الاتصال. أفضل نقطة بداية.</span></a>
+          <a class="tool-card" href="https://psiphon.ca/" target="_blank" rel="noopener"><b>Psiphon</b><span>مصمم خصيصاً لتجاوز الرقابة، يتبدّل بين طرق الاتصال تلقائياً.</span></a>
+          <a class="tool-card" href="https://www.torproject.org/download/" target="_blank" rel="noopener"><b>Tor Browser</b><span>أقوى تجاوز وخصوصية، لكنه أبطأ.</span></a>
+          <a class="tool-card" href="https://orbot.app/" target="_blank" rel="noopener"><b>Orbot</b><span>شبكة Tor لتطبيقات Android وiPhone.</span></a>
+          <a class="tool-card" href="https://protonvpn.com/free-vpn" target="_blank" rel="noopener"><b>Proton VPN المجاني</b><span>بلا حد للبيانات ولا سجلات، من شركة Proton السويسرية.</span></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ BROWSER ============ -->
+    <section class="view" id="view-browser" role="tabpanel" hidden>
+      <div>
+        <h2>المتصفح</h2>
+        <p class="lede">افتح أي صفحة مباشرة أو عبر وسيط: خادم الترجمة من Google يجلب الصفحة نيابةً عنك، والأرشيف يعرض آخر نسخة محفوظة. كلاهما يعمل غالباً حتى لو كان الموقع الأصلي محجوباً.</p>
+      </div>
+      <div class="panel">
+        <div class="bar">
+          <input class="input ltr" type="url" id="bUrl" placeholder="https://example.com" autocomplete="off" spellcheck="false">
+          <button class="btn primary" id="bGo" type="button">فتح</button>
+        </div>
+        <div class="chips" role="group" aria-label="طريقة الفتح">
+          <button class="chip" type="button" data-via="direct" aria-pressed="true">مباشر</button>
+          <button class="chip" type="button" data-via="translate" aria-pressed="false">عبر Google Translate</button>
+          <button class="chip" type="button" data-via="wayback" aria-pressed="false">أرشيف Wayback</button>
+          <button class="chip" type="button" data-via="archive" aria-pressed="false">archive.today</button>
+        </div>
+        <div class="row" style="margin-top: 10px">
+          <a class="btn" id="bOpen" href="#" target="_blank" rel="noopener" aria-disabled="true">فتح في تبويب جديد</a>
+          <button class="btn" id="bCopy" type="button">نسخ الرابط</button>
+          <span class="mono" id="bResolved" style="font-size: 12px; color: var(--muted); overflow-wrap: anywhere; min-width: 0; flex: 1 1 200px"></span>
+        </div>
+        <div class="viewer" id="viewer">
+          <iframe id="frame" title="المتصفح المدمج" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"></iframe>
+          <div class="vhint">
+            <span>صفحة فارغة؟ كثير من المواقع تمنع عرضها داخل إطار. جرّب "عبر Google Translate" أو افتحها في تبويب جديد.</span>
+          </div>
+        </div>
+        <div class="viewer-off" id="viewerOff" hidden>المتصفح المدمج يعمل عند فتح الملف في متصفحك. هنا استخدم زر "فتح في تبويب جديد" بعد اختيار طريقة الفتح.</div>
+      </div>
+
+      <div class="split">
+        <div class="panel">
+          <h3>تنزيل الملفات</h3>
+          <p class="lede" style="font-size: 13.5px; margin-bottom: 10px">ضع رابطاً مباشراً لملف (صورة، فيديو، PDF، ZIP) لتنزيله. لفيديو داخل صفحة (YouTube أو X أو Instagram) استخدم cobalt.</p>
+          <div class="bar">
+            <input class="input ltr" type="url" id="dUrl" placeholder="https://example.com/file.mp4" autocomplete="off" spellcheck="false">
+            <a class="btn primary" id="dGo" href="#" target="_blank" rel="noopener" download aria-disabled="true">تنزيل</a>
+          </div>
+          <div class="row" style="margin-top: 10px">
+            <a class="btn" href="https://cobalt.tools/" target="_blank" rel="noopener">cobalt: تنزيل فيديو من صفحة</a>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="row" style="justify-content: space-between; margin-bottom: 8px">
+            <h3>آخر الروابط</h3>
+            <button class="btn sm ghost" id="histClear" type="button">مسح</button>
+          </div>
+          <ul class="hist" id="hist"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  "use strict";
+  document.documentElement.lang = "ar";
+  document.documentElement.dir = "rtl";
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const enc = encodeURIComponent;
+  const EMBEDDED = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  if (EMBEDDED) $("#embedNotice").hidden = false;
+
+  /* ---------- helpers ---------- */
+  let toastTimer;
+  function toast(msg, ms = 2600) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+  }
+  function copyText(text, el) {
+    const done = () => toast("تم النسخ: " + text.slice(0, 60));
+    const fallback = () => {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      ta.remove();
+      if (ok) done(); else toast("حدّد النص وانسخه يدوياً: " + text);
+      if (!ok && el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  }
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-copy]");
+    if (b) copyText(b.dataset.copy, b.previousElementSibling);
+  });
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("dsh_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("dsh_" + k, JSON.stringify(v)); } catch (e) {} }
+  };
+  function normUrl(raw) {
+    let s = (raw || "").trim();
+    if (!s) return null;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = "https://" + s;
+    try { const u = new URL(s); return /^https?:$/.test(u.protocol) ? u.href : null; } catch (e) { return null; }
+  }
+  function canvasFrom(src, w, h) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d").drawImage(src, 0, 0, w, h);
+    return c;
+  }
+  function isClean(c) { try { c.getContext("2d").getImageData(0, 0, 1, 1); return true; } catch (e) { return false; } }
+  function fmtTime(s) { s = Math.max(0, s || 0); const m = Math.floor(s / 60); return m + ":" + String(Math.floor(s % 60)).padStart(2, "0"); }
+
+  /* ---------- tabs (hash routing) ---------- */
+  const TABS = ["search", "editor", "dns", "browser"];
+  function showTab(name) {
+    if (!TABS.includes(name)) name = "search";
+    TABS.forEach((t) => { $("#view-" + t).hidden = t !== name; });
+    $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+    if (name === "editor") openEditor();
+  }
+  $$(".tabs button").forEach((b) => b.addEventListener("click", () => {
+    if (location.hash !== "#" + b.dataset.tab) location.hash = b.dataset.tab; else showTab(b.dataset.tab);
+  }));
+  addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+
+  /* ---------- engines ---------- */
+  const ENGINES = [
+    { id: "yandex", name: "Yandex", note: "الأقوى في الوجوه والأماكن والنسخ المعدّلة",
+      byUrl: (u) => `https://yandex.com/images/search?rpt=imageview&url=${enc(u)}`,
+      home: "https://yandex.com/images/", up: { action: () => "https://yandex.com/images/search?rpt=imageview", field: "upfile" } },
+    { id: "tineye", name: "TinEye", note: "أقدم ظهور للصورة ونسخها بدقة أعلى",
+      byUrl: (u) => `https://tineye.com/search?url=${enc(u)}`,
+      home: "https://tineye.com/", up: { action: () => "https://tineye.com/search", field: "image" } },
+    { id: "bing", name: "Bing Visual Search", note: "منتجات ومشاهير وصفحات تسوق",
+      byUrl: (u) => `https://www.bing.com/images/search?view=detailv2&iss=sbi&form=SBIVSP&sbisrc=UrlPaste&q=imgurl:${enc(u)}`,
+      home: "https://www.bing.com/visualsearch", up: { action: () => "https://www.bing.com/images/search?view=detailv2&iss=sbiupload&FORM=SBIIDP", field: "imageBin", base64: true, extra: { cbir: "sbi" } } },
+    { id: "google", name: "Google Lens", note: "النصوص والمنتجات والمعالم المعروفة",
+      byUrl: (u) => `https://lens.google.com/uploadbyurl?url=${enc(u)}`,
+      home: "https://lens.google.com/", up: { action: () => `https://lens.google.com/v3/upload?hl=ar&re=df&ep=gisbubb&st=${Date.now()}`, field: "encoded_image" } },
+    { id: "saucenao", name: "SauceNAO", note: "الرسوم والأنمي والفن الرقمي ومصدره",
+      byUrl: (u) => `https://saucenao.com/search.php?url=${enc(u)}`,
+      home: "https://saucenao.com/", up: { action: () => "https://saucenao.com/search.php", field: "file" } },
+    { id: "iqdb", name: "IQDB", note: "قواعد بيانات صور الفن والأنمي",
+      byUrl: (u) => `https://iqdb.org/?url=${enc(u)}`,
+      home: "https://iqdb.org/", up: { action: () => "https://iqdb.org/", field: "file", extra: { MAX_FILE_SIZE: "8388608" } } },
+  ];
+
+  /* ---------- working image state ---------- */
+  const S = { work: null, label: "", srcUrl: null, edited: false, sample: false, jpeg: null, b64: null, png: null, token: 0, videoName: "" };
+
+  function setWork(canvas, opts = {}) {
+    S.work = canvas;
+    S.label = opts.label || "صورة";
+    S.srcUrl = opts.srcUrl || null;
+    S.edited = !!opts.edited;
+    S.sample = !!opts.sample;
+    renderPreview();
+    prepareBlobs();
+  }
+
+  function prepareBlobs() {
+    const token = ++S.token;
+    S.jpeg = S.b64 = S.png = null;
+    renderEngines();
+    if (!S.work) return;
+    const max = 1600, w = S.work.width, h = S.work.height, k = Math.min(1, max / Math.max(w, h));
+    const small = canvasFrom(S.work, Math.round(w * k), Math.round(h * k));
+    small.toBlob((jpeg) => {
+      if (token !== S.token || !jpeg) return;
+      S.jpeg = jpeg;
+      const fr = new FileReader();
+      fr.onload = () => {
+        if (token !== S.token) return;
+        S.b64 = String(fr.result).split(",")[1];
+        small.toBlob((png) => { if (token === S.token) { S.png = png; renderEngines(); } }, "image/png");
+      };
+      fr.readAsDataURL(jpeg);
+    }, "image/jpeg", 0.9);
+  }
+
+  function renderPreview() {
+    const cv = $("#previewCanvas"), img = $("#previewImg"), vid = $("#vid"), empty = $("#previewEmpty"), tag = $("#previewTag");
+    const showingVideo = !vid.hidden;
+    img.hidden = true;
+    if (S.work && !showingVideo) {
+      const max = 1200, k = Math.min(1, max / Math.max(S.work.width, S.work.height));
+      cv.width = Math.round(S.work.width * k); cv.height = Math.round(S.work.height * k);
+      cv.getContext("2d").drawImage(S.work, 0, 0, cv.width, cv.height);
+      cv.hidden = false; empty.hidden = true;
+    } else if (!showingVideo) {
+      cv.hidden = true; empty.hidden = false;
+    } else {
+      cv.hidden = true; empty.hidden = true;
+    }
+    tag.hidden = !(S.sample || S.edited);
+    tag.textContent = S.sample ? "مثال" : "معدّلة";
+    renderMeta();
+  }
+
+  function renderMeta() {
+    const m = $("#meta"), parts = [];
+    if (S.work) parts.push(`<span>الصورة الحالية: <b>${esc(S.label)}</b></span>`, `<span class="mono">${S.work.width}×${S.work.height}px</span>`);
+    else if (S.srcUrl) parts.push(`<span>رابط: <b class="mono">${esc(S.srcUrl.slice(0, 60))}</b></span>`);
+    if (!$("#vid").hidden && S.videoName) parts.push(`<span>فيديو: <b>${esc(S.videoName)}</b></span>`);
+    m.innerHTML = parts.join("");
+    const has = !!S.work;
+    $("#toEditor").disabled = !has;
+    $("#copyImg").disabled = !has;
+    $("#saveImg").disabled = !has;
+    $("#saveImg").hidden = EMBEDDED;
+  }
+  function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  function searchMode() {
+    if (S.srcUrl && !S.edited) return "url";
+    if (S.work) return "up";
+    return "none";
+  }
+
+  function renderEngines() {
+    const mode = searchMode(), ready = !!(S.jpeg && S.b64);
+    const pill = $("#modePill");
+    pill.className = "mode-pill " + (mode === "url" ? "url" : mode === "up" ? "up" : "");
+    pill.textContent = mode === "url" ? "بحث بالرابط" : mode === "up" ? (EMBEDDED ? "نسخ ولصق" : "رفع مباشر") : "اختر صورة";
+    $("#engines").innerHTML = ENGINES.map((e) => {
+      let primary;
+      if (mode === "url") {
+        primary = `<a class="btn primary sm" href="${esc(e.byUrl(S.srcUrl))}" target="_blank" rel="noopener">بحث</a>`;
+      } else if (mode === "up" && !EMBEDDED) {
+        primary = `<button class="btn primary sm" type="button" data-up="${e.id}" ${ready ? "" : "disabled"}>${ready ? "رفع وبحث" : "تجهيز…"}</button>`;
+      } else if (mode === "up") {
+        primary = `<a class="btn primary sm" href="${esc(e.home)}" target="_blank" rel="noopener" data-paste="${e.id}">نسخ ولصق</a>`;
+      } else {
+        primary = `<button class="btn primary sm" type="button" disabled>بحث</button>`;
+      }
+      return `<div class="engine"><span class="name">${esc(e.name)}</span><span class="note">${esc(e.note)}</span>
+        <div class="acts">${primary}<a class="btn sm ghost" href="${esc(e.home)}" target="_blank" rel="noopener">الموقع</a></div></div>`;
+    }).join("");
+  }
+
+  $("#engines").addEventListener("click", (ev) => {
+    const up = ev.target.closest("[data-up]");
+    if (up) { uploadTo(ENGINES.find((e) => e.id === up.dataset.up)); return; }
+    const paste = ev.target.closest("[data-paste]");
+    if (paste) { copyImage(true); }
+  });
+
+  /* Submit a real multipart form to the engine in a new tab (same as its own upload form). */
+  function uploadTo(engine) {
+    if (!S.jpeg || !S.b64) return toast("الصورة قيد التجهيز، حاول بعد لحظة");
+    const f = document.createElement("form");
+    f.method = "POST"; f.enctype = "multipart/form-data"; f.target = "_blank";
+    f.action = engine.up.action(); f.hidden = true;
+    Object.entries(engine.up.extra || {}).forEach(([k, v]) => {
+      const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; f.appendChild(i);
+    });
+    const inp = document.createElement("input");
+    if (engine.up.base64) {
+      inp.type = "hidden"; inp.name = engine.up.field; inp.value = S.b64;
+    } else {
+      inp.type = "file"; inp.name = engine.up.field;
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(new File([S.jpeg], "image.jpg", { type: "image/jpeg" }));
+        inp.files = dt.files;
+      } catch (e) {
+        toast("متصفحك لا يدعم الرفع التلقائي. استخدم \"نسخ الصورة\" ثم الصقها في " + engine.name, 4500);
+        copyImage(false);
+        window.open(engine.home, "_blank", "noopener");
+        return;
+      }
+    }
+    f.appendChild(inp);
+    document.body.appendChild(f);
+    f.submit();
+    f.remove();
+    toast("جاري الرفع إلى " + engine.name + " في تبويب جديد");
+  }
+
+  function copyImage(thenPaste) {
+    if (!S.work) return;
+    const msg = thenPaste ? "تم نسخ الصورة. الصقها بـ Ctrl+V (أو ضغطة مطوّلة ← لصق) في صفحة المحرك" : "تم نسخ الصورة";
+    try {
+      const blobP = S.png ? Promise.resolve(S.png) : new Promise((r) => S.work.toBlob(r, "image/png"));
+      navigator.clipboard.write([new ClipboardItem({ "image/png": blobP })]).then(
+        () => toast(msg, 4500),
+        () => toast("المتصفح منع نسخ الصورة. احفظها ثم ارفعها يدوياً في الموقع", 4500));
+    } catch (e) {
+      toast("نسخ الصور غير مدعوم هنا. احفظ الصورة ثم ارفعها يدوياً", 4500);
+    }
+  }
+  $("#copyImg").addEventListener("click", () => copyImage(false));
+  $("#saveImg").addEventListener("click", () => {
+    if (!S.work) return;
+    S.work.toBlob((b) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b); a.download = "deepsearch-image.png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }, "image/png");
+  });
+  $("#toEditor").addEventListener("click", () => { location.hash = "editor"; });
+
+  /* ---------- source: file / url / paste / drop ---------- */
+  function setSrcMode(url) {
+    $("#srcFileBtn").setAttribute("aria-pressed", String(!url));
+    $("#srcUrlBtn").setAttribute("aria-pressed", String(url));
+    $("#fileBox").hidden = url; $("#urlBox").hidden = !url;
+    if (url) $("#srcUrl").focus();
+  }
+  $("#srcFileBtn").addEventListener("click", () => setSrcMode(false));
+  $("#srcUrlBtn").addEventListener("click", () => setSrcMode(true));
+
+  function hideVideo() {
+    const v = $("#vid");
+    if (!v.hidden) { v.pause(); if (v.src.startsWith("blob:")) URL.revokeObjectURL(v.src); v.removeAttribute("src"); v.load(); }
+    v.hidden = true; $("#videoTools").hidden = true; $("#frames").innerHTML = "";
+  }
+
+  function loadFile(file) {
+    if (!file) return;
+    if (file.type.startsWith("video/")) return loadVideo(URL.createObjectURL(file), file.name, false);
+    if (!file.type.startsWith("image/")) return toast("هذا الملف ليس صورة أو فيديو");
+    hideVideo();
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      setWork(canvasFrom(img, img.naturalWidth, img.naturalHeight), { label: file.name || "صورة ملصقة" });
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => { toast("تعذّر قراءة الصورة. جرّب صيغة JPG أو PNG"); URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+  $("#fileInput").addEventListener("change", (e) => { loadFile(e.target.files[0]); e.target.value = ""; });
+  const drop = $("#drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => {
+    const f = e.dataTransfer.files[0];
+    if (f) return loadFile(f);
+    const u = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    if (u) { setSrcMode(true); $("#srcUrl").value = u.trim(); loadUrl(u); }
+  });
+  document.addEventListener("paste", (e) => {
+    if (e.target.closest && e.target.closest("input, textarea")) return;
+    const items = [...(e.clipboardData ? e.clipboardData.items : [])];
+    const it = items.find((i) => i.type.startsWith("image/"));
+    if (it) { loadFile(it.getAsFile()); location.hash = "search"; return; }
+    const txt = e.clipboardData && e.clipboardData.getData("text/plain");
+    if (txt && /^https?:\/\//i.test(txt.trim())) { setSrcMode(true); $("#srcUrl").value = txt.trim(); loadUrl(txt); }
+  });
+
+  const VIDEO_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
+  function loadUrl(raw) {
+    const u = normUrl(raw);
+    if (!u) return toast("أدخل رابطاً يبدأ بـ http أو https");
+    addHistory(u);
+    if (VIDEO_RE.test(u)) return loadVideo(u, u.split("/").pop().split("?")[0], true);
+    hideVideo();
+    const name = decodeURIComponent(new URL(u).pathname.split("/").pop() || new URL(u).hostname);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => {
+      const c = canvasFrom(img, img.naturalWidth, img.naturalHeight);
+      if (isClean(c)) setWork(c, { label: name, srcUrl: u });
+      else urlOnly(u, null);
+    };
+    img.onerror = () => {
+      // الموقع لا يسمح بقراءة البكسلات (CORS) — نعرض المعاينة فقط، والبحث بالرابط يبقى يعمل
+      const plain = new Image();
+      plain.referrerPolicy = "no-referrer";
+      plain.onload = () => urlOnly(u, plain);
+      plain.onerror = () => urlOnly(u, null);
+      plain.src = u;
+    };
+    img.src = u;
+  }
+  function urlOnly(u, imgEl) {
+    S.work = null; S.srcUrl = u; S.edited = false; S.sample = false; S.label = "";
+    S.token++; S.jpeg = S.b64 = S.png = null;
+    const pv = $("#previewImg");
+    $("#previewCanvas").hidden = true; $("#previewTag").hidden = true;
+    if (imgEl) { pv.src = imgEl.src; pv.hidden = false; $("#previewEmpty").hidden = true; }
+    else { pv.hidden = true; $("#previewEmpty").hidden = false; $("#previewEmpty").textContent = "تعذّر عرض المعاينة هنا، لكن البحث بالرابط يعمل. اضغط \"بحث\" بجانب أي محرك."; }
+    renderMeta(); renderEngines();
+    toast("البحث بالرابط جاهز. التعديل غير متاح لأن الموقع يمنع قراءة الصورة", 4200);
+  }
+  $("#srcUrlGo").addEventListener("click", () => loadUrl($("#srcUrl").value));
+  $("#srcUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") loadUrl(e.target.value); });
+
+  /* ---------- video ---------- */
+  function loadVideo(src, name, remote) {
+    const v = $("#vid");
+    hideVideo();
+    S.videoName = name || "فيديو";
+    if (remote) v.crossOrigin = "anonymous"; else v.removeAttribute("crossorigin");
+    v.src = src;
+    v.hidden = false;
+    $("#videoTools").hidden = false;
+    $("#previewCanvas").hidden = true; $("#previewImg").hidden = true; $("#previewEmpty").hidden = true; $("#previewTag").hidden = true;
+    S.work = null; S.srcUrl = null; S.edited = false; S.sample = false;
+    renderMeta(); prepareBlobs();
+    v.onloadeddata = () => { if (v.currentTime === 0 && isFinite(v.duration)) v.currentTime = Math.min(1, v.duration / 10); };
+    v.onerror = () => {
+      // بعض المواقع لا ترسل ترويسات CORS: نعيد التحميل بدونها (التشغيل يعمل، والالتقاط قد يُمنع)
+      if (remote && v.hasAttribute("crossorigin")) { v.removeAttribute("crossorigin"); v.src = src; return; }
+      toast("تعذّر تشغيل هذا الفيديو. جرّب ملف mp4 أو نزّله أولاً", 4000);
+    };
+  }
+  function grab(v, maxDim) {
+    if (!v.videoWidth) return null;
+    const k = maxDim ? Math.min(1, maxDim / Math.max(v.videoWidth, v.videoHeight)) : 1;
+    const c = canvasFrom(v, Math.round(v.videoWidth * k), Math.round(v.videoHeight * k));
+    return isClean(c) ? c : null;
+  }
+  function seek(v, t) {
+    return new Promise((res) => {
+      const done = () => { v.removeEventListener("seeked", done); res(); };
+      v.addEventListener("seeked", done);
+      v.currentTime = t;
+    });
+  }
+  function useFrame(c, t) {
+    if (!c) return toast("الموقع يمنع التقاط إطارات من هذا الفيديو. نزّله ثم افتحه كملف", 4500);
+    const v = $("#vid");
+    v.pause();
+    S.work = c; S.label = `${S.videoName} @ ${fmtTime(t)}`; S.srcUrl = null; S.edited = false; S.sample = false;
+    renderMeta(); prepareBlobs();
+    toast("تم اختيار الإطار " + fmtTime(t) + " للبحث");
+  }
+  $("#grabBtn").addEventListener("click", () => { const v = $("#vid"); useFrame(grab(v), v.currentTime); });
+  $("#thumbsBtn").addEventListener("click", async () => {
+    const v = $("#vid"), box = $("#frames");
+    if (!isFinite(v.duration) || !v.duration) return toast("انتظر حتى يتحمّل الفيديو");
+    v.pause(); box.innerHTML = "";
+    const back = v.currentTime;
+    for (let i = 1; i <= 8; i++) {
+      const t = (v.duration * i) / 9;
+      await seek(v, t);
+      const full = grab(v);
+      if (!full) { box.textContent = "الموقع يمنع التقاط الإطارات من هذا الفيديو."; return; }
+      const b = document.createElement("button");
+      b.type = "button";
+      const th = canvasFrom(full, 192, Math.round(192 * full.height / full.width));
+      b.appendChild(th);
+      const s = document.createElement("span"); s.textContent = fmtTime(t); b.appendChild(s);
+      b.addEventListener("click", () => { $$("#frames button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); useFrame(full, t); });
+      box.appendChild(b);
+    }
+    await seek(v, back);
+  });
+
+  /* ---------- sample image (example content) ---------- */
+  function makeSample() {
+    const c = document.createElement("canvas"); c.width = 1200; c.height = 800;
+    const g = c.getContext("2d");
+    const sky = g.createLinearGradient(0, 0, 0, 800);
+    sky.addColorStop(0, "#1d3a8a"); sky.addColorStop(0.55, "#e7826a"); sky.addColorStop(1, "#f6c99a");
+    g.fillStyle = sky; g.fillRect(0, 0, 1200, 800);
+    g.fillStyle = "#ffe7b0"; g.beginPath(); g.arc(860, 430, 95, 0, Math.PI * 2); g.fill();
+    const ridge = (y, amp, col, seed) => {
+      g.fillStyle = col; g.beginPath(); g.moveTo(0, 800);
+      for (let x = 0; x <= 1200; x += 20) g.lineTo(x, y - Math.abs(Math.sin(x / 140 + seed)) * amp - Math.sin(x / 37 + seed) * amp * 0.12);
+      g.lineTo(1200, 800); g.closePath(); g.fill();
+    };
+    ridge(560, 170, "#5a4a7a", 1.3); ridge(640, 120, "#34305a", 2.6); ridge(720, 80, "#1b1c33", 4.1);
+    g.fillStyle = "rgba(255,255,255,.85)"; g.font = "600 34px 'IBM Plex Sans Arabic', Tahoma, sans-serif";
+    g.textAlign = "right"; g.fillText("صورة تجريبية — استبدلها بصورتك", 1160, 762);
+    return c;
+  }
+  $("#sampleBtn").addEventListener("click", () => { hideVideo(); setWork(makeSample(), { label: "صورة تجريبية", sample: true }); });
+
+  /* ---------- EDITOR ---------- */
+  const E = { img: null, crop: null, ratio: 0, view: { k: 1, ox: 0, oy: 0 }, base: null, prev: null, drag: null, open: false };
+  const stage = $("#stage");
+
+  function openEditor() {
+    if (!S.work) {
+      E.open = false;
+      sizeStage();
+      const g = stage.getContext("2d");
+      g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--stage") || "#191c24";
+      g.fillRect(0, 0, stage.width, stage.height);
+      g.fillStyle = "#a7adbb"; g.font = `${15 * devicePixelRatio}px 'IBM Plex Sans Arabic', Tahoma`; g.textAlign = "center";
+      g.fillText(S.srcUrl ? "هذه الصورة من رابط يمنع التعديل. نزّلها ثم ارفعها كملف" : "اختر صورة أولاً من تبويب البحث العكسي", stage.width / 2, stage.height / 2);
+      return;
+    }
+    if (E.open && E.src === S.work) { draw(); return; }
+    E.open = true; E.src = S.work;
+    E.img = canvasFrom(S.work, S.work.width, S.work.height);
+    ["edB", "edC", "edS"].forEach((id) => { $("#" + id).value = 0; $("#" + id + "o").textContent = "0"; });
+    resetCrop(); buildPreview(); draw();
+  }
+
+  function resetCrop() {
+    const w = E.img.width, h = E.img.height;
+    E.crop = { x: 0, y: 0, w, h };
+    if (E.ratio) fitRatio();
+  }
+  function fitRatio() {
+    const r = E.ratio, W = E.img.width, H = E.img.height;
+    let w = W, h = w / r;
+    if (h > H) { h = H; w = h * r; }
+    E.crop = { x: (W - w) / 2, y: (H - h) / 2, w, h };
+  }
+  function buildPreview() {
+    const max = 1000, k = Math.min(1, max / Math.max(E.img.width, E.img.height));
+    const c = canvasFrom(E.img, Math.max(1, Math.round(E.img.width * k)), Math.max(1, Math.round(E.img.height * k)));
+    E.base = c.getContext("2d").getImageData(0, 0, c.width, c.height);
+    E.prev = c;
+    applyAdjust();
+  }
+  function adjust(data, b, c, s) {
+    const d = data.data, bb = b * 2.55, cc = c * 2.55, f = (259 * (cc + 255)) / (255 * (259 - cc)), sat = 1 + s / 100;
+    for (let i = 0; i < d.length; i += 4) {
+      let r = d[i], g = d[i + 1], bl = d[i + 2];
+      const y = 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+      r = y + (r - y) * sat; g = y + (g - y) * sat; bl = y + (bl - y) * sat;
+      d[i] = f * (r + bb - 128) + 128; d[i + 1] = f * (g + bb - 128) + 128; d[i + 2] = f * (bl + bb - 128) + 128;
+    }
+    return data;
+  }
+  const vals = () => [+$("#edB").value, +$("#edC").value, +$("#edS").value];
+  function applyAdjust() {
+    const [b, c, s] = vals();
+    const copy = new ImageData(new Uint8ClampedArray(E.base.data), E.base.width, E.base.height);
+    E.prev.getContext("2d").putImageData((b || c || s) ? adjust(copy, b, c, s) : copy, 0, 0);
+  }
+  let raf = 0;
+  ["edB", "edC", "edS"].forEach((id) => $("#" + id).addEventListener("input", (e) => {
+    $("#" + id + "o").textContent = e.target.value;
+    if (!E.open) return;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => { applyAdjust(); draw(); });
+  }));
+
+  function sizeStage() {
+    const wrap = $("#stageWrap"), dpr = devicePixelRatio || 1;
+    const w = Math.max(280, wrap.clientWidth), h = Math.round(Math.min(Math.max(300, innerHeight * 0.62), 600));
+    stage.style.height = h + "px";
+    stage.width = Math.round(w * dpr); stage.height = Math.round(h * dpr);
+  }
+  function draw() {
+    if (!E.open) return;
+    sizeStage();
+    const g = stage.getContext("2d"), W = stage.width, H = stage.height, dpr = devicePixelRatio || 1, pad = 24 * dpr;
+    const iw = E.img.width, ih = E.img.height;
+    const k = Math.min((W - 2 * pad) / iw, (H - 2 * pad) / ih);
+    E.view = { k, ox: (W - iw * k) / 2, oy: (H - ih * k) / 2 };
+    g.clearRect(0, 0, W, H);
+    g.imageSmoothingQuality = "high";
+    g.drawImage(E.prev, E.view.ox, E.view.oy, iw * k, ih * k);
+    const c = E.crop, x = E.view.ox + c.x * k, y = E.view.oy + c.y * k, w = c.w * k, h = c.h * k;
+    g.fillStyle = "rgba(0,0,0,.55)";
+    g.fillRect(E.view.ox, E.view.oy, iw * k, y - E.view.oy);
+    g.fillRect(E.view.ox, y + h, iw * k, E.view.oy + ih * k - y - h);
+    g.fillRect(E.view.ox, y, x - E.view.ox, h);
+    g.fillRect(x + w, y, E.view.ox + iw * k - x - w, h);
+    g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = dpr;
+    for (let i = 1; i < 3; i++) {
+      g.beginPath(); g.moveTo(x + (w * i) / 3, y); g.lineTo(x + (w * i) / 3, y + h); g.stroke();
+      g.beginPath(); g.moveTo(x, y + (h * i) / 3); g.lineTo(x + w, y + (h * i) / 3); g.stroke();
+    }
+    g.strokeStyle = "#fff"; g.lineWidth = 1.5 * dpr; g.strokeRect(x, y, w, h);
+    g.lineWidth = 4 * dpr; g.lineCap = "round";
+    const L = 16 * dpr;
+    [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]].forEach(([px, py, dx, dy]) => {
+      g.beginPath(); g.moveTo(px + dx * L, py); g.lineTo(px, py); g.lineTo(px, py + dy * L); g.stroke();
+    });
+    $("#cropRead").textContent = `${Math.round(c.w)} × ${Math.round(c.h)} px`;
+  }
+  addEventListener("resize", () => { if (!$("#view-editor").hidden) draw(); });
+
+  function toImg(ev) {
+    const r = stage.getBoundingClientRect(), dpr = stage.width / r.width;
+    return { x: ((ev.clientX - r.left) * dpr - E.view.ox) / E.view.k, y: ((ev.clientY - r.top) * dpr - E.view.oy) / E.view.k };
+  }
+  function hit(p) {
+    const c = E.crop, tol = (22 * (stage.width / stage.getBoundingClientRect().width)) / E.view.k;
+    const nl = Math.abs(p.x - c.x) < tol, nr = Math.abs(p.x - (c.x + c.w)) < tol;
+    const nt = Math.abs(p.y - c.y) < tol, nb = Math.abs(p.y - (c.y + c.h)) < tol;
+    const inX = p.x > c.x - tol && p.x < c.x + c.w + tol, inY = p.y > c.y - tol && p.y < c.y + c.h + tol;
+    let m = "";
+    if (inY && (nl || nr)) m += Math.abs(p.x - c.x) <= Math.abs(p.x - c.x - c.w) ? "l" : "r";
+    if (inX && (nt || nb)) m += Math.abs(p.y - c.y) <= Math.abs(p.y - c.y - c.h) ? "t" : "b";
+    if (!m && p.x > c.x && p.x < c.x + c.w && p.y > c.y && p.y < c.y + c.h) m = "move";
+    return m;
+  }
+  stage.addEventListener("pointerdown", (ev) => {
+    if (!E.open) return;
+    const p = toImg(ev), m = hit(p);
+    if (!m) return;
+    E.drag = { m, p, c: { ...E.crop } };
+    stage.setPointerCapture(ev.pointerId);
+  });
+  stage.addEventListener("pointermove", (ev) => {
+    if (!E.open) return;
+    const p = toImg(ev);
+    if (!E.drag) {
+      const m = hit(p);
+      stage.style.cursor = m === "move" ? "move" : (m === "lt" || m === "rb") ? "nwse-resize" : (m === "rt" || m === "lb") ? "nesw-resize" : (m === "l" || m === "r") ? "ew-resize" : (m === "t" || m === "b") ? "ns-resize" : "crosshair";
+      return;
+    }
+    const { m, c: o } = E.drag, dx = p.x - E.drag.p.x, dy = p.y - E.drag.p.y, W = E.img.width, H = E.img.height, min = Math.max(16, Math.min(W, H) * 0.04);
+    let { x, y, w, h } = o;
+    if (m === "move") {
+      x = Math.min(Math.max(0, o.x + dx), W - o.w); y = Math.min(Math.max(0, o.y + dy), H - o.h);
+    } else {
+      if (m.includes("l")) { x = Math.min(Math.max(0, o.x + dx), o.x + o.w - min); w = o.x + o.w - x; }
+      if (m.includes("r")) { w = Math.min(Math.max(min, o.w + dx), W - o.x); }
+      if (m.includes("t")) { y = Math.min(Math.max(0, o.y + dy), o.y + o.h - min); h = o.y + o.h - y; }
+      if (m.includes("b")) { h = Math.min(Math.max(min, o.h + dy), H - o.y); }
+      if (E.ratio) {
+        const r = E.ratio;
+        if (m === "l" || m === "r") h = w / r; else if (m === "t" || m === "b") w = h * r; else h = w / r;
+        if (m.includes("t")) y = o.y + o.h - h;
+        if (m.includes("l")) x = o.x + o.w - w;
+        if (x < 0 || y < 0 || x + w > W || y + h > H) return;
+      }
+    }
+    E.crop = { x, y, w, h };
+    draw();
+  });
+  const endDrag = () => { E.drag = null; };
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
+
+  function transform(kind) {
+    if (!E.open) return;
+    const s = E.img, c = document.createElement("canvas"), g = c.getContext("2d");
+    if (kind === "rotL" || kind === "rotR") {
+      c.width = s.height; c.height = s.width;
+      g.translate(c.width / 2, c.height / 2);
+      g.rotate((kind === "rotR" ? 90 : -90) * Math.PI / 180);
+      g.drawImage(s, -s.width / 2, -s.height / 2);
+    } else {
+      c.width = s.width; c.height = s.height;
+      if (kind === "flipH") { g.translate(c.width, 0); g.scale(-1, 1); } else { g.translate(0, c.height); g.scale(1, -1); }
+      g.drawImage(s, 0, 0);
+    }
+    E.img = c; resetCrop(); buildPreview(); draw();
+  }
+  ["rotL", "rotR", "flipH", "flipV"].forEach((id) => $("#" + id).addEventListener("click", () => transform(id)));
+  $$("[data-ratio]").forEach((b) => b.addEventListener("click", () => {
+    $$("[data-ratio]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    E.ratio = +b.dataset.ratio;
+    if (E.open) { if (E.ratio) fitRatio(); else resetCrop(); draw(); }
+  }));
+  $("#edReset").addEventListener("click", () => { E.open = false; E.src = null; openEditor(); });
+  $("#edCancel").addEventListener("click", () => { E.open = false; E.src = null; location.hash = "search"; });
+  $("#edApply").addEventListener("click", () => {
+    if (!E.open) return;
+    const c = E.crop, out = document.createElement("canvas");
+    out.width = Math.max(1, Math.round(c.w)); out.height = Math.max(1, Math.round(c.h));
+    const g = out.getContext("2d");
+    g.drawImage(E.img, Math.round(c.x), Math.round(c.y), out.width, out.height, 0, 0, out.width, out.height);
+    const [b, cc, s] = vals();
+    if (b || cc || s) g.putImageData(adjust(g.getImageData(0, 0, out.width, out.height), b, cc, s), 0, 0);
+    const label = (S.label || "صورة").replace(/ \(معدّلة\)$/, "") + " (معدّلة)";
+    hideVideo();
+    setWork(out, { label, edited: true });
+    E.open = false; E.src = null;
+    location.hash = "search";
+    toast("تم تطبيق التعديل. اختر محركاً للبحث");
+  });
+
+  /* ---------- DNS ---------- */
+  const PROVIDERS = [
+    { name: "Cloudflare", tag: "موصى به", note: "الأسرع عالمياً، لا يحتفظ بسجلات", v4: ["1.1.1.1", "1.0.0.1"], v6: ["2606:4700:4700::1111", "2606:4700:4700::1001"], doh: "https://cloudflare-dns.com/dns-query", dot: "one.one.one.one", rec: true },
+    { name: "Google Public DNS", note: "موثوق ومتاح في كل مكان", v4: ["8.8.8.8", "8.8.4.4"], v6: ["2001:4860:4860::8888", "2001:4860:4860::8844"], doh: "https://dns.google/dns-query", dot: "dns.google" },
+    { name: "Quad9", note: "يحجب المواقع الخبيثة والتصيّد", v4: ["9.9.9.9", "149.112.112.112"], v6: ["2620:fe::fe", "2620:fe::9"], doh: "https://dns.quad9.net/dns-query", dot: "dns.quad9.net" },
+    { name: "AdGuard DNS", note: "يحجب الإعلانات والمتتبعات أيضاً", v4: ["94.140.14.14", "94.140.15.15"], v6: ["2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff"], doh: "https://dns.adguard-dns.com/dns-query", dot: "dns.adguard-dns.com" },
+    { name: "Mullvad DNS", note: "تركيز على الخصوصية", v4: ["194.242.2.2"], v6: ["2a07:e340::2"], doh: "https://dns.mullvad.net/dns-query", dot: "dns.mullvad.net" },
+  ];
+  const kvRow = (k, v) => `<dt>${k}</dt><dd>${esc(v)}</dd><button class="copy" type="button" data-copy="${esc(v)}">نسخ</button>`;
+  $("#providers").innerHTML = PROVIDERS.map((p) => `
+    <article class="prov${p.rec ? " rec" : ""}">
+      <header><h3>${esc(p.name)} ${p.tag ? `<span class="badge">${p.tag}</span>` : ""}</h3><span>${esc(p.note)}</span></header>
+      <dl class="kv" style="margin: 0">
+        ${p.v4.map((v, i) => kvRow(i ? "" : "IPv4", v)).join("")}
+        ${p.v6.map((v, i) => kvRow(i ? "" : "IPv6", v)).join("")}
+        ${kvRow("DoH", p.doh)}
+        ${kvRow("DoT", p.dot)}
+      </dl>
+    </article>`).join("");
+
+  const RTYPE = { 1: "A", 5: "CNAME", 28: "AAAA" };
+  const DNS_STATUS = { 0: "NOERROR", 2: "SERVFAIL", 3: "NXDOMAIN", 5: "REFUSED" };
+  async function dohLookup(provider, name) {
+    const base = provider === "cf" ? "https://cloudflare-dns.com/dns-query" : "https://dns.google/resolve";
+    const out = { status: null, answers: [] };
+    for (const type of ["A", "AAAA"]) {
+      const r = await fetch(`${base}?name=${enc(name)}&type=${type}`, { headers: { accept: "application/dns-json" }, cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      if (out.status == null || j.Status !== 0) out.status = j.Status;
+      (j.Answer || []).forEach((a) => out.answers.push({ type: RTYPE[a.type] || a.type, data: a.data, ttl: a.TTL }));
+    }
+    return out;
+  }
+  function resTable(title, res) {
+    if (res.error) return `<div class="res"><h4>${title}<span class="badge">خطأ</span></h4><div style="font-size:13px;color:var(--muted)">${esc(res.error)}</div></div>`;
+    const rows = res.answers.length
+      ? res.answers.map((a) => `<tr><td class="t">${a.type}</td><td class="v">${esc(a.data)}</td><td class="t">${a.ttl}s</td></tr>`).join("")
+      : `<tr><td colspan="3" style="color:var(--muted)">لا توجد سجلات</td></tr>`;
+    return `<div class="res"><h4>${title}<span class="badge">${DNS_STATUS[res.status] || res.status}</span></h4><table>${rows}</table></div>`;
+  }
+  async function runLookup() {
+    let name = $("#dnsName").value.trim().toLowerCase();
+    try { if (/^https?:/.test(name)) name = new URL(name).hostname; } catch (e) {}
+    name = name.replace(/\/.*$/, "");
+    if (!/^[a-z0-9.-]+\.[a-z0-9-]{2,}$/i.test(name) && !/^[^\s/]+\.[^\s/]+$/.test(name)) return toast("اكتب اسم نطاق مثل example.com");
+    $("#dnsName").value = name;
+    $("#dnsOut").innerHTML = `<div class="res" style="color:var(--muted)">جاري الاستعلام المشفّر…</div>`;
+    $("#dnsVerdict").innerHTML = "";
+    const [cf, gg] = await Promise.all(["cf", "gg"].map((p) => dohLookup(p, name).catch((e) => ({ error: e.message || "فشل الاتصال" }))));
+    $("#dnsOut").innerHTML = resTable("Cloudflare 1.1.1.1", cf) + resTable("Google 8.8.8.8", gg);
+    let v;
+    if (cf.error && gg.error) {
+      v = `<div class="verdict warn">${EMBEDDED ? "الفحص المباشر لا يعمل داخل نسخة المعاينة. افتح الملف في متصفحك." : "تعذّر الوصول لخوادم DoH من هذا المتصفح. ربما تحجبها شبكتك؛ جرّب WARP أو Psiphon من القائمة بالأسفل."}</div>`;
+    } else {
+      const ok = [cf, gg].find((r) => !r.error && r.answers.some((a) => a.type === "A" || a.type === "AAAA"));
+      v = ok
+        ? `<div class="verdict ok"><b>${esc(name)}</b> له عناوين حقيقية عبر DNS المشفّر. إذا لم يفتح عندك فالحجب غالباً من DNS مزوّد الإنترنت، وتفعيل Cloudflare بالأسفل يحل المشكلة. إذا بقي محجوباً بعدها فاستخدم WARP.</div>`
+        : `<div class="verdict warn">لا توجد عناوين لهذا الاسم حتى عبر DNS المشفّر. تأكد من كتابة النطاق صحيحاً.</div>`;
+    }
+    $("#dnsVerdict").innerHTML = v;
+  }
+  $("#dnsGo").addEventListener("click", runLookup);
+  $("#dnsName").addEventListener("keydown", (e) => { if (e.key === "Enter") runLookup(); });
+
+  /* ---------- BROWSER ---------- */
+  const B = { via: "direct", url: null };
+  const VIA = {
+    direct: (u) => u,
+    translate: (u) => `https://translate.google.com/translate?sl=auto&tl=ar&hl=ar&u=${enc(u)}`,
+    wayback: (u) => `https://web.archive.org/web/2/${u}`,
+    archive: (u) => `https://archive.ph/newest/${u}`,
+  };
+  if (EMBEDDED) { $("#viewer").hidden = true; $("#viewerOff").hidden = false; }
+  function resolved() { return B.url ? VIA[B.via](B.url) : null; }
+  function updateBrowser(load) {
+    const r = resolved(), open = $("#bOpen");
+    if (r) { open.href = r; open.removeAttribute("aria-disabled"); } else { open.href = "#"; open.setAttribute("aria-disabled", "true"); }
+    $("#bResolved").textContent = r || "";
+    if (load && r && !EMBEDDED) $("#frame").src = r;
+  }
+  function go() {
+    const raw = $("#bUrl").value.trim();
+    const u = normUrl(raw) || (raw ? "https://duckduckgo.com/?q=" + enc(raw) : null);
+    if (!u) return toast("اكتب رابطاً أو كلمة بحث");
+    B.url = u; $("#bUrl").value = u;
+    addHistory(u);
+    updateBrowser(true);
+  }
+  $("#bGo").addEventListener("click", go);
+  $("#bUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  $("#bUrl").addEventListener("input", () => {
+    const u = normUrl($("#bUrl").value);
+    B.url = u; updateBrowser(false);
+  });
+  $$("[data-via]").forEach((c) => c.addEventListener("click", () => {
+    $$("[data-via]").forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+    B.via = c.dataset.via;
+    updateBrowser(true);
+  }));
+  $("#bCopy").addEventListener("click", () => { const r = resolved(); if (r) copyText(r); else toast("لا يوجد رابط بعد"); });
+
+  const dUrl = $("#dUrl"), dGo = $("#dGo");
+  dUrl.addEventListener("input", () => {
+    const u = normUrl(dUrl.value);
+    if (u) { dGo.href = u; dGo.removeAttribute("aria-disabled"); dGo.download = decodeURIComponent(new URL(u).pathname.split("/").pop() || "download"); }
+    else { dGo.href = "#"; dGo.setAttribute("aria-disabled", "true"); }
+  });
+  dGo.addEventListener("click", () => {
+    if (dGo.getAttribute("aria-disabled") !== "true") { addHistory(dGo.href); toast("إذا فُتح الملف بدل تنزيله: اضغط مطوّلاً أو بالزر الأيمن ← حفظ باسم", 4500); }
+  });
+
+  function addHistory(u) {
+    const h = store.get("hist", []).filter((x) => x !== u);
+    h.unshift(u);
+    store.set("hist", h.slice(0, 12));
+    renderHistory();
+  }
+  function renderHistory() {
+    const h = store.get("hist", []), ul = $("#hist");
+    ul.innerHTML = h.length
+      ? h.map((u) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a><button class="copy" type="button" data-load="${esc(u)}">فتح هنا</button></li>`).join("")
+      : `<li style="color:var(--muted)">الروابط التي تفتحها أو تبحث بها ستظهر هنا.</li>`;
+  }
+  $("#hist").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-load]");
+    if (b) { $("#bUrl").value = b.dataset.load; go(); }
+  });
+  $("#histClear").addEventListener("click", () => { store.set("hist", []); renderHistory(); });
+
+  /* ---------- init ---------- */
+  $("#bUrl").value = "https://en.wikipedia.org/wiki/Reverse_image_search";
+  B.url = $("#bUrl").value; updateBrowser(!EMBEDDED);
+  renderHistory();
+  setWork(makeSample(), { label: "صورة تجريبية", sample: true });
+  showTab(location.hash.slice(1) || "search");
+})();
+</script>
+<!--CONTENT-END-->
+</body>
+</html>
