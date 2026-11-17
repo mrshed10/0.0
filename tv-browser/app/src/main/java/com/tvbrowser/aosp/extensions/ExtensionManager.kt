@@ -105,8 +105,13 @@ class ExtensionManager(
                 notifyChanged()
             }
 
-            override fun onEnabled(extension: WebExtension) = notifyChanged()
-            override fun onDisabled(extension: WebExtension) = notifyChanged()
+            override fun onEnabled(extension: WebExtension) {
+                notifyChanged()
+            }
+
+            override fun onDisabled(extension: WebExtension) {
+                notifyChanged()
+            }
         })
 
         controller.ensureBuiltIn(BRIDGE_URL, BRIDGE_ID).accept({ ext ->

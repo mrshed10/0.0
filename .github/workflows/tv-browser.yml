@@ -28,6 +28,13 @@ jobs:
           chmod +x gradlew
           ./gradlew -q :app:dependencies --configuration stableReleaseRuntimeClasspath | grep -i geckoview | head -3 || true
           ./gradlew -q :app:dependencies --configuration unsignedReleaseRuntimeClasspath | grep -i geckoview | head -3 || true
+      - name: Dump GeckoView extension API (diagnostics)
+        run: |
+          ./gradlew -q :app:dependencies --configuration stableReleaseCompileClasspath > /dev/null || true
+          AAR=$(find ~/.gradle/caches -name 'geckoview-160*.aar' | head -1)
+          mkdir -p /tmp/gv && cd /tmp/gv && unzip -oq "$AAR" classes.jar && \
+          javap -cp classes.jar 'org.mozilla.geckoview.WebExtensionController$PromptDelegate' \
+            'org.mozilla.geckoview.WebExtension$PermissionPromptResponse' || true
       - name: Build release APKs (both engines, R8-minified)
         run: ./gradlew assembleStableRelease assembleUnsignedRelease --stacktrace
       - uses: actions/upload-artifact@v4
