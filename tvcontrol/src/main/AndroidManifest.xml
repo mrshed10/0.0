@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- التطبيق مخصص للتلفاز لكنه لا يشترط Leanback حتى يُثبَّت على أنظمة AOSP المعدّلة أيضًا -->
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+
+    <!-- لعرض جميع الأنشطة (Activities) في النظام داخل مستعرض الأنشطة (Android 11+) -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <!--
+        اختيارية: لا تُمنح تلقائيًا. عند منحها مرة واحدة عبر:
+        adb shell pm grant com.tvtools.controlpanel android.permission.WRITE_SECURE_SETTINGS
+        يستطيع التطبيق تشغيل/إيقاف تصحيح USB والتصحيح اللاسلكي مباشرة بضغطة زر.
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
+    <application
+        android:allowBackup="true"
+        android:banner="@drawable/banner"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.TvControl">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <!-- يظهر في الشاشة الرئيسية للتلفاز (Google TV / Android TV) -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <!-- ويظهر أيضًا في مشغّلات AOSP العادية التي لا تدعم Leanback -->
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ActivityBrowserActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ShortcutsActivity"
+            android:exported="false" />
+    </application>
+</manifest>

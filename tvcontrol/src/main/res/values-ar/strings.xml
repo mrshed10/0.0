@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">لوحة تحكم الشاشة</string>
+    <string name="main_subtitle">وصول سريع لإعدادات النظام المخفية — استخدم أسهم الريموت وزر OK</string>
+
+    <string name="tile_activities">مشغّل الأنشطة</string>
+    <string name="tile_activities_sub">استعراض وفتح أي نشاط (Activity) في النظام</string>
+    <string name="tile_settings">إعدادات أندرويد</string>
+    <string name="tile_settings_sub">الإعدادات الكاملة com.android.settings</string>
+    <string name="tile_developer">خيارات المطور</string>
+    <string name="tile_developer_sub">فتح خيارات المطور مباشرة</string>
+    <string name="tile_usb">تصحيح أخطاء USB</string>
+    <string name="tile_usb_sub">تشغيل/إيقاف ADB أو الانتقال للخيار</string>
+    <string name="tile_about">حول الجهاز</string>
+    <string name="tile_about_sub">اضغط 7 مرات على «الإصدار» لتفعيل وضع المطور</string>
+    <string name="tile_shortcuts">اختصارات النظام</string>
+    <string name="tile_shortcuts_sub">الواي فاي، التطبيقات، اللغة، التخزين والمزيد</string>
+
+    <string name="state_on">مفعّل</string>
+    <string name="state_off">متوقف</string>
+    <string name="status_line">خيارات المطور: %1$s  •  تصحيح USB: %2$s  •  التحكم المباشر: %3$s  •  أندرويد %4$s (API %5$d)  •  %6$s</string>
+
+    <string name="dev_disabled_title">خيارات المطور غير مفعّلة</string>
+    <string name="dev_disabled_message">افتح «حول»، ثم انتقل إلى «الإصدار» (Android TV OS build) واضغط OK سبع مرات حتى تظهر رسالة «أصبحت الآن مطورًا». بعدها ارجع واضغط هذا الزر مرة أخرى.</string>
+    <string name="open_about">فتح «حول»</string>
+    <string name="try_anyway">المحاولة على أي حال</string>
+
+    <string name="usb_dialog_title">تصحيح USB: %1$s</string>
+    <string name="usb_turn_on">تشغيل تصحيح أخطاء USB</string>
+    <string name="usb_turn_off">إيقاف تصحيح أخطاء USB</string>
+    <string name="wifi_adb_turn_on">تشغيل التصحيح اللاسلكي</string>
+    <string name="wifi_adb_turn_off">إيقاف التصحيح اللاسلكي</string>
+    <string name="usb_open_settings">فتح خيار تصحيح أخطاء USB</string>
+    <string name="usb_how_to_grant">تفعيل التبديل بضغطة واحدة (صلاحية ADB)</string>
+    <string name="grant_help_message">لا يسمح أندرويد للتطبيقات العادية بتشغيل تصحيح USB بنفسها. للسماح لهذا التطبيق بذلك بضغطة واحدة: فعّل تصحيح USB مرة واحدة من خيارات المطور، ثم نفّذ هذا الأمر من الكمبيوتر (مرة واحدة فقط):\n\n%1$s\n\nبعدها سيبدّل هذا الزر حالة التصحيح فورًا، حتى لو أوقفه النظام بعد إعادة التشغيل.</string>
+    <string name="toggle_done">تم</string>
+    <string name="toggle_failed">فشل: الصلاحية غير ممنوحة أو محجوبة من الشركة المصنّعة</string>
+
+    <string name="loading">جارٍ التحميل…</string>
+    <string name="browser_packages_header">التطبيقات التي تحتوي أنشطة قابلة للفتح (%1$d)</string>
+    <string name="browser_activities_header">%1$s — %2$d نشاط</string>
+    <string name="browser_package_sub">%1$s  •  %2$d نشاط</string>
+    <string name="error_not_available">هذه الشاشة غير متوفرة على هذا الجهاز (حذفتها الشركة المصنّعة)</string>
+    <string name="error_launch_failed">تعذّر الفتح: %1$s</string>
+
+    <string name="sc_android_settings">إعدادات أندرويد (الكاملة / المخفية)</string>
+    <string name="sc_tv_settings">إعدادات التلفاز</string>
+    <string name="sc_apps">كل التطبيقات</string>
+    <string name="sc_unknown_sources">تثبيت التطبيقات غير المعروفة</string>
+    <string name="sc_home_app">تطبيق الشاشة الرئيسية الافتراضي</string>
+    <string name="sc_wifi">الواي فاي</string>
+    <string name="sc_network">الشبكة والإنترنت</string>
+    <string name="sc_bluetooth">البلوتوث وأجهزة التحكم</string>
+    <string name="sc_display">الشاشة والعرض</string>
+    <string name="sc_sound">الصوت</string>
+    <string name="sc_language">اللغة</string>
+    <string name="sc_keyboard">لوحة المفاتيح / طرق الإدخال</string>
+    <string name="sc_date">التاريخ والوقت</string>
+    <string name="sc_storage">التخزين</string>
+    <string name="sc_accessibility">إمكانية الوصول</string>
+    <string name="sc_security">الأمان والقيود</string>
+    <string name="sc_testing">قائمة الاختبار (معلومات الجهاز والشبكة)</string>
+    <string name="sc_sysui_tuner">أداة ضبط واجهة النظام (System UI Tuner)</string>
+</resources>

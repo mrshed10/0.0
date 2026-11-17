@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV Control Panel</string>
+    <string name="main_subtitle">Quick access to hidden system settings — use the remote arrows and OK</string>
+
+    <string name="tile_activities">Activity Launcher</string>
+    <string name="tile_activities_sub">Browse and open any system activity</string>
+    <string name="tile_settings">Android Settings</string>
+    <string name="tile_settings_sub">Full com.android.settings</string>
+    <string name="tile_developer">Developer Options</string>
+    <string name="tile_developer_sub">Open developer settings directly</string>
+    <string name="tile_usb">USB Debugging</string>
+    <string name="tile_usb_sub">Toggle ADB or jump to the setting</string>
+    <string name="tile_about">About Device</string>
+    <string name="tile_about_sub">Tap Build 7 times to unlock developer mode</string>
+    <string name="tile_shortcuts">System Shortcuts</string>
+    <string name="tile_shortcuts_sub">Wi-Fi, apps, language, storage and more</string>
+
+    <string name="state_on">ON</string>
+    <string name="state_off">OFF</string>
+    <string name="status_line">Developer options: %1$s  •  USB debugging: %2$s  •  Direct control: %3$s  •  Android %4$s (API %5$d)  •  %6$s</string>
+
+    <string name="dev_disabled_title">Developer options are disabled</string>
+    <string name="dev_disabled_message">Open “About”, then select “Build” (Android TV OS build) and press OK 7 times until you see “You are now a developer”. Then come back and press this button again.</string>
+    <string name="open_about">Open About</string>
+    <string name="try_anyway">Try anyway</string>
+
+    <string name="usb_dialog_title">USB debugging: %1$s</string>
+    <string name="usb_turn_on">Turn USB debugging ON</string>
+    <string name="usb_turn_off">Turn USB debugging OFF</string>
+    <string name="wifi_adb_turn_on">Turn wireless debugging ON</string>
+    <string name="wifi_adb_turn_off">Turn wireless debugging OFF</string>
+    <string name="usb_open_settings">Open the USB debugging setting</string>
+    <string name="usb_how_to_grant">Enable one-press toggle (ADB permission)</string>
+    <string name="grant_help_message">Android does not let regular apps toggle USB debugging. To allow this app to do it with one press, enable USB debugging once from Developer Options, then run this command from a computer (one time only):\n\n%1$s\n\nAfter that, this button will toggle debugging instantly, even if the firmware turns it off after a reboot.</string>
+    <string name="toggle_done">Done</string>
+    <string name="toggle_failed">Failed: permission not granted or blocked by the manufacturer</string>
+
+    <string name="loading">Loading…</string>
+    <string name="browser_packages_header">Apps with launchable activities (%1$d)</string>
+    <string name="browser_activities_header">%1$s — %2$d activities</string>
+    <string name="browser_package_sub">%1$s  •  %2$d activities</string>
+    <string name="error_not_available">This screen is not available on this device (removed by the manufacturer)</string>
+    <string name="error_launch_failed">Could not open: %1$s</string>
+
+    <string name="sc_android_settings">Android Settings (full / hidden)</string>
+    <string name="sc_tv_settings">TV Settings</string>
+    <string name="sc_apps">All apps</string>
+    <string name="sc_unknown_sources">Install unknown apps</string>
+    <string name="sc_home_app">Default home app</string>
+    <string name="sc_wifi">Wi-Fi</string>
+    <string name="sc_network">Network &amp; internet</string>
+    <string name="sc_bluetooth">Bluetooth &amp; remotes</string>
+    <string name="sc_display">Display</string>
+    <string name="sc_sound">Sound</string>
+    <string name="sc_language">Language</string>
+    <string name="sc_keyboard">Keyboard / input methods</string>
+    <string name="sc_date">Date &amp; time</string>
+    <string name="sc_storage">Storage</string>
+    <string name="sc_accessibility">Accessibility</string>
+    <string name="sc_security">Security &amp; restrictions</string>
+    <string name="sc_testing">Testing menu (device / network info)</string>
+    <string name="sc_sysui_tuner">System UI Tuner</string>
+</resources>

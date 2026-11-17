@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- حالة التركيز (Focus) واضحة جدًا لأن المستخدم يتنقّل بالريموت وليس باللمس -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape>
+            <solid android:color="@color/accent_dark" />
+            <corners android:radius="20dp" />
+            <stroke android:width="4dp" android:color="@color/text_primary" />
+        </shape>
+    </item>
+    <item android:state_focused="true">
+        <shape>
+            <solid android:color="@color/accent" />
+            <corners android:radius="20dp" />
+            <stroke android:width="4dp" android:color="@color/text_primary" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <solid android:color="@color/surface" />
+            <corners android:radius="20dp" />
+            <stroke android:width="2dp" android:color="@color/outline" />
+        </shape>
+    </item>
+</selector>
