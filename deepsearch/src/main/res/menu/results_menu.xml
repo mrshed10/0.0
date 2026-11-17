@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_links"
+        android:icon="@drawable/ic_link"
+        android:title="@string/extract_links"
+        app:showAsAction="always" />
+    <item android:id="@+id/action_reload" android:title="@string/resubmit" app:showAsAction="never" />
+    <item android:id="@+id/action_manual" android:title="@string/manual_upload" app:showAsAction="never" />
+    <item android:id="@+id/action_open_hub" android:title="@string/open_in_hub" app:showAsAction="never" />
+    <item android:id="@+id/action_open_external" android:title="@string/open_external" app:showAsAction="never" />
+</menu>

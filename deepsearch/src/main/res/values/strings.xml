@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DeepSearch Hub</string>
+
+    <!-- التنقل -->
+    <string name="nav_search">البحث العكسي</string>
+    <string name="nav_browser">المتصفح</string>
+    <string name="nav_dns">DNS الآمن</string>
+
+    <!-- شاشة البحث -->
+    <string name="search_header">ابحث عن مصدر أي صورة أو فيديو</string>
+    <string name="search_sub">نرفع الوسائط لعدة محركات بحث عكسي في وقت واحد ونستخرج الروابط الأصلية</string>
+    <string name="tap_to_pick">اضغط لاختيار صورة أو فيديو</string>
+    <string name="tap_to_pick_sub">أو اسحبها وأفلتها هنا، أو شاركها من أي تطبيق</string>
+    <string name="pick">اختيار</string>
+    <string name="edit">تعديل</string>
+    <string name="deep_search">بحث عكسي عميق</string>
+    <string name="engines_title">محركات البحث</string>
+    <string name="video_frame_title">اختر الإطار المراد البحث عنه</string>
+    <string name="frame_at">الإطار %1$s / %2$s</string>
+    <string name="search_tip">نصيحة: قص الصورة على الجزء المهم (وجه، شعار، مشهد) يعطي نتائج أدق بكثير.</string>
+    <string name="pick_first">اختر صورة أو فيديو أولاً</string>
+    <string name="pick_engine">اختر محركاً واحداً على الأقل</string>
+
+    <!-- النتائج -->
+    <string name="results_title">نتائج البحث العكسي</string>
+    <string name="uploading_to">جاري الرفع إلى</string>
+    <string name="extract_links">استخراج الروابط</string>
+    <string name="resubmit">إعادة الرفع</string>
+    <string name="manual_upload">رفع يدوي</string>
+    <string name="manual_upload_hint">اضغط زر رفع الصورة في الموقع — سيتم إرفاق صورتك تلقائياً</string>
+    <string name="open_in_hub">فتح في متصفح التطبيق</string>
+    <string name="open_external">فتح في متصفح خارجي</string>
+    <string name="fetching_image">جاري جلب الصورة…</string>
+
+    <!-- الروابط -->
+    <string name="links_title">الروابط المستخرجة</string>
+    <string name="links_count">%1$d رابط</string>
+    <string name="no_links">لم يتم العثور على روابط في هذه الصفحة</string>
+    <string name="all">الكل</string>
+    <string name="kind_video">فيديو</string>
+    <string name="kind_image">صورة</string>
+    <string name="kind_page">صفحة</string>
+    <string name="act_open_hub">فتح في المتصفح الداخلي</string>
+    <string name="act_reverse_search">بحث عكسي عن هذه الصورة</string>
+    <string name="act_download">تحميل</string>
+    <string name="act_copy">نسخ الرابط</string>
+    <string name="act_share">مشاركة</string>
+    <string name="copied">تم النسخ</string>
+    <string name="download_started">بدأ تحميل %1$s</string>
+    <string name="download_unsupported">لا يمكن تحميل هذا النوع من الروابط مباشرة</string>
+    <string name="error_x">خطأ: %1$s</string>
+
+    <!-- المحرر -->
+    <string name="editor_title">تعديل الصورة</string>
+    <string name="save">حفظ</string>
+    <string name="rotate_left">تدوير لليسار</string>
+    <string name="rotate_right">تدوير لليمين</string>
+    <string name="flip">قلب أفقي</string>
+    <string name="reset_crop">إعادة القص</string>
+    <string name="reset_colors">إعادة الألوان</string>
+    <string name="brightness">السطوع</string>
+    <string name="contrast">التباين</string>
+    <string name="saturation">التشبع</string>
+
+    <!-- المتصفح -->
+    <string name="url_hint">ابحث أو اكتب رابطاً</string>
+    <string name="back">رجوع</string>
+    <string name="forward">تقدم</string>
+    <string name="reload">تحديث</string>
+    <string name="home">الرئيسية</string>
+    <string name="more">المزيد</string>
+    <string name="adblock">حجب الإعلانات</string>
+    <string name="doh_in_browser">DNS مشفّر (DoH)</string>
+    <string name="javascript">JavaScript</string>
+    <string name="desktop_mode">وضع سطح المكتب</string>
+    <string name="proxy">بروكسي…</string>
+    <string name="set_home">تعيين كصفحة رئيسية</string>
+    <string name="share_page">مشاركة / تحميل الصفحة</string>
+    <string name="clear_data">مسح بيانات التصفح</string>
+    <string name="home_saved">تم تعيين الصفحة الرئيسية</string>
+    <string name="data_cleared">تم مسح الكاش والكوكيز والسجل</string>
+    <string name="shield_vpn">🔒 DNS للجهاز</string>
+    <string name="shield_doh">🔒 DoH</string>
+    <string name="shield_off">DNS عادي</string>
+    <string name="shield_fmt">%1$s · 🛡 %2$d</string>
+    <string name="proxy_title">بروكسي المتصفح</string>
+    <string name="proxy_msg">يمرر كل صفحات التطبيق عبر بروكسي (يتجاوز الحجب القائم على IP وليس DNS فقط). مثال: socks5://127.0.0.1:9050 مع Orbot، أو http://host:8080</string>
+    <string name="proxy_unsupported">نسخة WebView على جهازك لا تدعم البروكسي. حدّث Android System WebView.</string>
+    <string name="disable">تعطيل</string>
+    <string name="proxy_on">تم تفعيل البروكسي</string>
+    <string name="proxy_off">تم تعطيل البروكسي</string>
+
+    <!-- DNS -->
+    <string name="dns_header">DNS الآمن</string>
+    <string name="dns_sub">تشفير استعلامات DNS يمنع التجسس عليها وتجاوز الحجب والفلترة القائمة على DNS.</string>
+    <string name="dns_provider_title">مزوّد DNS</string>
+    <string name="provider_fmt">%1$s\n%2$s</string>
+    <string name="custom_provider">مخصص</string>
+    <string name="custom_provider_note">أي رابط DoH (مثل NextDNS)</string>
+    <string name="custom_url_hint">https://dns.example.com/dns-query</string>
+    <string name="test">اختبار الاتصال</string>
+    <string name="testing">جاري الاختبار…</string>
+    <string name="test_ok">✓ %1$s يعمل — %2$d ms\nexample.com → %3$s</string>
+    <string name="test_fail">✗ فشل: %1$s</string>
+    <string name="system_wide_title">على مستوى الجهاز كاملاً</string>
+    <string name="system_wide_desc">ينشئ VPN محلياً يلتقط استعلامات DNS فقط ويرسلها مشفرة. باقي البيانات تمر مباشرة دون أي خادم وسيط.</string>
+    <string name="vpn_switch">تفعيل DNS الآمن للجهاز</string>
+    <string name="vpn_status_on">● يعمل الآن عبر %1$s</string>
+    <string name="vpn_status_off">○ متوقف (المزوّد المختار: %1$s)</string>
+    <string name="browser_title">المتصفح الداخلي فقط</string>
+    <string name="browser_doh_switch">استخدام DoH داخل المتصفح</string>
+    <string name="browser_doh_desc">يعمل حتى بدون VPN. يُتجاهل تلقائياً عند تفعيل DNS الجهاز.</string>
+    <string name="private_dns_title">Private DNS النظامي (Android 9+)</string>
+    <string name="private_dns_desc">بديل بدون VPN: انسخ اسم المضيف وضعه في الإعدادات ← الشبكة ← DNS الخاص.</string>
+    <string name="dot_not_available">غير متاح لهذا المزوّد</string>
+    <string name="copy">نسخ</string>
+    <string name="open_settings">فتح الإعدادات</string>
+    <string name="private_dns_hint">تم نسخ اسم المضيف. اختر \"اسم مضيف مزوّد DNS الخاص\" والصقه.</string>
+    <string name="adblock_title">قائمة حجب الإعلانات</string>
+    <string name="adblock_desc">القائمة المدمجة صغيرة. حمّل القائمة الكاملة (StevenBlack) لحجب أكثر من 100 ألف نطاق إعلاني وتتبعي.</string>
+    <string name="adblock_count">النطاقات المحجوبة: %1$d</string>
+    <string name="update_list">تحميل/تحديث القائمة</string>
+    <string name="downloading">جاري التحميل…</string>
+</resources>

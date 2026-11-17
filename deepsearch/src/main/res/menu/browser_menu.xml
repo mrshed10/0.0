@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="all">
+        <item android:id="@+id/opt_adblock" android:title="@string/adblock" />
+        <item android:id="@+id/opt_doh" android:title="@string/doh_in_browser" />
+        <item android:id="@+id/opt_js" android:title="@string/javascript" />
+        <item android:id="@+id/opt_desktop" android:title="@string/desktop_mode" />
+    </group>
+    <item android:id="@+id/opt_proxy" android:title="@string/proxy" />
+    <item android:id="@+id/opt_set_home" android:title="@string/set_home" />
+    <item android:id="@+id/opt_share" android:title="@string/share_page" />
+    <item android:id="@+id/opt_clear" android:title="@string/clear_data" />
+</menu>

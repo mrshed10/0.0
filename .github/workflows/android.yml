@@ -23,3 +23,7 @@ jobs:
         with:
           name: saudi-salaries-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deepsearch-hub-debug-apk
+          path: deepsearch/build/outputs/apk/debug/*.apk
