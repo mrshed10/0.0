@@ -89,9 +89,34 @@ class ExtensionManager(
 
     init {
         controller.promptDelegate = object : WebExtensionController.PromptDelegate {
-            // The user explicitly chose to install: accept the permission prompt.
-            override fun onInstallPrompt(extension: WebExtension): GeckoResult<AllowOrDeny>? =
-                GeckoResult.fromValue(AllowOrDeny.ALLOW)
+            // The user explicitly chose to install: grant the requested permissions.
+            override fun onInstallPromptRequest(
+                extension: WebExtension,
+                permissions: Array<String>,
+                origins: Array<String>,
+                dataCollectionPermissions: Array<String>,
+            ): GeckoResult<WebExtension.PermissionPromptResponse>? =
+                GeckoResult.fromValue(
+                    WebExtension.PermissionPromptResponse(
+                        true,  // isPermissionsGranted
+                        false, // isPrivateModeGranted (no private browsing here)
+                        false, // isTechnicalAndInteractionDataGranted (no telemetry)
+                    )
+                )
+
+            override fun onUpdatePrompt(
+                extension: WebExtension,
+                newPermissions: Array<String>,
+                newOrigins: Array<String>,
+                newDataCollectionPermissions: Array<String>,
+            ): GeckoResult<AllowOrDeny>? = GeckoResult.fromValue(AllowOrDeny.ALLOW)
+
+            override fun onOptionalPrompt(
+                extension: WebExtension,
+                permissions: Array<String>,
+                origins: Array<String>,
+                dataCollectionPermissions: Array<String>,
+            ): GeckoResult<AllowOrDeny>? = GeckoResult.fromValue(AllowOrDeny.ALLOW)
         }
 
         controller.setAddonManagerDelegate(object : WebExtensionController.AddonManagerDelegate {
