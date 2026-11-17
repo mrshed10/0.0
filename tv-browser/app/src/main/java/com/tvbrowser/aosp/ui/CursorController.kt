@@ -155,7 +155,7 @@ class CursorController(
     private fun press() {
         buttonDown = true
         downTime = SystemClock.uptimeMillis()
-        cursor.pressed = true
+        cursor.clicking = true
         target.requestFocus()
         sendMouse(MotionEvent.ACTION_DOWN)
     }
@@ -163,7 +163,7 @@ class CursorController(
     private fun release() {
         if (!buttonDown) return
         buttonDown = false
-        cursor.pressed = false
+        cursor.clicking = false
         sendMouse(MotionEvent.ACTION_UP)
     }
 

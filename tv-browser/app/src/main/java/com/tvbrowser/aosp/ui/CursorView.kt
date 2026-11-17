@@ -18,7 +18,7 @@ class CursorView @JvmOverloads constructor(
         private set
     var cursorY = 0f
         private set
-    var pressed = false
+    var clicking = false
         set(v) {
             field = v
             invalidate()
@@ -67,7 +67,7 @@ class CursorView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        if (pressed) canvas.drawCircle(cursorX, cursorY, 14f * scale / 1.4f, ring)
+        if (clicking) canvas.drawCircle(cursorX, cursorY, 14f * scale / 1.4f, ring)
         canvas.save()
         canvas.translate(cursorX, cursorY)
         canvas.scale(scale, scale)
