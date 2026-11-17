@@ -17,7 +17,13 @@ class Row(
     val onClick: () -> Unit,
 )
 
-class RowAdapter(context: Context, private val rows: List<Row>) : BaseAdapter() {
+class RowAdapter(context: Context, private var rows: List<Row>) : BaseAdapter() {
+
+    /** استبدال المحتوى (يُستخدم عند تصفية نتائج البحث). */
+    fun submit(newRows: List<Row>) {
+        rows = newRows
+        notifyDataSetChanged()
+    }
 
     private val inflater = LayoutInflater.from(context)
 

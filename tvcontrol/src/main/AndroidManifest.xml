@@ -24,6 +24,26 @@
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
+    <!--
+        رؤية حزم النظام على Android 11+ (Package Visibility).
+        QUERY_ALL_PACKAGES أعلاه تكفي وحدها، لكن هذه الإعلانات تضمن رؤية حزم الإعدادات
+        حتى لو أزالت الشركة المصنّعة الصلاحية الواسعة أو رفضتها.
+    -->
+    <queries>
+        <package android:name="com.android.settings" />
+        <package android:name="com.android.tv.settings" />
+        <package android:name="com.android.systemui" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.APPLICATION_DEVELOPMENT_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:banner="@drawable/banner"
@@ -53,6 +73,15 @@
 
         <activity
             android:name=".ShortcutsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".SystemActivityExplorerActivity"
+            android:exported="false"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+
+        <activity
+            android:name=".SystemTweaksActivity"
             android:exported="false" />
     </application>
 </manifest>

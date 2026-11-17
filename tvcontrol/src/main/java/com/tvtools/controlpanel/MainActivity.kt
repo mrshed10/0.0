@@ -31,6 +31,12 @@ class MainActivity : Activity() {
         statusView = findViewById(R.id.status)
 
         val tiles = listOf(
+            Tile(R.drawable.ic_search, R.string.tile_explorer, R.string.tile_explorer_sub) {
+                startActivity(Intent(this, SystemActivityExplorerActivity::class.java))
+            },
+            Tile(R.drawable.ic_tune, R.string.tile_tweaks, R.string.tile_tweaks_sub) {
+                startActivity(Intent(this, SystemTweaksActivity::class.java))
+            },
             Tile(R.drawable.ic_apps, R.string.tile_activities, R.string.tile_activities_sub) {
                 startActivity(Intent(this, ActivityBrowserActivity::class.java))
             },
@@ -92,7 +98,7 @@ class MainActivity : Activity() {
 
     private fun openDeveloperOptions() {
         if (AdbHelper.isDeveloperOptionsEnabled(this)) {
-            SystemIntents.launchFirst(this, SystemIntents.developerOptions())
+            launchDeveloperOptionsOrExplore()
             return
         }
         AlertDialog.Builder(this)
@@ -102,10 +108,25 @@ class MainActivity : Activity() {
                 SystemIntents.launchFirst(this, SystemIntents.deviceInfo())
             }
             .setNeutralButton(R.string.try_anyway) { _, _ ->
-                SystemIntents.launchFirst(this, SystemIntents.developerOptions())
+                launchDeveloperOptionsOrExplore()
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
+    }
+
+    /**
+     * إذا حذفت الشركة ACTION_APPLICATION_DEVELOPMENT_SETTINGS وكل بدائله،
+     * نفتح مستكشف الأنشطة مصفّى على "dev" ليجد المستخدم الشاشة المخفية بنفسه.
+     */
+    private fun launchDeveloperOptionsOrExplore() = launchOrExplore(SystemIntents.developerOptions())
+
+    private fun launchOrExplore(candidates: List<Intent>) {
+        if (SystemIntents.launchFirst(this, candidates, showError = false)) return
+        Toast.makeText(this, R.string.dev_missing_explore, Toast.LENGTH_LONG).show()
+        startActivity(
+            Intent(this, SystemActivityExplorerActivity::class.java)
+                .putExtra(SystemActivityExplorerActivity.EXTRA_QUERY, "dev"),
+        )
     }
 
     /**
@@ -129,7 +150,9 @@ class MainActivity : Activity() {
             }
         }
         labels += getString(R.string.usb_open_settings)
-        actions.add { SystemIntents.launchFirst(this, SystemIntents.usbDebugging()) }
+        actions.add { launchOrExplore(SystemIntents.usbDebugging()) }
+        labels += getString(R.string.tile_tweaks)
+        actions.add { startActivity(Intent(this, SystemTweaksActivity::class.java)) }
         if (!canWrite) {
             labels += getString(R.string.usb_how_to_grant)
             actions.add { showGrantHelp() }

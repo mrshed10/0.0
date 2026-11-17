@@ -61,4 +61,42 @@
     <string name="sc_security">Security &amp; restrictions</string>
     <string name="sc_testing">Testing menu (device / network info)</string>
     <string name="sc_sysui_tuner">System UI Tuner</string>
+    <string name="tile_explorer">System Activity Explorer</string>
+    <string name="tile_explorer_sub">Internal screens of Settings &amp; factory apps</string>
+    <string name="tile_tweaks">Direct System Settings</string>
+    <string name="tile_tweaks_sub">ADB &amp; animation speed without developer UI</string>
+    <string name="dev_missing_explore">The standard developer options screen was removed. Search for it in the System Activity Explorer.</string>
+
+    <string name="error_activity_not_found">Not available on this device: %1$s</string>
+    <string name="error_activity_denied">Blocked: this activity is internal or requires a system permission (SecurityException)\n%1$s</string>
+    <string name="error_activity_failed">Could not open: %1$s</string>
+
+    <string name="explorer_title">System Activity Explorer</string>
+    <string name="explorer_search_hint">Search: dev, debug, usb, info…</string>
+    <string name="explorer_count">%1$d / %2$d</string>
+    <string name="explorer_exported">exported</string>
+    <string name="explorer_internal">internal (may be blocked)</string>
+    <string name="filter_all">All</string>
+
+    <string name="perm_missing_title">⚠ WRITE_SECURE_SETTINGS permission not granted</string>
+    <string name="perm_missing_body">Values below are read-only. Android only allows this permission to be granted over ADB. Run this command once from a computer, or from a phone with an ADB app (e.g. a wireless ADB / shell app), while connected to the TV:</string>
+    <string name="perm_granted_title">✓ Direct control enabled (WRITE_SECURE_SETTINGS granted)</string>
+    <string name="perm_recheck">Check again</string>
+    <string name="perm_granted_toast">Permission granted — controls enabled</string>
+    <string name="perm_missing_toast">Permission still not granted</string>
+
+    <string name="section_debugging">Debugging</string>
+    <string name="switch_dev">Developer options (development_settings_enabled)</string>
+    <string name="switch_adb">USB debugging (adb_enabled)</string>
+    <string name="switch_wifi_adb">Wireless debugging (adb_wifi_enabled)</string>
+
+    <string name="section_animations">Animation speed</string>
+    <string name="anim_hint">0 = off (fastest response), 0.5x = faster, 1x = default. Applied instantly.</string>
+    <string name="anim_all">All animations</string>
+    <string name="anim_window">Window animation scale</string>
+    <string name="anim_transition">Transition animation scale</string>
+    <string name="anim_animator">Animator duration scale</string>
+    <string name="anim_off">Off</string>
+    <string name="anim_current">Current: %1$s</string>
+    <string name="anim_mixed">Current: mixed values</string>
 </resources>

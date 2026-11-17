@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.ListView
 import android.widget.TextView
-import android.widget.Toast
 
 /**
  * مستعرض أنشطة مدمج (بديل Activity Launcher):
@@ -108,14 +107,7 @@ class ActivityBrowserActivity : Activity() {
                     subtitle = shortName,
                     icon = info.loadIcon(pm),
                 ) {
-                    val error = SystemIntents.tryLaunch(this, SystemIntents.component(pkg, info.name))
-                    if (error != null) {
-                        Toast.makeText(
-                            this,
-                            getString(R.string.error_launch_failed, error),
-                            Toast.LENGTH_LONG,
-                        ).show()
-                    }
+                    SystemIntents.launchWithFeedback(this, SystemIntents.component(pkg, info.name))
                 }
             }
     }

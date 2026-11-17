@@ -61,4 +61,42 @@
     <string name="sc_security">الأمان والقيود</string>
     <string name="sc_testing">قائمة الاختبار (معلومات الجهاز والشبكة)</string>
     <string name="sc_sysui_tuner">أداة ضبط واجهة النظام (System UI Tuner)</string>
+    <string name="tile_explorer">مستكشف أنشطة النظام</string>
+    <string name="tile_explorer_sub">الشاشات الداخلية للإعدادات وتطبيقات المصنع</string>
+    <string name="tile_tweaks">تعديل إعدادات النظام المباشرة</string>
+    <string name="tile_tweaks_sub">ADB وسرعة الحركة بدون واجهة المطور</string>
+    <string name="dev_missing_explore">شاشة خيارات المطور القياسية محذوفة من هذا الجهاز. ابحث عنها في مستكشف أنشطة النظام.</string>
+
+    <string name="error_activity_not_found">غير متوفر على هذا الجهاز: %1$s</string>
+    <string name="error_activity_denied">محظور: هذا النشاط داخلي أو يتطلب صلاحية نظام (SecurityException)\n%1$s</string>
+    <string name="error_activity_failed">تعذّر الفتح: %1$s</string>
+
+    <string name="explorer_title">مستكشف أنشطة النظام</string>
+    <string name="explorer_search_hint">بحث: dev، debug، usb، info…</string>
+    <string name="explorer_count">%1$d / %2$d</string>
+    <string name="explorer_exported">مُصدَّر</string>
+    <string name="explorer_internal">داخلي (قد يُحظر)</string>
+    <string name="filter_all">الكل</string>
+
+    <string name="perm_missing_title">⚠ صلاحية WRITE_SECURE_SETTINGS غير ممنوحة</string>
+    <string name="perm_missing_body">القيم أدناه للقراءة فقط. أندرويد لا يسمح بمنح هذه الصلاحية إلا عبر ADB. نفّذ هذا الأمر مرة واحدة من الكمبيوتر، أو من الهاتف بتطبيق ADB (مثل تطبيقات ADB اللاسلكي / Shell) أثناء الاتصال بالشاشة:</string>
+    <string name="perm_granted_title">✓ التحكم المباشر مفعّل (صلاحية WRITE_SECURE_SETTINGS ممنوحة)</string>
+    <string name="perm_recheck">إعادة الفحص</string>
+    <string name="perm_granted_toast">تم منح الصلاحية — أصبحت عناصر التحكم مفعّلة</string>
+    <string name="perm_missing_toast">الصلاحية ما زالت غير ممنوحة</string>
+
+    <string name="section_debugging">تصحيح الأخطاء</string>
+    <string name="switch_dev">خيارات المطور (development_settings_enabled)</string>
+    <string name="switch_adb">تصحيح أخطاء USB (adb_enabled)</string>
+    <string name="switch_wifi_adb">التصحيح اللاسلكي (adb_wifi_enabled)</string>
+
+    <string name="section_animations">سرعة الرسوم المتحركة</string>
+    <string name="anim_hint">0 = إيقاف (أسرع استجابة)، 0.5x = أسرع، 1x = الافتراضي. يُطبَّق فورًا.</string>
+    <string name="anim_all">كل الرسوم المتحركة</string>
+    <string name="anim_window">حجم الرسوم المتحركة للنافذة</string>
+    <string name="anim_transition">حجم الرسوم المتحركة للنقل</string>
+    <string name="anim_animator">طول مدة الرسوم المتحركة</string>
+    <string name="anim_off">إيقاف</string>
+    <string name="anim_current">الحالية: %1$s</string>
+    <string name="anim_mixed">الحالية: قيم مختلفة</string>
 </resources>

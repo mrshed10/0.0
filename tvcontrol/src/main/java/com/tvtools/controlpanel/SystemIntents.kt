@@ -61,31 +61,59 @@ object SystemIntents {
 
     fun action(action: String): List<Intent> = listOf(Intent(action))
 
-    /**
-     * يجرّب الـ Intents بالترتيب ويفتح أول واحد يعمل.
-     * @return true إذا نجح الفتح.
-     */
-    fun launchFirst(context: Context, candidates: List<Intent>): Boolean {
-        for (intent in candidates) {
-            if (tryLaunch(context, intent) == null) return true
-        }
-        Toast.makeText(context, R.string.error_not_available, Toast.LENGTH_LONG).show()
-        return false
+    /** نتيجة محاولة فتح نشاط، مع سبب الفشل لعرض رسالة واضحة. */
+    sealed class LaunchResult {
+        object Ok : LaunchResult()
+        /** النشاط غير موجود على هذا الجهاز (حذفته الشركة أو اسم خاطئ). */
+        data class NotFound(val detail: String) : LaunchResult()
+        /** النشاط داخلي (exported=false) أو محمي بصلاحية نظام. */
+        data class Denied(val detail: String) : LaunchResult()
+        data class Failed(val detail: String) : LaunchResult()
     }
 
-    /** @return null عند النجاح، أو رسالة الخطأ. */
-    fun tryLaunch(context: Context, intent: Intent): String? {
+    fun launch(context: Context, intent: Intent): LaunchResult {
         val i = Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return try {
             context.startActivity(i)
-            null
+            LaunchResult.Ok
         } catch (e: ActivityNotFoundException) {
-            e.message ?: "ActivityNotFoundException"
+            LaunchResult.NotFound(e.message.orEmpty())
         } catch (e: SecurityException) {
-            e.message ?: "SecurityException"
+            LaunchResult.Denied(e.message.orEmpty())
         } catch (e: RuntimeException) {
-            e.message ?: e.javaClass.simpleName
+            LaunchResult.Failed(e.message ?: e.javaClass.simpleName)
         }
+    }
+
+    /** يفتح النشاط، وعند الفشل يعرض Toast يشرح السبب. @return true عند النجاح. */
+    fun launchWithFeedback(context: Context, intent: Intent): Boolean {
+        val messageRes = when (launch(context, intent)) {
+            LaunchResult.Ok -> return true
+            is LaunchResult.NotFound -> R.string.error_activity_not_found
+            is LaunchResult.Denied -> R.string.error_activity_denied
+            is LaunchResult.Failed -> R.string.error_activity_failed
+        }
+        Toast.makeText(
+            context,
+            context.getString(messageRes, describe(intent)),
+            Toast.LENGTH_LONG,
+        ).show()
+        return false
+    }
+
+    /**
+     * يجرّب الـ Intents بالترتيب ويفتح أول واحد يعمل.
+     * @param showError عرض رسالة "غير متوفرة" عند فشل كل البدائل.
+     * @return true إذا نجح الفتح.
+     */
+    fun launchFirst(context: Context, candidates: List<Intent>, showError: Boolean = true): Boolean {
+        for (intent in candidates) {
+            if (launch(context, intent) == LaunchResult.Ok) return true
+        }
+        if (showError) {
+            Toast.makeText(context, R.string.error_not_available, Toast.LENGTH_LONG).show()
+        }
+        return false
     }
 
     fun describe(intent: Intent): String =

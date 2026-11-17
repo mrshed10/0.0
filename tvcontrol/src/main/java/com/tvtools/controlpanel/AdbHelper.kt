@@ -49,6 +49,26 @@ object AdbHelper {
         return writeGlobal(context, ADB_WIFI_ENABLED, if (enabled) 1 else 0)
     }
 
+    /** مفاتيح سرعة الرسوم المتحركة الثلاثة (نفس ما يعدّله قسم "الرسم" في خيارات المطور). */
+    val animationScaleKeys: List<String> = listOf(
+        Settings.Global.WINDOW_ANIMATION_SCALE,
+        Settings.Global.TRANSITION_ANIMATION_SCALE,
+        Settings.Global.ANIMATOR_DURATION_SCALE,
+    )
+
+    fun getAnimationScale(context: Context, key: String): Float =
+        Settings.Global.getFloat(context.contentResolver, key, 1f)
+
+    /** يُطبَّق فورًا: WindowManager يراقب هذه القيم ويحدّث السرعة دون إعادة تشغيل. */
+    fun setAnimationScale(context: Context, key: String, value: Float): Boolean = try {
+        Settings.Global.putFloat(context.contentResolver, key, value)
+    } catch (e: SecurityException) {
+        false
+    }
+
+    fun setDeveloperOptions(context: Context, enabled: Boolean): Boolean =
+        writeGlobal(context, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, if (enabled) 1 else 0)
+
     private fun readGlobal(context: Context, key: String): Int =
         Settings.Global.getInt(context.contentResolver, key, 0)
 
