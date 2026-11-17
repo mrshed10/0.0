@@ -161,3 +161,23 @@ object WidgetJson {
         )
     }
 }
+
+/** A design the user saved from the editor ("My designs"). */
+data class SavedDesign(val id: String, val name: String, val config: WidgetConfig, val wide: Boolean)
+
+object SavedDesignsJson {
+    fun encode(list: List<SavedDesign>): String = org.json.JSONArray().apply {
+        list.forEach { d ->
+            put(JSONObject().put("id", d.id).put("name", d.name).put("wide", d.wide).put("config", WidgetJson.encodeObject(d.config)))
+        }
+    }.toString()
+
+    fun decode(raw: String?): List<SavedDesign> = runCatching {
+        val a = org.json.JSONArray(raw ?: return emptyList())
+        (0 until a.length()).mapNotNull { i ->
+            val o = a.getJSONObject(i)
+            val config = WidgetJson.decodeObject(o.getJSONObject("config")) ?: return@mapNotNull null
+            SavedDesign(o.getString("id"), o.optString("name").ifBlank { "—" }, config, o.optBoolean("wide", true))
+        }
+    }.getOrDefault(emptyList())
+}

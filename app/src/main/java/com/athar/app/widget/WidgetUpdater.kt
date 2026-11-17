@@ -181,14 +181,25 @@ object LockCard {
                 val prefs = container.settings.prayer.value
                 val now = LocalDateTime.now()
                 val next = PrayerSchedule.next(now, prefs.timesFor(now.toLocalDate()), prefs.timesFor(now.toLocalDate().plusDays(1)))
-                builder.setContentTitle("🕌 ${data.name} · ${data.time}")
-                    .setContentText(data.rows.joinToString("  ") { (if (it.isNext) "● " else "") + it.name + " " + it.time.substringBefore(' ') })
-                    .setSubText(data.place)
-                    .setWhen(next.at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
-                    .setShowWhen(true)
-                    .setUsesChronometer(true)
-                    .setChronometerCountDown(true)
-                    .setProgress(1000, (data.progress * 1000).toInt(), false)
+                if (data.inIqama && data.iqamaAtMillis > 0) {
+                    builder.setContentTitle("🕌 " + context.getString(R.string.lock_iqama_title, data.iqamaPrayer, data.iqamaTime))
+                        .setContentText(context.getString(R.string.widget_next_in, data.name) + " " + data.time)
+                        .setSubText(data.place)
+                        .setWhen(data.iqamaAtMillis)
+                        .setShowWhen(true)
+                        .setUsesChronometer(true)
+                        .setChronometerCountDown(true)
+                        .setProgress(1000, (data.iqamaProgress * 1000).toInt(), false)
+                } else {
+                    builder.setContentTitle("🕌 ${data.name} · ${data.time}")
+                        .setContentText(data.rows.joinToString("  ") { (if (it.isNext) "● " else "") + it.name + " " + it.time.substringBefore(' ') })
+                        .setSubText(data.place)
+                        .setWhen(next.at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+                        .setShowWhen(true)
+                        .setUsesChronometer(true)
+                        .setChronometerCountDown(true)
+                        .setProgress(1000, (data.progress * 1000).toInt(), false)
+                }
             }
             is WidgetData.Big -> builder.setContentTitle("${data.title}: ${data.value} ${data.unit}".trim())
                 .setContentText(listOf(data.line1, data.line2).filter { it.isNotBlank() }.joinToString(" · "))

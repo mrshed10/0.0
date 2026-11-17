@@ -144,6 +144,7 @@ class PrayerViewModel(private val settings: AppSettings) : ViewModel() {
 
     fun setVolume(volume: AdhanVolume) = settings.updatePrayer { it.copy(volume = volume) }
     fun setAdhanInSilent(enabled: Boolean) = settings.updatePrayer { it.copy(adhanInSilent = enabled) }
+    fun setVoice(transform: (VoicePrefs) -> VoicePrefs) = settings.updatePrayer { it.copy(voice = transform(it.voice)) }
     fun updateSilent(transform: (SilentPrefs) -> SilentPrefs) = settings.updatePrayer { it.copy(silent = transform(it.silent)) }
     fun resetDefaults() = settings.resetPrayerAlerts()
 

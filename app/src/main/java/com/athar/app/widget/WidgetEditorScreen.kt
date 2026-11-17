@@ -4,6 +4,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BookmarkAdd
+import androidx.compose.material.icons.rounded.ViewAgenda
+import com.athar.app.core.designsystem.component.GlassTextField
+import com.athar.app.core.designsystem.glass.GlassSheet
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Style
@@ -120,6 +125,8 @@ fun WidgetEditorScreen(
     saveLabel: String? = null,
     /** The placed widget's real size, so the preview matches it exactly. */
     previewSize: androidx.compose.ui.unit.DpSize? = null,
+    /** Saves the current look as a custom design in "My designs" (name chosen by the user). */
+    onSaveAsDesign: ((WidgetConfig, String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var config by remember { mutableStateOf(initial) }
@@ -140,6 +147,24 @@ fun WidgetEditorScreen(
         }
     }
     val scope = rememberCoroutineScope()
+    var naming by remember { mutableStateOf(false) }
+    if (naming && onSaveAsDesign != null) {
+        val defaultName = stringResource(type.label)
+        var name by remember { mutableStateOf(defaultName) }
+        GlassSheet(onDismiss = { naming = false }) {
+            Text(stringResource(R.string.save_as_design), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            GlassTextField(name, { name = it.take(40) }, stringResource(R.string.design_name_hint), Modifier.fillMaxWidth())
+            GlassButton(
+                stringResource(R.string.save),
+                {
+                    onSaveAsDesign(config, name.ifBlank { defaultName })
+                    naming = false
+                },
+                icon = Icons.Rounded.Check,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -228,6 +253,49 @@ fun WidgetEditorScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // Elements: build the widget from time, date, days, prayer, counters...
+        item {
+            GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Violet) {
+                CardHeader(stringResource(R.string.elements_title), Icons.Rounded.ViewAgenda, tint = AtharColors.Violet)
+                Spacer(Modifier.height(6.dp))
+                if (type == WidgetType.Custom) {
+                    Text(stringResource(R.string.elements_body), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextSecondary)
+                    if (initial.content.type != WidgetType.Custom) {
+                        Spacer(Modifier.height(8.dp))
+                        GlassButton(
+                            stringResource(R.string.elements_back_to_design),
+                            { config = config.copy(content = initial.content) },
+                            filled = false,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                } else {
+                    Text(stringResource(R.string.elements_convert_body), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextSecondary)
+                    Spacer(Modifier.height(8.dp))
+                    GlassButton(
+                        stringResource(R.string.elements_convert),
+                        {
+                            config = config.copy(
+                                content = WidgetContent(WidgetType.Custom, extra = CustomSpecJson.encode(CustomSpec.starter())),
+                            )
+                        },
+                        color = AtharColors.Violet,
+                        filled = false,
+                        icon = Icons.Rounded.Add,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        if (type == WidgetType.Custom) {
+            item {
+                CustomDesigner(
+                    spec = CustomSpecJson.decode(config.content.extra),
+                    onChange = { config = config.copy(content = config.content.copy(extra = CustomSpecJson.encode(it))) },
+                )
             }
         }
 
@@ -488,6 +556,18 @@ fun WidgetEditorScreen(
             }
         }
 
+        if (onSaveAsDesign != null) {
+            item {
+                GlassButton(
+                    stringResource(R.string.save_as_design),
+                    { naming = true },
+                    color = AtharColors.Violet,
+                    filled = false,
+                    icon = Icons.Rounded.BookmarkAdd,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
         item {
             GlassButton(
                 saveLabel ?: stringResource(R.string.save),
@@ -519,7 +599,9 @@ private fun Swatches(colors: List<Int>, selected: Int, onPick: (Int) -> Unit) {
 
 /** Design options shown for a widget type (index = [WidgetStyle.variant]). */
 private fun variantLabels(type: WidgetType): List<Int> = when (type) {
-    WidgetType.NextPrayer -> listOf(R.string.variant_prayer_classic, R.string.variant_prayer_ring, R.string.variant_prayer_bar)
+    WidgetType.NextPrayer -> listOf(
+        R.string.variant_prayer_classic, R.string.variant_prayer_ring, R.string.variant_prayer_bar, R.string.variant_prayer_iqama,
+    )
     WidgetType.AnalogClock, WidgetType.WideClock -> listOf(R.string.clock_light_hands, R.string.clock_dark_hands)
     WidgetType.DigitalClock -> listOf(R.string.clock_with_date, R.string.clock_time_only)
     WidgetType.WorldClock -> listOf(R.string.variant_side_by_side, R.string.variant_stacked)

@@ -1,5 +1,7 @@
 package com.athar.app.widget
 
+import com.athar.app.R
+
 import android.appwidget.AppWidgetManager
 import android.content.Intent
 import android.graphics.Color as AndroidColor
@@ -67,6 +69,10 @@ class WidgetConfigActivity : ComponentActivity() {
                             wide = wide,
                             previewSize = previewSize,
                             onCancel = { finish() },
+                            onSaveAsDesign = { config, name ->
+                                (application as com.athar.app.AtharApplication).container.settings.saveDesign(name, config, wide)
+                                android.widget.Toast.makeText(this@WidgetConfigActivity, getString(R.string.design_saved), android.widget.Toast.LENGTH_SHORT).show()
+                            },
                             onSave = { config ->
                                 store.put(appWidgetId, config)
                                 store.pending = null

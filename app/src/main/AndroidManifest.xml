@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Opens the adhan stop screen over the lock screen (like an alarm clock). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Prayer times by location (city-level accuracy is enough). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Exact alarms for adhan and reminders. -->
@@ -188,6 +190,20 @@
         <receiver
             android:name=".core.notify.AlarmReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".core.notify.AdhanStopReceiver"
+            android:exported="false" />
+
+        <activity
+            android:name=".core.notify.AdhanAlarmActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Athar"
+            android:turnScreenOn="true" />
 
         <receiver
             android:name=".core.notify.RescheduleReceiver"

@@ -39,6 +39,16 @@ sealed interface WidgetData {
         val atMillis: Long = 0,
         /** Share of the time since the previous prayer that has passed (0..1), in 1/120 steps. */
         val progress: Float = 0f,
+        /** Between an adhan and its iqama: the countdown is to the iqama of [iqamaPrayer]. */
+        val inIqama: Boolean = false,
+        /** Prayer whose iqama is shown (the current one during [inIqama], else the next). */
+        val iqamaPrayer: String = "",
+        /** Iqama time (epoch millis); 0 = no iqama countdown for that prayer. */
+        val iqamaAtMillis: Long = 0,
+        /** Iqama time as text, e.g. "12:20 PM". */
+        val iqamaTime: String = "",
+        /** Share of the adhan → iqama wait that has passed (0..1), in 1/120 steps. */
+        val iqamaProgress: Float = 0f,
     ) : WidgetData
     data class Big(val title: String, val value: String, val unit: String, val line1: String, val line2: String, val tab: String) : WidgetData
     data class TaskRow(val id: Long, val title: String, val done: Boolean)
@@ -124,6 +134,11 @@ object WidgetDataLoader {
                 val times = prefs.timesFor(today)
                 val next = PrayerSchedule.next(now, times, prefs.timesFor(today.plusDays(1)))
                 val previous = PrayerSchedule.previous(now, times, prefs.timesFor(today.minusDays(1)))
+                val zone = java.time.ZoneId.systemDefault()
+                val currentIqama = com.athar.app.feature.prayer.IqamaMath.iqamaAt(previous, prefs.alert(previous.prayer))
+                val inIqama = currentIqama != null && now.isBefore(currentIqama)
+                val iqamaFor = if (inIqama) previous else next
+                val iqamaAt = if (inIqama) currentIqama else com.athar.app.feature.prayer.IqamaMath.iqamaAt(next, prefs.alert(next.prayer))
                 WidgetData.NextPrayer(
                     name = s(next.prayer.label),
                     time = clock(next.at.toLocalTime()),
@@ -134,6 +149,15 @@ object WidgetDataLoader {
                     atMillis = next.at.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
                     // Quantized so a minute tick only redraws when a dot actually changes.
                     progress = (PrayerSchedule.progress(now, previous.at, next.at) * 120).toInt() / 120f,
+                    inIqama = inIqama,
+                    iqamaPrayer = s(iqamaFor.prayer.label),
+                    iqamaAtMillis = iqamaAt?.atZone(zone)?.toInstant()?.toEpochMilli() ?: 0,
+                    iqamaTime = iqamaAt?.let { clock(it.toLocalTime()) }.orEmpty(),
+                    iqamaProgress = if (inIqama && currentIqama != null) {
+                        (PrayerSchedule.progress(now, previous.at, currentIqama) * 120).toInt() / 120f
+                    } else {
+                        0f
+                    },
                 )
             }
             WidgetType.Counter -> {

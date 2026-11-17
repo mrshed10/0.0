@@ -31,6 +31,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +61,7 @@ import com.athar.app.core.designsystem.theme.AtharColors
 import kotlinx.coroutines.flow.first
 
 enum class GalleryTab(@StringRes val label: Int) {
+    Mine(R.string.gallery_mine),
     Nothing(R.string.gallery_nothing),
     New(R.string.gallery_new),
     Clock(R.string.gallery_clock),
@@ -79,6 +84,10 @@ data class WidgetTemplate(
     val config: WidgetConfig,
     val wide: Boolean,
     val isNew: Boolean = false,
+    /** Name of a saved design (instead of [name]). */
+    val title: String? = null,
+    /** Set for designs the user saved ("My designs"). */
+    val savedId: String? = null,
 )
 
 object WidgetTemplates {
@@ -121,6 +130,7 @@ object WidgetTemplates {
         t("nothing_hijri", GalleryTab.Nothing, R.string.tpl_nothing_hijri, WidgetType.NothingDate, nothingLight.copy(variant = 1), wide = false),
         // Glowing dots + animated prayer countdowns
         t("prayer_ring_glow", GalleryTab.Nothing, R.string.tpl_prayer_ring, WidgetType.NextPrayer, glow.copy(variant = PrayerPulse.RING), wide = false, isNew = true),
+        t("prayer_iqama_glow", GalleryTab.Nothing, R.string.tpl_prayer_iqama, WidgetType.NextPrayer, glow.copy(variant = PrayerPulse.IQAMA), wide = true, isNew = true),
         t("prayer_bar_glow", GalleryTab.Nothing, R.string.tpl_prayer_bar, WidgetType.NextPrayer, glow.copy(variant = PrayerPulse.BAR), wide = true, isNew = true),
         t("nothing_glow_clock", GalleryTab.Nothing, R.string.tpl_glow_clock, WidgetType.NothingClock, glow, wide = false, isNew = true),
         t("nothing_glow_date", GalleryTab.Nothing, R.string.tpl_glow_date, WidgetType.NothingDate, glow.copy(accentColor = 0xFFE6C27A.toInt()), wide = false, isNew = true),
@@ -171,6 +181,7 @@ object WidgetTemplates {
         // Prayer
         t("prayer_table", GalleryTab.Prayer, R.string.tpl_prayer_table, WidgetType.NextPrayer, night, wide = true, isNew = true),
         t("prayer_gold", GalleryTab.Prayer, R.string.tpl_prayer_gold, WidgetType.NextPrayer, gold.copy(fontId = "amiri"), wide = true),
+        t("prayer_iqama", GalleryTab.Prayer, R.string.tpl_prayer_iqama, WidgetType.NextPrayer, night.copy(variant = PrayerPulse.IQAMA), wide = true, isNew = true),
         t("prayer_ring", GalleryTab.Prayer, R.string.tpl_prayer_ring, WidgetType.NextPrayer, night.copy(variant = PrayerPulse.RING), wide = false, isNew = true),
         t("prayer_bar", GalleryTab.Prayer, R.string.tpl_prayer_bar, WidgetType.NextPrayer, gold.copy(variant = PrayerPulse.BAR), wide = true, isNew = true),
         t("prayer_small", GalleryTab.Prayer, R.string.tpl_prayer_small, WidgetType.NextPrayer, clear, wide = false),
@@ -205,12 +216,27 @@ object WidgetTemplates {
 @Composable
 fun WidgetGalleryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    var tab by rememberSaveable { mutableStateOf(GalleryTab.Nothing) }
+    val settings = (context.applicationContext as AtharApplication).container.settings
+    val saved by settings.savedDesigns.collectAsState()
+    var tab by rememberSaveable { mutableStateOf(if (settings.savedDesigns.value.isEmpty()) GalleryTab.Nothing else GalleryTab.Mine) }
     var customizing by remember { mutableStateOf<WidgetTemplate?>(null) }
     val pinRequested = stringResource(R.string.pin_requested)
     val pinUnsupported = stringResource(R.string.pin_unsupported)
     val needItem = stringResource(R.string.gallery_need_item)
-    val hidden by (context.applicationContext as AtharApplication).container.settings.hiddenWidgets.collectAsState()
+    val hidden by settings.hiddenWidgets.collectAsState()
+    val savedMsg = stringResource(R.string.design_saved)
+    val hiddenMsg = stringResource(R.string.design_hidden)
+    val deletedMsg = stringResource(R.string.design_deleted)
+    val newDesignName = stringResource(R.string.design_new)
+    fun remove(t: WidgetTemplate) {
+        if (t.savedId != null) {
+            settings.deleteDesign(t.savedId)
+            Toast.makeText(context, deletedMsg, Toast.LENGTH_SHORT).show()
+        } else {
+            settings.setWidgetHidden(t.id, true)
+            Toast.makeText(context, hiddenMsg, Toast.LENGTH_LONG).show()
+        }
+    }
 
     // First record of each kind, so item-based templates show real data.
     val firstItems by produceState(emptyMap<WidgetType, Long>()) {
@@ -234,6 +260,12 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
             wide = template.wide,
             saveLabel = stringResource(R.string.add_to_home_screen),
             onCancel = { customizing = null },
+            onSaveAsDesign = { config, name ->
+                settings.saveDesign(name, config, template.wide)
+                Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+                tab = GalleryTab.Mine
+                customizing = null
+            },
             onSave = { config ->
                 val ok = WidgetPinner.pin(context, config, small = !template.wide)
                 Toast.makeText(context, if (ok) pinRequested else pinUnsupported, Toast.LENGTH_LONG).show()
@@ -285,8 +317,29 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            val visible = WidgetTemplates.forTab(tab).filterNot { it.id in hidden }
-            if (visible.isEmpty()) {
+            val visible = if (tab == GalleryTab.Mine) {
+                saved.map {
+                    WidgetTemplate("saved:" + it.id, GalleryTab.Mine, 0, it.config, it.wide, title = it.name, savedId = it.id)
+                }
+            } else {
+                WidgetTemplates.forTab(tab).filterNot { it.id in hidden }
+            }
+            if (tab == GalleryTab.Mine) {
+                item(key = "new", span = { GridItemSpan(2) }) {
+                    NewDesignCell {
+                        customizing = WidgetTemplate(
+                            "new", GalleryTab.Mine, 0,
+                            WidgetConfig(
+                                WidgetContent(WidgetType.Custom, extra = CustomSpecJson.encode(CustomSpec.starter())),
+                                WidgetPresets.glow,
+                            ),
+                            wide = true,
+                            title = newDesignName,
+                        )
+                    }
+                }
+            }
+            if (visible.isEmpty() && tab != GalleryTab.Mine) {
                 item(span = { GridItemSpan(2) }) {
                     Text(
                         stringResource(R.string.gallery_tab_hidden),
@@ -297,7 +350,7 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
                 }
             }
             items(visible, key = { it.id }, span = { GridItemSpan(if (it.wide) 2 else 1) }) { template ->
-                TemplateCell(template, resolved(template)) {
+                TemplateCell(template, resolved(template), onRemove = { remove(template) }) {
                     val type = template.config.content.type
                     if (type.needsItem && (firstItems[type] ?: -1) < 0) {
                         Toast.makeText(context, needItem, Toast.LENGTH_LONG).show()
@@ -310,8 +363,35 @@ fun WidgetGalleryScreen(onBack: () -> Unit) {
     }
 }
 
+/** "New design": start from elements (time, date, days, prayer…). */
 @Composable
-private fun TemplateCell(template: WidgetTemplate, config: WidgetConfig, onClick: () -> Unit) {
+private fun NewDesignCell(onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Color.White.copy(alpha = 0.06f))
+            .border(1.dp, AtharColors.Violet.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+            .clickable(onClick = onClick)
+            .padding(18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(44.dp).clip(CircleShape).background(AtharColors.Violet.copy(alpha = 0.25f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Rounded.Add, contentDescription = null, tint = AtharColors.Violet)
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.design_new), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.design_new_body), style = MaterialTheme.typography.labelMedium, color = AtharColors.TextSecondary)
+        }
+    }
+}
+
+@Composable
+private fun TemplateCell(template: WidgetTemplate, config: WidgetConfig, onRemove: () -> Unit, onClick: () -> Unit) {
     val context = LocalContext.current
     val data by produceState<WidgetData>(WidgetData.Unconfigured, config) {
         value = WidgetDataLoader.load(context, config)
@@ -327,10 +407,28 @@ private fun TemplateCell(template: WidgetTemplate, config: WidgetConfig, onClick
                 .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(config.style.cornerDp.dp)),
         ) {
             WidgetPreview(config, data, template.wide, onTap = onClick)
+            // Remove from the list (saved designs are deleted, ready designs hidden).
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .clickable(onClick = onRemove),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = stringResource(if (template.savedId != null) R.string.delete else R.string.design_hide),
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-            Text(stringResource(template.name), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            Text(template.title ?: stringResource(template.name), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
             if (template.isNew) {
                 Text(
                     stringResource(R.string.gallery_new),

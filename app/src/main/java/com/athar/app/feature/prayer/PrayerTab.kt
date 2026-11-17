@@ -210,7 +210,7 @@ private fun LazyListScope.timesPage(
             )
         }
     }
-    item(key = "audio") { AdhanAudioCard(state.prefs, viewModel) }
+    item(key = "audio") { androidx.compose.foundation.layout.Column { AdhanAudioCard(state.prefs, viewModel) } }
     item(key = "silent") { SilentModeCard(state.prefs, viewModel) }
     item(key = "reset") { ResetPrayerDefaults(viewModel::resetDefaults) }
 }

@@ -23,8 +23,10 @@ enum class AlertKind(
     val multiTone: Boolean = false,
     val importance: Int = NotificationManager.IMPORTANCE_HIGH,
 ) {
-    Fajr("fajr2", R.string.channel_fajr, true, silentChannel = true),
-    Adhan("adhan2", R.string.channel_adhan, true, silentChannel = true),
+    Fajr("fajr3", R.string.channel_fajr, true, silentChannel = true),
+    Adhan("adhan3", R.string.channel_adhan, true, silentChannel = true),
+    /** Spoken alerts: the sound comes from the app (tone + voice), the channel is silent. */
+    Voice("voice", R.string.channel_voice, false, silentChannel = true),
     PrePrayer("pre", R.string.channel_pre_prayer, false, multiTone = true),
     Iqama("iqama", R.string.channel_iqama, false, multiTone = true),
     Salary("salary", R.string.channel_salary, false),
@@ -39,6 +41,8 @@ enum class AlertKind(
 object Channels {
     /** Channels from older versions that are replaced. */
     private val legacyPrefixes = listOf("fajr_", "adhan_")
+    /** Older channel ids (created before the adhan was public on the lock screen). */
+    private val legacyIds = setOf("fajr2", "adhan2")
 
     fun ensure(context: Context, kind: AlertKind, tone: String?): String {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -64,12 +68,14 @@ object Channels {
                 )
             }
             channel.enableVibration(kind.importance >= NotificationManager.IMPORTANCE_HIGH)
+            // Prayer alerts show fully on the lock screen, with their buttons.
+            if (kind != AlertKind.Status) channel.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             nm.createNotificationChannel(channel)
         }
         val stale = nm.notificationChannels.filter { ch ->
             ch.id != id && (
                 (!kind.multiTone && !kind.silentChannel && ch.id.startsWith(kind.key + "_")) ||
-                    legacyPrefixes.any { ch.id.startsWith(it) }
+                    legacyPrefixes.any { ch.id.startsWith(it) } || ch.id in legacyIds
                 )
         }
         stale.forEach { nm.deleteNotificationChannel(it.id) }

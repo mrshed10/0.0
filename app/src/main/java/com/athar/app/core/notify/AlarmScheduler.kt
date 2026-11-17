@@ -37,6 +37,8 @@ data class Alarm(
     val action: AlarmAction = if (kind == null) AlarmAction.Refresh else AlarmAction.Notify,
     /** false = fires only while the phone is awake (no battery cost when idle). */
     val wakeup: Boolean = true,
+    /** Sentence spoken aloud (prayer announcements), if voice is on. */
+    val speech: String? = null,
 )
 
 /**
@@ -95,6 +97,7 @@ class AlarmScheduler(
                         title = context.getString(R.string.notif_adhan_title, name),
                         text = "${clock(adhan.toLocalTime())} · $place",
                         action = AlarmAction.Adhan,
+                        speech = if (prefs.voice.adhan) PrayerSpeech.adhan(context, name) else null,
                     )
                 }
             }
@@ -107,6 +110,7 @@ class AlarmScheduler(
                         tone = alert.preTone,
                         title = context.getString(R.string.notif_pre_title, name, minutes.toString()),
                         text = "${clock(adhan.toLocalTime())} · $place",
+                        speech = if (prefs.voice.pre) PrayerSpeech.pre(context, name, minutes) else null,
                     )
                 }
             }
@@ -119,6 +123,7 @@ class AlarmScheduler(
                         tone = alert.iqamaTone,
                         title = context.getString(R.string.notif_iqama_title, name),
                         text = clock(at.toLocalTime()),
+                        speech = if (prefs.voice.iqama) PrayerSpeech.iqama(context, name) else null,
                     )
                 }
             }
@@ -154,9 +159,19 @@ class AlarmScheduler(
             prefs.timesFor(now.toLocalDate()),
             prefs.timesFor(now.toLocalDate().plusDays(1)),
         )
-        return listOf(
+        val previous = com.athar.app.feature.prayer.PrayerSchedule.previous(
+            now,
+            prefs.timesFor(now.toLocalDate()),
+            prefs.timesFor(now.toLocalDate().minusDays(1)),
+        )
+        val iqama = com.athar.app.feature.prayer.IqamaMath.iqamaAt(previous, prefs.alert(previous.prayer))
+            ?.takeIf { it.isAfter(now) }
+            ?: com.athar.app.feature.prayer.IqamaMath.iqamaAt(nextPrayer, prefs.alert(nextPrayer.prayer))
+        return listOfNotNull(
             Alarm(9_000, now.toLocalDate().plusDays(1).atTime(0, 0, 30), null, null, "", ""),
             Alarm(9_001, nextPrayer.at.plusSeconds(5), null, null, "", ""),
+            // Widgets switch from "iqama in" back to the next adhan.
+            iqama?.let { Alarm(9_004, it.plusSeconds(5), null, null, "", "") },
         )
     }
 
@@ -239,6 +254,7 @@ class AlarmScheduler(
                 .putExtra(AlarmReceiver.EXTRA_TONE, alarm.tone)
                 .putExtra(AlarmReceiver.EXTRA_TITLE, alarm.title)
                 .putExtra(AlarmReceiver.EXTRA_TEXT, alarm.text)
+                .putExtra(AlarmReceiver.EXTRA_SPEECH, alarm.speech)
         }
         return PendingIntent.getBroadcast(
             context,

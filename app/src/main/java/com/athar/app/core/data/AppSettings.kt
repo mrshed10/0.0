@@ -40,6 +40,7 @@ data class PrayerPrefs(
     /** Play the adhan on the alarm stream so it is heard in silent/vibrate mode. */
     val adhanInSilent: Boolean = true,
     val silent: SilentPrefs = SilentPrefs(),
+    val voice: VoicePrefs = VoicePrefs(),
 ) {
     fun timesFor(date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): List<PrayerTime> =
         PrayerCalculator.times(date, latitude, longitude, method, madhab, zone)
@@ -143,6 +144,9 @@ class AppSettings(context: Context) {
             .putString("prayer_volume", value.volume.name)
             .putBoolean("prayer_adhan_in_silent", value.adhanInSilent)
             .putString("prayer_silent", PrayerAlertsJson.encodeSilent(value.silent))
+            .putBoolean("voice_pre", value.voice.pre)
+            .putBoolean("voice_adhan", value.voice.adhan)
+            .putBoolean("voice_iqama", value.voice.iqama)
             .apply()
         _prayer.value = value
     }
@@ -161,6 +165,11 @@ class AppSettings(context: Context) {
             volume = enumOr(prefs.getString("prayer_volume", null), AdhanVolume.Alarm),
             adhanInSilent = prefs.getBoolean("prayer_adhan_in_silent", true),
             silent = PrayerAlertsJson.decodeSilent(prefs.getString("prayer_silent", null)) ?: SilentPrefs(),
+            voice = VoicePrefs(
+                pre = prefs.getBoolean("voice_pre", true),
+                adhan = prefs.getBoolean("voice_adhan", true),
+                iqama = prefs.getBoolean("voice_iqama", true),
+            ),
         )
     }
 
@@ -186,6 +195,7 @@ class AppSettings(context: Context) {
             volume = AdhanVolume.Alarm,
             adhanInSilent = true,
             silent = SilentPrefs(),
+            voice = VoicePrefs(),
         )
     }
 
@@ -310,6 +320,22 @@ class AppSettings(context: Context) {
     fun showAllWidgets() {
         prefs.edit().putStringSet("hidden_templates", emptySet()).apply()
         _hiddenWidgets.value = emptySet()
+    }
+
+    // --- saved widget designs ("My designs") ---
+    private val _savedDesigns = MutableStateFlow(com.athar.app.widget.SavedDesignsJson.decode(prefs.getString("saved_designs", null)))
+    val savedDesigns: StateFlow<List<com.athar.app.widget.SavedDesign>> = _savedDesigns.asStateFlow()
+
+    fun saveDesign(name: String, config: com.athar.app.widget.WidgetConfig, wide: Boolean) {
+        val design = com.athar.app.widget.SavedDesign("d" + System.currentTimeMillis(), name.trim().take(40), config, wide)
+        writeDesigns(listOf(design) + _savedDesigns.value)
+    }
+
+    fun deleteDesign(id: String) = writeDesigns(_savedDesigns.value.filterNot { it.id == id })
+
+    private fun writeDesigns(list: List<com.athar.app.widget.SavedDesign>) {
+        prefs.edit().putString("saved_designs", com.athar.app.widget.SavedDesignsJson.encode(list)).apply()
+        _savedDesigns.value = list
     }
 
     // --- one-off flags ---

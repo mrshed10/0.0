@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import com.athar.app.AtharApplication
 import com.athar.app.MainActivity
 import com.athar.app.R
+import com.athar.app.feature.prayer.AdhanVolume
 import com.athar.app.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,12 +29,23 @@ class AlarmReceiver : BroadcastReceiver() {
         val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()
         val tone = intent.getStringExtra(EXTRA_TONE)
+        val speech = intent.getStringExtra(EXTRA_SPEECH)
         val prefs = (context.applicationContext as AtharApplication).container.settings.prayer.value
 
         when (action) {
-            AlarmAction.Notify -> if (kind != null) Notifier.post(context, id, kind, tone, title, text)
+            AlarmAction.Notify -> if (kind != null) {
+                val audio = context.getSystemService(android.media.AudioManager::class.java)
+                val canSpeak = speech != null && Notifier.canPost(context) &&
+                    audio.ringerMode == android.media.AudioManager.RINGER_MODE_NORMAL
+                if (canSpeak) {
+                    // Tone + spoken sentence, with a stop button on the lock screen.
+                    AdhanService.announce(context, id, kind, tone, prefs.volume.coerceAudible(), title, text, speech!!)
+                } else {
+                    Notifier.post(context, id, kind, tone, title, text)
+                }
+            }
             AlarmAction.Adhan -> if (Notifier.canPost(context)) {
-                AdhanService.start(context, kind == AlertKind.Fajr, tone, prefs.volume, prefs.adhanInSilent, title, text)
+                AdhanService.start(context, kind == AlertKind.Fajr, tone, prefs.volume, prefs.adhanInSilent, title, text, speech)
             }
             AlarmAction.SilentOn -> if (RingerControl.enable(context, prefs.silent.mode)) {
                 Notifier.post(context, SILENT_NOTIFICATION, AlertKind.Status, null, title, text)
@@ -82,9 +94,13 @@ class AlarmReceiver : BroadcastReceiver() {
         const val EXTRA_TITLE = "title"
         const val EXTRA_TEXT = "text"
         const val EXTRA_ACTION = "action"
+        const val EXTRA_SPEECH = "speech"
         private const val SILENT_NOTIFICATION = 5_151
     }
 }
+
+/** Spoken alerts stay audible even when the adhan itself is set to silent. */
+private fun AdhanVolume.coerceAudible() = if (this == AdhanVolume.Silent) AdhanVolume.Medium else this
 
 /** Re-creates alarms after reboot, time/zone change, app update or exact-alarm permission change. */
 class RescheduleReceiver : BroadcastReceiver() {
@@ -110,12 +126,12 @@ object Notifier {
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) &&
             NotificationManagerCompat.from(context).areNotificationsEnabled()
 
-    /** Adhan notification without sound (sound, if any, comes from [AdhanService]). */
-    fun postSilentAdhan(context: Context, fajr: Boolean, title: String, text: String) {
+    /** A silent, informative notification left after an adhan or spoken alert ends. */
+    fun postNotice(context: Context, id: Int, kind: AlertKind, title: String, text: String) {
         if (!canPost(context)) return
-        val notification = AdhanService.buildNotification(context, if (fajr) AlertKind.Fajr else AlertKind.Adhan, title, text, withStop = false)
+        val notification = AdhanService.buildNotification(context, kind, title, text, playing = false)
         try {
-            NotificationManagerCompat.from(context).notify(AdhanService.NOTIFICATION_ID, notification)
+            NotificationManagerCompat.from(context).notify(id, notification)
         } catch (e: SecurityException) {
             // Permission revoked.
         }

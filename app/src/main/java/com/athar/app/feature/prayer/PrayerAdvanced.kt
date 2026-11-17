@@ -1,6 +1,12 @@
 package com.athar.app.feature.prayer
 
 import android.content.Intent
+import android.os.Build
+import androidx.compose.material.icons.rounded.RecordVoiceOver
+import androidx.compose.runtime.rememberCoroutineScope
+import com.athar.app.core.notify.PrayerSpeech
+import com.athar.app.core.notify.Speaker
+import kotlinx.coroutines.launch
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -311,6 +317,102 @@ fun AdhanAudioCard(prefs: PrayerPrefs, viewModel: PrayerViewModel) {
         ToneRow(stringResource(R.string.tone_other_prayers), prefs.adhanTone, { stopPreview(); viewModel.setAdhanTone(it) })
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.adhan_tone_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+    }
+    Spacer(Modifier.height(12.dp))
+    VoiceAlertsCard(prefs, viewModel)
+    LockScreenStopCard()
+}
+
+/** Spoken announcements before the prayer, at the adhan and at iqama. */
+@Composable
+private fun VoiceAlertsCard(prefs: PrayerPrefs, viewModel: PrayerViewModel) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var speaking by remember { mutableStateOf(false) }
+    val speaker = remember { mutableStateOf<Speaker?>(null) }
+    DisposableEffect(Unit) { onDispose { speaker.value?.shutdown() } }
+    val dhuhr = stringResource(Prayer.Dhuhr.label)
+    GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Teal) {
+        CardHeader(stringResource(R.string.voice_title), Icons.Rounded.RecordVoiceOver, tint = AtharColors.Teal)
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.voice_body), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextSecondary)
+        Spacer(Modifier.height(8.dp))
+        SwitchRow(
+            stringResource(R.string.voice_pre_switch),
+            prefs.voice.pre,
+            { on -> viewModel.setVoice { it.copy(pre = on) } },
+            subtitle = PrayerSpeech.pre(context, dhuhr, 10),
+        )
+        SwitchRow(
+            stringResource(R.string.voice_adhan_switch),
+            prefs.voice.adhan,
+            { on -> viewModel.setVoice { it.copy(adhan = on) } },
+            subtitle = PrayerSpeech.adhan(context, dhuhr),
+        )
+        SwitchRow(
+            stringResource(R.string.voice_iqama_switch),
+            prefs.voice.iqama,
+            { on -> viewModel.setVoice { it.copy(iqama = on) } },
+            subtitle = PrayerSpeech.iqama(context, dhuhr),
+        )
+        Spacer(Modifier.height(10.dp))
+        GlassButton(
+            stringResource(R.string.voice_test),
+            {
+                if (!speaking) {
+                    speaking = true
+                    scope.launch {
+                        val s = speaker.value ?: Speaker(context).also { speaker.value = it }
+                        s.speak(PrayerSpeech.pre(context, dhuhr, 10), alarmStream = false, volume = 1f)
+                        speaking = false
+                    }
+                }
+            },
+            color = AtharColors.Teal,
+            filled = false,
+            enabled = !speaking,
+            icon = Icons.Rounded.PlayArrow,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.voice_hint), style = MaterialTheme.typography.labelSmall, color = AtharColors.TextTertiary)
+    }
+}
+
+/**
+ * Android 14+ may need a one-time permission for the adhan stop screen to
+ * appear over the lock screen. Hidden when nothing is needed.
+ */
+@Composable
+private fun LockScreenStopCard() {
+    if (Build.VERSION.SDK_INT < 34) return
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current
+    var resumed by remember { mutableIntStateOf(0) }
+    LaunchedEffect(lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { resumed++ } }
+    val allowed = remember(resumed) {
+        context.getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent()
+    }
+    if (allowed) return
+    Spacer(Modifier.height(12.dp))
+    GlassCard(Modifier.fillMaxWidth(), accent = AtharColors.Rose) {
+        CardHeader(stringResource(R.string.adhan_lock_title), Icons.Rounded.Stop, tint = AtharColors.Rose)
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.adhan_lock_body), style = MaterialTheme.typography.bodyMedium, color = AtharColors.TextSecondary)
+        Spacer(Modifier.height(10.dp))
+        GlassButton(
+            stringResource(R.string.allow),
+            {
+                runCatching {
+                    context.startActivity(
+                        Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + context.packageName))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+            color = AtharColors.Rose,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

@@ -11,7 +11,7 @@ data class PrayerAlert(
     val adhan: Boolean = true,
     val preEnabled: Boolean = false,
     /** First pre-alert this many minutes before the adhan. */
-    val preMinutes: Int = 15,
+    val preMinutes: Int = 10,
     /** How many pre-alerts, spread evenly until the adhan (1–3). */
     val preCount: Int = 1,
     val preTone: String? = null,
@@ -40,6 +40,23 @@ data class PrayerAlert(
             },
         )
     }
+}
+
+/**
+ * Spoken announcements (phone text-to-speech): before the prayer ("Dhuhr is
+ * near, 10 minutes left"), at the adhan ("Allahu Akbar, it is time for Dhuhr")
+ * and at iqama ("Hayya 'ala as-salah").
+ */
+data class VoicePrefs(
+    val pre: Boolean = true,
+    val adhan: Boolean = true,
+    val iqama: Boolean = true,
+)
+
+object IqamaMath {
+    /** Iqama time after an adhan, or null if the iqama countdown is off for that prayer. */
+    fun iqamaAt(adhan: NextPrayer, alert: PrayerAlert): LocalDateTime? =
+        if (alert.iqamaEnabled && alert.iqamaMinutes > 0) adhan.at.plusMinutes(alert.iqamaMinutes.toLong()) else null
 }
 
 /** How loud the adhan plays. */

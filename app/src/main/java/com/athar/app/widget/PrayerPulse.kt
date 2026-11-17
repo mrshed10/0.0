@@ -36,9 +36,13 @@ object PrayerPulse {
     const val CLASSIC = 0
     const val RING = 1
     const val BAR = 2
+    /** Adhan and iqama countdowns together. */
+    const val IQAMA = 3
+
+    fun isAnimatedVariant(variant: Int) = variant == RING || variant == BAR || variant == IQAMA
 
     fun isAnimated(data: WidgetData, style: WidgetStyle) =
-        data is WidgetData.NextPrayer && (style.variant == RING || style.variant == BAR)
+        data is WidgetData.NextPrayer && isAnimatedVariant(style.variant)
 
     private val frameIds = intArrayOf(
         R.id.prayer_frame_0, R.id.prayer_frame_1, R.id.prayer_frame_2,
@@ -47,6 +51,7 @@ object PrayerPulse {
 
     /** Views for a next-prayer widget whose content area is [wDp]×[hDp]. */
     fun build(context: Context, data: WidgetData.NextPrayer, ws: WidgetStyle, wDp: Float, hDp: Float): RemoteViews {
+        if (ws.variant == IQAMA) return buildIqama(context, data, ws, wDp, hDp)
         val density = context.resources.displayMetrics.density
         val ring = ws.variant == RING
         val views = RemoteViews(context.packageName, if (ring) R.layout.widget_prayer_ring else R.layout.widget_prayer_bar)
@@ -95,16 +100,86 @@ object PrayerPulse {
         return views
     }
 
+    /**
+     * Adhan + iqama. Before the adhan the big timer counts to the adhan and
+     * the small one to its iqama; between adhan and iqama the big timer counts
+     * to the iqama (the dots fill as the wait passes) and the small one to the
+     * next adhan.
+     */
+    private fun buildIqama(context: Context, data: WidgetData.NextPrayer, ws: WidgetStyle, wDp: Float, hDp: Float): RemoteViews {
+        val density = context.resources.displayMetrics.density
+        val views = RemoteViews(context.packageName, R.layout.widget_prayer_iqama)
+        val res = context.resources
+        val nameDp = (hDp * 0.15f).coerceIn(12f, 24f)
+        val countDp = (hDp * 0.2f).coerceIn(14f, 34f)
+        val smallDp = (hDp * 0.09f).coerceIn(10f, 15f)
+        val name = if (data.inIqama) data.iqamaPrayer else data.name
+        val hasIqama = data.iqamaAtMillis > 0
+
+        val typeface = ws.fontId?.let { FontRegistry.typeface(context, it) }
+        if (typeface != null) {
+            val bold = FontRegistry.boldTypeface(context, ws.fontId, typeface)
+            views.setImageViewBitmap(
+                R.id.prayer_name_img,
+                TextBitmap.render(context, name, bold, nameDp, ws.textColor, (wDp * density * 0.5f).roundToInt().coerceAtLeast(40), 1, center = false),
+            )
+            views.setViewVisibility(R.id.prayer_name_img, View.VISIBLE)
+            views.setViewVisibility(R.id.prayer_name, View.GONE)
+        } else {
+            views.setTextViewText(R.id.prayer_name, name)
+            views.setTextColor(R.id.prayer_name, ws.textColor)
+            views.setTextViewTextSize(R.id.prayer_name, TypedValue.COMPLEX_UNIT_DIP, nameDp)
+        }
+        views.setTextViewText(
+            R.id.prayer_time,
+            if (data.inIqama) res.getString(R.string.widget_iqama_at, data.iqamaTime) else data.time,
+        )
+        views.setTextColor(R.id.prayer_time, ws.accentColor)
+        views.setTextViewTextSize(R.id.prayer_time, TypedValue.COMPLEX_UNIT_DIP, smallDp)
+
+        // Big countdown: the iqama during the wait, otherwise the adhan.
+        views.setTextViewText(R.id.prayer_main_label, res.getString(if (data.inIqama) R.string.widget_iqama_in else R.string.widget_adhan_in))
+        views.setTextColor(R.id.prayer_main_label, withAlpha(ws.textColor, 180))
+        views.setTextViewTextSize(R.id.prayer_main_label, TypedValue.COMPLEX_UNIT_DIP, smallDp * 0.9f)
+        countdown(views, R.id.prayer_countdown, if (data.inIqama) data.iqamaAtMillis else data.atMillis, if (data.inIqama) ws.accentColor else ws.textColor, countDp)
+
+        // Small countdown: the next adhan during the wait, otherwise that adhan's iqama.
+        if (data.inIqama || hasIqama) {
+            views.setViewVisibility(R.id.prayer_second_row, View.VISIBLE)
+            views.setTextViewText(
+                R.id.prayer_second_label,
+                if (data.inIqama) res.getString(R.string.widget_next_in, data.name) else res.getString(R.string.widget_iqama_at, data.iqamaTime),
+            )
+            views.setTextColor(R.id.prayer_second_label, withAlpha(ws.textColor, 180))
+            views.setTextViewTextSize(R.id.prayer_second_label, TypedValue.COMPLEX_UNIT_DIP, smallDp)
+            countdown(views, R.id.prayer_second, if (data.inIqama) data.atMillis else data.iqamaAtMillis, ws.accentColor, smallDp * 1.1f)
+        } else {
+            views.setViewVisibility(R.id.prayer_second_row, View.GONE)
+        }
+
+        val barH = (hDp * 0.22f).coerceIn(10f, 32f)
+        val wPx = (wDp * density).roundToInt().coerceIn(48, 520)
+        val hPx = (barH * density).roundToInt().coerceIn(10, 48)
+        val frames = barFrames(wPx, hPx, if (data.inIqama) data.iqamaProgress else data.progress, ws.textColor, ws.accentColor)
+        frames.forEachIndexed { i, bitmap -> views.setImageViewBitmap(frameIds[i], bitmap) }
+        return views
+    }
+
     /** The small live countdown line used by the classic design. */
     fun countdownLine(context: Context, data: WidgetData.NextPrayer, color: Int, sizeDp: Float): RemoteViews =
-        RemoteViews(context.packageName, R.layout.widget_prayer_chrono).also { countdown(it, data.atMillis, color, sizeDp) }
+        RemoteViews(context.packageName, R.layout.widget_prayer_chrono).also {
+            countdown(it, R.id.prayer_countdown, if (data.inIqama) data.iqamaAtMillis else data.atMillis, color, sizeDp)
+        }
 
-    private fun countdown(views: RemoteViews, atMillis: Long, color: Int, sizeDp: Float) {
+    private fun countdown(views: RemoteViews, atMillis: Long, color: Int, sizeDp: Float) =
+        countdown(views, R.id.prayer_countdown, atMillis, color, sizeDp)
+
+    private fun countdown(views: RemoteViews, id: Int, atMillis: Long, color: Int, sizeDp: Float) {
         val left = (atMillis - System.currentTimeMillis()).coerceAtLeast(0)
-        views.setChronometer(R.id.prayer_countdown, SystemClock.elapsedRealtime() + left, null, true)
-        views.setChronometerCountDown(R.id.prayer_countdown, true)
-        views.setTextColor(R.id.prayer_countdown, color)
-        views.setTextViewTextSize(R.id.prayer_countdown, TypedValue.COMPLEX_UNIT_DIP, sizeDp)
+        views.setChronometer(id, SystemClock.elapsedRealtime() + left, null, true)
+        views.setChronometerCountDown(id, true)
+        views.setTextColor(id, color)
+        views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_DIP, sizeDp)
     }
 
     // ------------------------------------------------------------ frames

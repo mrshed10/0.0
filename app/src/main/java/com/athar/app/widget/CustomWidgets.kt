@@ -33,6 +33,15 @@ enum class ElementKind(@StringRes val label: Int, val ticks: Boolean = false) {
     Salary(R.string.el_salary),
     Tasbih(R.string.el_tasbih),
     Verse(R.string.el_verse),
+    GregorianNumeric(R.string.el_gregorian_numeric),
+    HijriNumeric(R.string.el_hijri_numeric),
+    MonthName(R.string.el_month),
+    DaysLeftInMonth(R.string.el_days_left_month),
+    YearProgress(R.string.el_year_progress),
+    IqamaCountdown(R.string.el_iqama_countdown, ticks = true),
+    TasksToday(R.string.el_tasks_today),
+    HabitsToday(R.string.el_habits_today),
+    Debts(R.string.el_debts),
 }
 
 data class CustomElement(
@@ -98,7 +107,7 @@ object CustomSpecJson {
         )
     }.getOrDefault(CustomSpec.starter())
 
-    const val MAX_ELEMENTS = 8
+    const val MAX_ELEMENTS = 10
 }
 
 object CustomWidgets {
@@ -150,6 +159,50 @@ object CustomWidgets {
                         "${t.count % d.count.coerceAtLeast(1)} / ${d.count} · ${t.todayCount(today)}"
                     }
                     ElementKind.Verse -> "﴿ ${SpiritualContent.verseFor(today).ar} ﴾"
+                    ElementKind.GregorianNumeric -> DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.ENGLISH).format(today)
+                    ElementKind.HijriNumeric -> {
+                        val h = HijriCalendar.fromGregorian(today)
+                        String.format(Locale.ENGLISH, "%02d/%02d/%d", h.day, h.month, h.year) + " " + res.getString(R.string.hijri_suffix)
+                    }
+                    ElementKind.MonthName -> today.month.getDisplayName(TextStyle.FULL_STANDALONE, locale)
+                    ElementKind.DaysLeftInMonth -> {
+                        val left = today.lengthOfMonth() - today.dayOfMonth
+                        res.getString(R.string.el_days_left_value, left.toString())
+                    }
+                    ElementKind.YearProgress -> {
+                        val p = (today.dayOfYear - 1) * 100 / today.lengthOfYear()
+                        "${today.year} · $p%"
+                    }
+                    ElementKind.IqamaCountdown -> {
+                        val prefs = c.settings.prayer.value
+                        val times = prefs.timesFor(today)
+                        val prev = PrayerSchedule.previous(now, times, prefs.timesFor(today.minusDays(1)))
+                        val next = PrayerSchedule.next(now, times, prefs.timesFor(today.plusDays(1)))
+                        val current = com.athar.app.feature.prayer.IqamaMath.iqamaAt(prev, prefs.alert(prev.prayer))?.takeIf { now.isBefore(it) }
+                        val (prayer, at) = if (current != null) prev.prayer to current else next.prayer to com.athar.app.feature.prayer.IqamaMath.iqamaAt(next, prefs.alert(next.prayer))
+                        if (at == null) {
+                            "—"
+                        } else {
+                            val left = java.time.Duration.between(now, at).toMinutes().coerceAtLeast(0)
+                            res.getString(R.string.el_iqama_value, res.getString(prayer.label), String.format(Locale.ENGLISH, "%02d:%02d", left / 60, left % 60))
+                        }
+                    }
+                    ElementKind.TasksToday -> {
+                        val tasks = com.athar.app.feature.tasks.TaskGrouping.forToday(c.taskRepository.tasks.first(), today)
+                        res.getString(R.string.tasks_done, tasks.count { it.done }.toString(), tasks.size.toString())
+                    }
+                    ElementKind.HabitsToday -> {
+                        val days = c.habitRepository.doneDays.first()
+                        val habits = c.habitRepository.habits.first()
+                        val done = habits.count { com.athar.app.feature.habits.StreakMath.summarize(it, days[it.id].orEmpty(), today).doneToday }
+                        res.getString(R.string.el_habits_value, done.toString(), habits.size.toString())
+                    }
+                    ElementKind.Debts -> {
+                        val totals = com.athar.app.feature.debts.DebtMath.totals(
+                            com.athar.app.feature.debts.DebtMath.balances(c.debtRepository.people.first(), c.debtRepository.entries.first()),
+                        )
+                        res.getString(R.string.debts_owed_to_me) + " " + com.athar.app.core.format.Money.format(totals.owedToMeMinor)
+                    }
                 }
             }.getOrDefault("—")
             CustomLine(text, e.sizeSp, e.color, e.accent, e.bold, e.dots)
@@ -161,5 +214,5 @@ object CustomWidgets {
 /** True if this widget must be redrawn every minute. */
 fun WidgetConfig.needsMinuteTick(): Boolean =
     content.type.minuteClock ||
-        (content.type == WidgetType.NextPrayer && (style.variant == PrayerPulse.RING || style.variant == PrayerPulse.BAR)) ||
+        (content.type == WidgetType.NextPrayer && PrayerPulse.isAnimatedVariant(style.variant)) ||
         (content.type == WidgetType.Custom && CustomWidgets.needsTick(CustomSpecJson.decode(content.extra)))
