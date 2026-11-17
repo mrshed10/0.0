@@ -4,7 +4,7 @@ plugins {
 
 val geckoviewVersion: String = providers.gradleProperty("geckoviewVersion").getOrElse("+")
 val geckoviewNightlyVersion: String = providers.gradleProperty("geckoviewNightlyVersion").getOrElse("+")
-val appMinSdk: Int = providers.gradleProperty("appMinSdk").getOrElse("21").toInt()
+val appMinSdk: Int = providers.gradleProperty("appMinSdk").getOrElse("26").toInt()
 
 android {
     namespace = "com.tvbrowser.aosp"
