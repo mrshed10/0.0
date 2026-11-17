@@ -21,5 +21,5 @@ class BrowserTab(val id: Int, var url: String) {
     val killTimes = ArrayDeque<Long>()
 
     val isLive: Boolean get() = session != null
-    val displayTitle: String get() = title.ifBlank { url }
+    val displayTitle: String get() = title.ifBlank { if (url == "tv:quick") "★ الوصول السريع" else url }
 }

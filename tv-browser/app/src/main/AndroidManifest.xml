@@ -4,15 +4,17 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- لتثبيت الإضافات من مجلد التنزيلات على الأجهزة التي لا تحتوي على منتقي ملفات -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
-    <!-- شاشة تلفاز: لا لمس، ريموت فقط -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
+    <!--
+      No largeHeap: on a 1GB device a big Java heap only makes the Low Memory Killer
+      target us sooner. Our Java side is tiny; the engine's memory is native.
+    -->
     <application
         android:name=".TvBrowserApp"
         android:allowBackup="false"
@@ -20,7 +22,6 @@
         android:hardwareAccelerated="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
-        android:largeHeap="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.TvBrowser"
         android:usesCleartextTraffic="true">
@@ -46,9 +47,22 @@
         </activity>
 
         <activity
+            android:name=".ui.SettingsActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
+            android:exported="false"
+            android:label="@string/settings" />
+
+        <activity
             android:name=".extensions.ExtensionsActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode"
             android:exported="false"
             android:label="@string/extensions_title" />
+
+        <!-- Restarts the browser cleanly (applies engine settings / recovers from engine shutdown). -->
+        <activity
+            android:name=".util.RestartActivity"
+            android:exported="false"
+            android:process=":restart"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>

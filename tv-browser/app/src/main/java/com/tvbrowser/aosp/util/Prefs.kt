@@ -8,64 +8,119 @@ class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("tvbrowser", Context.MODE_PRIVATE)
     val lowRam: Boolean = DeviceProfile.isLowRam(context)
 
+    private fun bool(key: String, def: Boolean) = sp.getBoolean(key, def)
+    private fun putBool(key: String, v: Boolean) = sp.edit().putBoolean(key, v).apply()
+    private fun int(key: String, def: Int) = sp.getInt(key, def)
+    private fun putInt(key: String, v: Int) = sp.edit().putInt(key, v).apply()
+
+    // ---------------- general
+    /** QUICK_ACCESS_URL = the native Quick Access screen (costs no engine memory). */
     var homePage: String
-        get() = sp.getString(KEY_HOME, DEFAULT_HOME) ?: DEFAULT_HOME
-        set(v) = sp.edit().putString(KEY_HOME, v).apply()
+        get() = sp.getString("home", QUICK_ACCESS_URL) ?: QUICK_ACCESS_URL
+        set(v) = sp.edit().putString("home", v).apply()
 
     /** 0 = Google, 1 = DuckDuckGo, 2 = Bing */
     var searchEngine: Int
-        get() = sp.getInt(KEY_SEARCH, 0)
-        set(v) = sp.edit().putInt(KEY_SEARCH, v).apply()
+        get() = int("search", 0)
+        set(v) = putInt("search", v)
 
-    /** Max number of tabs (open or discarded). */
+    var restoreTabs: Boolean
+        get() = bool("restore_tabs", true)
+        set(v) = putBool("restore_tabs", v)
+
+    // ---------------- ad blocking
+    /** Engine's built-in tracker/ad-network blocking: native code, almost free on CPU/RAM. */
+    var builtInAdBlock: Boolean
+        get() = bool("adblock_builtin", true)
+        set(v) = putBool("adblock_builtin", v)
+
+    var extensionsEnabled: Boolean
+        get() = bool("extensions_enabled", true)
+        set(v) = putBool("extensions_enabled", v)
+
+    // ---------------- performance & memory
     var maxTabs: Int
-        get() = sp.getInt(KEY_MAX_TABS, if (lowRam) 4 else 8)
-        set(v) = sp.edit().putInt(KEY_MAX_TABS, v.coerceIn(1, 12)).apply()
+        get() = int("max_tabs", if (lowRam) 3 else 8)
+        set(v) = putInt("max_tabs", v.coerceIn(1, 12))
 
-    /** Tabs allowed to keep a live GeckoSession. Others are "discarded" (state only, ~0 RAM). */
+    /** Tabs that keep a live page. Others are frozen (state only, ~0 RAM). */
     var maxLiveTabs: Int
-        get() = sp.getInt(KEY_MAX_LIVE, if (lowRam) 1 else 3)
-        set(v) = sp.edit().putInt(KEY_MAX_LIVE, v.coerceIn(1, 6)).apply()
+        get() = int("max_live", 1.takeIf { lowRam } ?: 3)
+        set(v) = putInt("max_live", v.coerceIn(1, 6))
 
-    /** Virtual cursor speed 1..5 */
+    /** Periodic cache clearing interval in minutes (0 = off). */
+    var cacheClearMinutes: Int
+        get() = int("cache_clear_min", 10)
+        set(v) = putInt("cache_clear_min", v)
+
+    /** 30 fps rendering: halves CPU/GPU work for animations & scrolling. (restart) */
+    var cpuSaver: Boolean
+        get() = bool("cpu_saver", lowRam)
+        set(v) = putBool("cpu_saver", v)
+
+    /** Make YouTube & co. send H.264 (hardware-decoded on every TV chip) instead of VP9/AV1. (restart) */
+    var preferH264: Boolean
+        get() = bool("prefer_h264", true)
+        set(v) = putBool("prefer_h264", v)
+
+    /** Don't load images at all: huge memory savings on heavy pages. (restart) */
+    var blockImages: Boolean
+        get() = bool("block_images", false)
+        set(v) = putBool("block_images", v)
+
+    // ---------------- data
+    var clearOnExit: Boolean
+        get() = bool("clear_on_exit", false)
+        set(v) = putBool("clear_on_exit", v)
+
+    // ---------------- remote / volume
     var cursorSpeed: Int
-        get() = sp.getInt(KEY_CURSOR_SPEED, 3)
-        set(v) = sp.edit().putInt(KEY_CURSOR_SPEED, v.coerceIn(1, 5)).apply()
+        get() = int("cursor_speed", 3)
+        set(v) = putInt("cursor_speed", v.coerceIn(1, 5))
 
     /** 0 = mouse events (desktop-like, supports hover), 1 = touch events (fallback) */
     var clickMode: Int
-        get() = sp.getInt(KEY_CLICK_MODE, CLICK_MOUSE)
-        set(v) = sp.edit().putInt(KEY_CLICK_MODE, v).apply()
+        get() = int("click_mode", CLICK_MOUSE)
+        set(v) = putInt("click_mode", v)
 
     var cursorMode: Boolean
-        get() = sp.getBoolean(KEY_CURSOR_MODE, true)
-        set(v) = sp.edit().putBoolean(KEY_CURSOR_MODE, v).apply()
+        get() = bool("cursor_mode", true)
+        set(v) = putBool("cursor_mode", v)
 
-    /** Allow web pages to call window.tvDevice.* (volume control). */
     var allowPageVolume: Boolean
-        get() = sp.getBoolean(KEY_PAGE_VOLUME, true)
-        set(v) = sp.edit().putBoolean(KEY_PAGE_VOLUME, v).apply()
+        get() = bool("page_volume", true)
+        set(v) = putBool("page_volume", v)
 
+    var showSystemVolumeUi: Boolean
+        get() = bool("system_volume_ui", false)
+        set(v) = putBool("system_volume_ui", v)
+
+    // ---------------- storage
     var savedTabs: String?
-        get() = sp.getString(KEY_SAVED_TABS, null)
-        set(v) = sp.edit().putString(KEY_SAVED_TABS, v).apply()
+        get() = sp.getString("saved_tabs", null)
+        set(v) = sp.edit().putString("saved_tabs", v).apply()
 
     var storesJson: String?
-        get() = sp.getString(KEY_STORES, null)
-        set(v) = sp.edit().putString(KEY_STORES, v).apply()
+        get() = sp.getString("stores", null)
+        set(v) = sp.edit().putString("stores", v).apply()
+
+    var bookmarksJson: String?
+        get() = sp.getString("bookmarks", null)
+        set(v) = sp.edit().putString("bookmarks", v).apply()
+
+    /** Engine-level prefs changed since start → a restart is pending. */
+    var restartPending = false
 
     /** Turns whatever the user typed in the URL bar into a URL. */
     fun resolveInput(input: String): String {
         val text = input.trim()
         if (text.isEmpty()) return homePage
         val lower = text.lowercase()
-        if (lower.startsWith("http://") || lower.startsWith("https://") ||
-            lower.startsWith("about:") || lower.startsWith("file://") ||
-            lower.startsWith("resource://") || lower.startsWith("moz-extension://")
+        if (lower == QUICK_ACCESS_URL || lower.startsWith("http://") || lower.startsWith("https://") ||
+            lower.startsWith("about:") || lower.startsWith("moz-extension://")
         ) return text
         val looksLikeHost = !text.contains(' ') &&
-            (text.contains('.') || text.startsWith("localhost")) &&
-            !text.endsWith('.')
+            (text.contains('.') || text.startsWith("localhost")) && !text.endsWith('.')
         if (looksLikeHost) return "https://$text"
         val q = Uri.encode(text)
         return when (searchEngine) {
@@ -76,19 +131,8 @@ class Prefs(context: Context) {
     }
 
     companion object {
-        const val DEFAULT_HOME = "https://www.google.com/"
+        const val QUICK_ACCESS_URL = "tv:quick"
         const val CLICK_MOUSE = 0
         const val CLICK_TOUCH = 1
-
-        private const val KEY_HOME = "home"
-        private const val KEY_SEARCH = "search"
-        private const val KEY_MAX_TABS = "max_tabs"
-        private const val KEY_MAX_LIVE = "max_live"
-        private const val KEY_CURSOR_SPEED = "cursor_speed"
-        private const val KEY_CLICK_MODE = "click_mode"
-        private const val KEY_CURSOR_MODE = "cursor_mode"
-        private const val KEY_PAGE_VOLUME = "page_volume"
-        private const val KEY_SAVED_TABS = "saved_tabs"
-        private const val KEY_STORES = "stores"
     }
 }

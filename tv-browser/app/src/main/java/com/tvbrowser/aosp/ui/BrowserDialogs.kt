@@ -12,9 +12,6 @@ import com.tvbrowser.aosp.BuildConfig
 import com.tvbrowser.aosp.R
 import com.tvbrowser.aosp.TvBrowserApp
 import com.tvbrowser.aosp.extensions.ExtensionSources
-import com.tvbrowser.aosp.util.DeviceProfile
-import com.tvbrowser.aosp.util.Prefs
-import org.mozilla.geckoview.StorageController
 import java.io.File
 import java.io.FileInputStream
 
@@ -158,62 +155,6 @@ class BrowserDialogs(private val activity: MainActivity, private val app: TvBrow
             .setItems(arrayOf(activity.getString(R.string.tab_switch), activity.getString(R.string.tab_close))) { _, which ->
                 if (which == 0) { tm.select(tab); activity.focusPage() } else tm.close(tab)
             }
-            .setNegativeButton(android.R.string.cancel, null).show()
-    }
-
-    // ------------------------------------------------------------------ settings
-
-    fun showSettings() {
-        val p = app.prefs
-        val engines = activity.resources.getStringArray(R.array.search_engines)
-        val items = arrayOf(
-            activity.getString(R.string.set_home, p.homePage),
-            activity.getString(R.string.set_search, engines[p.searchEngine]),
-            activity.getString(R.string.set_max_tabs, p.maxTabs),
-            activity.getString(R.string.set_live_tabs, p.maxLiveTabs),
-            activity.getString(R.string.set_cursor_speed, p.cursorSpeed),
-            activity.getString(if (p.clickMode == Prefs.CLICK_MOUSE) R.string.set_click_mouse else R.string.set_click_touch),
-            activity.getString(if (p.allowPageVolume) R.string.set_page_volume_on else R.string.set_page_volume_off),
-            activity.getString(R.string.set_system_volume_ui, if (app.volume.showSystemUi) "✓" else "✗"),
-            activity.getString(R.string.set_clear_data),
-            activity.getString(R.string.set_about_config),
-            activity.getString(
-                R.string.set_memory,
-                DeviceProfile.availRamMb(activity), DeviceProfile.totalRamMb(activity),
-                activity.tabs.tabs.count { it.isLive }, activity.tabs.tabs.size,
-            ),
-        )
-        builder().setTitle(R.string.settings)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> textSetting(R.string.set_home_title, p.homePage) { p.homePage = p.resolveInput(it) }
-                    1 -> choice(R.string.set_search_title, engines, p.searchEngine) { p.searchEngine = it }
-                    2 -> choice(R.string.set_max_tabs_title, (1..12).map { "$it" }.toTypedArray(), p.maxTabs - 1) { p.maxTabs = it + 1 }
-                    3 -> choice(R.string.set_live_tabs_title, (1..6).map { "$it" }.toTypedArray(), p.maxLiveTabs - 1) { p.maxLiveTabs = it + 1 }
-                    4 -> choice(R.string.set_cursor_speed_title, (1..5).map { "$it" }.toTypedArray(), p.cursorSpeed - 1) { p.cursorSpeed = it + 1 }
-                    5 -> p.clickMode = if (p.clickMode == Prefs.CLICK_MOUSE) Prefs.CLICK_TOUCH else Prefs.CLICK_MOUSE
-                    6 -> p.allowPageVolume = !p.allowPageVolume
-                    7 -> app.volume.showSystemUi = !app.volume.showSystemUi
-                    8 -> app.runtime.storageController.clearData(StorageController.ClearFlags.ALL)
-                        .accept({ activity.toast(activity.getString(R.string.data_cleared)) }, {})
-                    9 -> { activity.tabs.openTab("about:config"); activity.focusPage() }
-                    10 -> { activity.tabs.discardBackgroundTabs(); System.gc(); activity.toast(activity.getString(R.string.memory_freed)) }
-                }
-                if (which in 5..7) showSettings()
-            }
-            .setNegativeButton(android.R.string.cancel, null).show()
-    }
-
-    private fun textSetting(title: Int, value: String, save: (String) -> Unit) {
-        val input = EditText(activity).apply { setText(value); setSingleLine(); inputType = InputType.TYPE_TEXT_VARIATION_URI }
-        builder().setTitle(title).setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ -> save(input.text.toString()) }
-            .setNegativeButton(android.R.string.cancel, null).show()
-    }
-
-    private fun choice(title: Int, items: Array<String>, selected: Int, save: (Int) -> Unit) {
-        builder().setTitle(title)
-            .setSingleChoiceItems(items, selected) { d, which -> save(which); d.dismiss() }
             .setNegativeButton(android.R.string.cancel, null).show()
     }
 }

@@ -4,6 +4,7 @@
     <color name="toolbar">#FF1E2227</color>
     <color name="url_bg">#FF2B3038</color>
     <color name="accent">#FF1E88E5</color>
+    <color name="accent_light">#FF90CAF9</color>
     <color name="accent_dark">#FF1565C0</color>
     <color name="install">#FF2E7D32</color>
     <color name="text">#FFECEFF1</color>

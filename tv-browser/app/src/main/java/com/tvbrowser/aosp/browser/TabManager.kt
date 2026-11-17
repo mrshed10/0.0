@@ -6,6 +6,8 @@ import android.os.SystemClock
 import android.util.Log
 import com.tvbrowser.aosp.extensions.ExtensionManager
 import com.tvbrowser.aosp.util.Prefs
+import com.tvbrowser.aosp.util.safe
+import com.tvbrowser.aosp.util.safeOr
 import org.json.JSONArray
 import org.json.JSONObject
 import org.mozilla.geckoview.AllowOrDeny
@@ -19,10 +21,12 @@ import org.mozilla.geckoview.WebResponse
  * Owns all tabs and their GeckoSessions.
  *
  * RAM strategy (1GB devices):
- *  - only [Prefs.maxLiveTabs] sessions stay open (default 1 on low-RAM devices);
- *  - background tabs are discarded (session closed, SessionState kept) and restored on demand;
- *  - on onTrimMemory / onLowMemory every background tab is discarded immediately;
- *  - if the content process is killed by the Low Memory Killer, the tab is restored from state.
+ *  - the home page is the native Quick Access screen: a tab showing it has NO session at all;
+ *  - only [Prefs.maxLiveTabs] sessions stay open (default 1); the rest are frozen
+ *    (session closed, SessionState kept) and restored on demand;
+ *  - if Android kills the page process, the page is restored — at most 3 times per minute,
+ *    then the tab falls back to Quick Access instead of looping (white screen + crash).
+ *  - every engine callback is wrapped in [safe]: an exception never crashes the browser.
  */
 class TabManager(
     private val runtime: GeckoRuntime,
@@ -38,6 +42,7 @@ class TabManager(
         fun onBeforeSessionClose(session: GeckoSession)
         fun onFullScreen(tab: BrowserTab, fullScreen: Boolean)
         fun onExternalResponse(tab: BrowserTab, response: WebResponse)
+        fun onPageRecovered(tab: BrowserTab, gaveUp: Boolean)
         /** Return true if the URL was consumed (e.g. an .xpi/.crx extension install). */
         fun interceptLoad(uri: String): Boolean
     }
@@ -47,6 +52,8 @@ class TabManager(
     var current: BrowserTab? = null
         private set
     private var nextId = 1
+
+    fun isQuickAccess(tab: BrowserTab) = tab.url == Prefs.QUICK_ACCESS_URL && tab.session == null
 
     // ------------------------------------------------------------------ tabs
 
@@ -63,18 +70,19 @@ class TabManager(
         return tab
     }
 
-    fun select(tab: BrowserTab) {
+    fun select(tab: BrowserTab) = safe(TAG) {
         tab.lastUsed = SystemClock.elapsedRealtime()
-        ensureLive(tab)
         val previous = current
         if (previous != null && previous !== tab) previous.session?.takeIf { it.isOpen }?.setActive(false)
         current = tab
+        // Free memory first, THEN open the new page.
+        enforceLiveLimit()
+        ensureLive(tab)
         tab.session?.takeIf { it.isOpen }?.setActive(true)
         listener.onTabSelected(tab)
-        enforceLiveLimit()
     }
 
-    fun close(tab: BrowserTab) {
+    fun close(tab: BrowserTab) = safe(TAG) {
         discard(tab)
         val idx = tabs.indexOf(tab)
         tabs.remove(tab)
@@ -92,7 +100,11 @@ class TabManager(
         current = null
     }
 
-    fun load(tab: BrowserTab, url: String) {
+    fun load(tab: BrowserTab, url: String) = safe(TAG) {
+        if (url == Prefs.QUICK_ACCESS_URL) {
+            goQuickAccess(tab)
+            return@safe
+        }
         tab.url = url
         val s = tab.session
         if (s == null) {
@@ -103,11 +115,23 @@ class TabManager(
         }
     }
 
+    /** Shows the native Quick Access screen in this tab and frees its page memory. */
+    fun goQuickAccess(tab: BrowserTab) = safe(TAG) {
+        discard(tab)
+        tab.url = Prefs.QUICK_ACCESS_URL
+        tab.title = ""
+        tab.state = null
+        tab.canGoBack = false
+        tab.canGoForward = false
+        tab.loading = false
+        if (tab === current) listener.onTabSelected(tab)
+    }
+
     /** Closes the session but keeps its state: frees the page's RAM. */
     fun discard(tab: BrowserTab) {
         val s = tab.session ?: return
-        listener.onBeforeSessionClose(s)
-        runCatching { if (s.isOpen) s.close() }
+        safe(TAG) { listener.onBeforeSessionClose(s) }
+        safe(TAG) { if (s.isOpen) s.close() }
         tab.session = null
         tab.pendingOpen = false
     }
@@ -115,6 +139,8 @@ class TabManager(
     fun discardBackgroundTabs() {
         tabs.filter { it !== current }.forEach { discard(it) }
     }
+
+    fun liveCount() = tabs.count { it.isLive }
 
     private fun enforceLiveLimit() {
         val background = tabs.filter { it.isLive && it !== current }.sortedBy { it.lastUsed }
@@ -128,6 +154,7 @@ class TabManager(
 
     private fun ensureLive(tab: BrowserTab) {
         if (tab.session != null) return
+        if (tab.url == Prefs.QUICK_ACCESS_URL && tab.state == null) return // native screen
         val s = newSession(tab)
         tab.session = s
         s.open(runtime)
@@ -137,23 +164,26 @@ class TabManager(
 
     // ------------------------------------------------------------------ persistence
 
-    fun serialize(): String {
+    fun serialize(): String = safeOr(TAG, "[]") {
         val arr = JSONArray()
         for (t in tabs) {
             arr.put(JSONObject().apply {
                 put("url", t.url)
                 put("title", t.title)
-                t.state?.let { put("state", it.toString()) }
+                if (t.url != Prefs.QUICK_ACCESS_URL) t.state?.let { put("state", it.toString()) }
                 put("current", t === current)
             })
         }
-        return arr.toString()
+        arr.toString()
     }
 
-    /** Restores tabs as discarded entries; only the current one is loaded. */
-    fun restore(json: String?): Boolean {
+    /**
+     * Restores tabs as frozen entries. The page the user was on is NOT reloaded automatically
+     * when [loadCurrent] is false (safe mode) — Quick Access is shown instead.
+     */
+    fun restore(json: String?, loadCurrent: Boolean): Boolean {
         if (json.isNullOrBlank()) return false
-        return runCatching {
+        return safeOr(TAG, false) {
             val arr = JSONArray(json)
             var selected: BrowserTab? = null
             for (i in 0 until minOf(arr.length(), prefs.maxTabs)) {
@@ -161,19 +191,17 @@ class TabManager(
                 val tab = BrowserTab(nextId++, o.optString("url", prefs.homePage))
                 tab.title = o.optString("title")
                 o.optString("state").takeIf { it.isNotEmpty() }?.let {
-                    tab.state = GeckoSession.SessionState.fromString(it)
+                    tab.state = runCatching { GeckoSession.SessionState.fromString(it) }.getOrNull()
                 }
                 tabs += tab
                 if (o.optBoolean("current")) selected = tab
             }
-            val toSelect = selected ?: tabs.lastOrNull() ?: return@runCatching false
+            if (tabs.isEmpty()) return@safeOr false
+            val toSelect = if (loadCurrent) selected ?: tabs.last()
+            else BrowserTab(nextId++, Prefs.QUICK_ACCESS_URL).also { tabs += it }
             select(toSelect)
             listener.onTabListChanged()
             true
-        }.getOrElse {
-            Log.w(TAG, "restore failed", it)
-            tabs.clear()
-            false
         }
     }
 
@@ -187,24 +215,31 @@ class TabManager(
         s.permissionDelegate = Permissions
         s.scrollDelegate = Scroll(tab)
         s.promptDelegate = prompts
-        extensions.attachSession(s)
+        safe(TAG) { extensions.attachSession(s) }
         return s
     }
 
-    /** Content process was killed (usually by the Low Memory Killer) or crashed. */
-    private fun recover(tab: BrowserTab) {
+    /** Content process was killed (Low Memory Killer) or crashed. */
+    private fun recover(tab: BrowserTab) = safe(TAG) {
         val now = SystemClock.elapsedRealtime()
         tab.killTimes.addLast(now)
         while (tab.killTimes.isNotEmpty() && now - tab.killTimes.first() > 60_000) tab.killTimes.removeFirst()
         discard(tab)
-        if (tab !== current) return
+        if (tab !== current) return@safe
         discardBackgroundTabs()
-        if (tab.killTimes.size >= 3) {
-            // Page is too heavy for this device: stop the reload loop.
-            tab.state = null
-            tab.url = "about:blank"
+        val gaveUp = tab.killTimes.size >= 3
+        if (gaveUp) {
+            // This page is too heavy for the device: stop the reload loop.
+            tab.killTimes.clear()
+            main.post { goQuickAccess(tab); listener.onPageRecovered(tab, true) }
+        } else {
+            main.postDelayed({
+                if (current === tab) {
+                    select(tab)
+                    listener.onPageRecovered(tab, false)
+                }
+            }, 400)
         }
-        main.post { if (current === tab) select(tab) }
     }
 
     private inner class Navigation(private val tab: BrowserTab) : GeckoSession.NavigationDelegate {
@@ -213,17 +248,17 @@ class TabManager(
             url: String?,
             perms: MutableList<ContentPermission>,
             hasUserGesture: Boolean,
-        ) {
-            if (url != null) tab.url = url
+        ) = safe(TAG) {
+            if (url != null && url != "about:blank") tab.url = url
             listener.onTabChanged(tab)
         }
 
-        override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
+        override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) = safe(TAG) {
             tab.canGoBack = canGoBack
             listener.onTabChanged(tab)
         }
 
-        override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) {
+        override fun onCanGoForward(session: GeckoSession, canGoForward: Boolean) = safe(TAG) {
             tab.canGoForward = canGoForward
             listener.onTabChanged(tab)
         }
@@ -231,51 +266,51 @@ class TabManager(
         override fun onLoadRequest(
             session: GeckoSession,
             request: GeckoSession.NavigationDelegate.LoadRequest,
-        ): GeckoResult<AllowOrDeny>? {
+        ): GeckoResult<AllowOrDeny>? = safeOr(TAG, GeckoResult.fromValue(AllowOrDeny.ALLOW)) {
             val uri = request.uri
-            if (listener.interceptLoad(uri)) return GeckoResult.fromValue(AllowOrDeny.DENY)
-            val scheme = uri.substringBefore(':').lowercase()
-            if (scheme == "intent" || scheme == "market" || scheme == "tel" || scheme == "mailto") {
-                return GeckoResult.fromValue(AllowOrDeny.DENY)
+            if (listener.interceptLoad(uri)) return@safeOr GeckoResult.fromValue(AllowOrDeny.DENY)
+            when (uri.substringBefore(':').lowercase()) {
+                "intent", "market", "tel", "mailto", "sms" -> GeckoResult.fromValue(AllowOrDeny.DENY)
+                else -> GeckoResult.fromValue(AllowOrDeny.ALLOW)
             }
-            return GeckoResult.fromValue(AllowOrDeny.ALLOW)
         }
 
-        override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession>? {
-            if (listener.interceptLoad(uri)) return null
-            if (tabs.size >= prefs.maxTabs) {
-                // Tab limit reached (RAM): open the link in the same tab instead.
-                session.loadUri(uri)
-                return null
+        override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession>? =
+            safeOr<GeckoResult<GeckoSession>?>(TAG, null) {
+                if (listener.interceptLoad(uri)) return@safeOr null
+                if (tabs.size >= prefs.maxTabs || prefs.maxLiveTabs <= 1) {
+                    // 1GB mode: a second live page would double memory. Open in the same tab.
+                    session.loadUri(uri)
+                    return@safeOr null
+                }
+                val newTab = BrowserTab(nextId++, uri)
+                val s = newSession(newTab)
+                newTab.session = s
+                newTab.pendingOpen = true
+                tabs += newTab
+                main.post {
+                    newTab.pendingOpen = false
+                    select(newTab)
+                    listener.onTabListChanged()
+                }
+                GeckoResult.fromValue(s)
             }
-            val newTab = BrowserTab(nextId++, uri)
-            val s = newSession(newTab)
-            newTab.session = s
-            newTab.pendingOpen = true
-            tabs += newTab
-            main.post {
-                newTab.pendingOpen = false
-                select(newTab)
-                listener.onTabListChanged()
-            }
-            return GeckoResult.fromValue(s)
-        }
     }
 
     private inner class Progress(private val tab: BrowserTab) : GeckoSession.ProgressDelegate {
-        override fun onPageStart(session: GeckoSession, url: String) {
+        override fun onPageStart(session: GeckoSession, url: String) = safe(TAG) {
             tab.loading = true
             tab.progress = 5
             listener.onTabChanged(tab)
         }
 
-        override fun onPageStop(session: GeckoSession, success: Boolean) {
+        override fun onPageStop(session: GeckoSession, success: Boolean) = safe(TAG) {
             tab.loading = false
             tab.progress = 100
             listener.onTabChanged(tab)
         }
 
-        override fun onProgressChange(session: GeckoSession, progress: Int) {
+        override fun onProgressChange(session: GeckoSession, progress: Int) = safe(TAG) {
             tab.progress = progress
             listener.onTabChanged(tab)
         }
@@ -286,20 +321,20 @@ class TabManager(
     }
 
     private inner class Content(private val tab: BrowserTab) : GeckoSession.ContentDelegate {
-        override fun onTitleChange(session: GeckoSession, title: String?) {
+        override fun onTitleChange(session: GeckoSession, title: String?) = safe(TAG) {
             tab.title = title.orEmpty()
             listener.onTabChanged(tab)
         }
 
-        override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
+        override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) = safe(TAG) {
             listener.onFullScreen(tab, fullScreen)
         }
 
-        override fun onCloseRequest(session: GeckoSession) {
+        override fun onCloseRequest(session: GeckoSession) = safe(TAG) {
             if (tabs.contains(tab)) close(tab)
         }
 
-        override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
+        override fun onExternalResponse(session: GeckoSession, response: WebResponse) = safe(TAG) {
             listener.onExternalResponse(tab, response)
         }
 
@@ -309,7 +344,7 @@ class TabManager(
         }
 
         override fun onKill(session: GeckoSession) {
-            Log.w(TAG, "content killed (low memory?): ${tab.url}")
+            Log.w(TAG, "content killed (low memory): ${tab.url}")
             recover(tab)
         }
     }

@@ -6,6 +6,7 @@ import android.text.InputType
 import android.widget.EditText
 import android.widget.LinearLayout
 import com.tvbrowser.aosp.R
+import com.tvbrowser.aosp.util.safe
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
@@ -20,6 +21,18 @@ class PromptHandler(private val activity: Activity) : PromptDelegate {
 
     private fun builder() = AlertDialog.Builder(activity, android.R.style.Theme_Material_Dialog_Alert)
 
+    private val unusable get() = activity.isFinishing || activity.isDestroyed
+
+    /** Shows the dialog; if that fails (e.g. activity in background) the prompt is dismissed. */
+    private fun AlertDialog.Builder.showOr(once: Once, fallback: PromptResponse) {
+        try {
+            show()
+        } catch (t: Throwable) {
+            safe("PromptHandler") { throw t }
+            once.complete(fallback)
+        }
+    }
+
     /** Completes a result exactly once (dialog may be both clicked and dismissed). */
     private class Once(val result: GeckoResult<PromptResponse>) {
         private var done = false
@@ -32,19 +45,19 @@ class PromptHandler(private val activity: Activity) : PromptDelegate {
     }
 
     override fun onAlertPrompt(session: GeckoSession, prompt: PromptDelegate.AlertPrompt): GeckoResult<PromptResponse>? {
-        if (activity.isFinishing) return GeckoResult.fromValue(prompt.dismiss())
+        if (unusable) return GeckoResult.fromValue(prompt.dismiss())
         val once = Once(GeckoResult())
         builder()
             .setTitle(prompt.title)
             .setMessage(prompt.message)
             .setPositiveButton(android.R.string.ok) { _, _ -> once.complete(prompt.dismiss()) }
             .setOnDismissListener { once.complete(prompt.dismiss()) }
-            .show()
+            .showOr(once, prompt.dismiss())
         return once.result
     }
 
     override fun onButtonPrompt(session: GeckoSession, prompt: PromptDelegate.ButtonPrompt): GeckoResult<PromptResponse>? {
-        if (activity.isFinishing) return GeckoResult.fromValue(prompt.dismiss())
+        if (unusable) return GeckoResult.fromValue(prompt.dismiss())
         val once = Once(GeckoResult())
         builder()
             .setTitle(prompt.title)
@@ -56,12 +69,12 @@ class PromptHandler(private val activity: Activity) : PromptDelegate {
                 once.complete(prompt.confirm(PromptDelegate.ButtonPrompt.Type.NEGATIVE))
             }
             .setOnDismissListener { once.complete(prompt.dismiss()) }
-            .show()
+            .showOr(once, prompt.dismiss())
         return once.result
     }
 
     override fun onTextPrompt(session: GeckoSession, prompt: PromptDelegate.TextPrompt): GeckoResult<PromptResponse>? {
-        if (activity.isFinishing) return GeckoResult.fromValue(prompt.dismiss())
+        if (unusable) return GeckoResult.fromValue(prompt.dismiss())
         val once = Once(GeckoResult())
         val input = EditText(activity).apply {
             setText(prompt.defaultValue)
@@ -74,12 +87,12 @@ class PromptHandler(private val activity: Activity) : PromptDelegate {
             .setPositiveButton(android.R.string.ok) { _, _ -> once.complete(prompt.confirm(input.text.toString())) }
             .setNegativeButton(android.R.string.cancel) { _, _ -> once.complete(prompt.dismiss()) }
             .setOnDismissListener { once.complete(prompt.dismiss()) }
-            .show()
+            .showOr(once, prompt.dismiss())
         return once.result
     }
 
     override fun onAuthPrompt(session: GeckoSession, prompt: PromptDelegate.AuthPrompt): GeckoResult<PromptResponse>? {
-        if (activity.isFinishing) return GeckoResult.fromValue(prompt.dismiss())
+        if (unusable) return GeckoResult.fromValue(prompt.dismiss())
         val once = Once(GeckoResult())
         val onlyPassword = (prompt.authOptions.flags and
             PromptDelegate.AuthPrompt.AuthOptions.Flags.ONLY_PASSWORD) != 0
@@ -110,7 +123,7 @@ class PromptHandler(private val activity: Activity) : PromptDelegate {
             }
             .setNegativeButton(android.R.string.cancel) { _, _ -> once.complete(prompt.dismiss()) }
             .setOnDismissListener { once.complete(prompt.dismiss()) }
-            .show()
+            .showOr(once, prompt.dismiss())
         return once.result
     }
 
@@ -121,7 +134,7 @@ class PromptHandler(private val activity: Activity) : PromptDelegate {
 
     /** HTML <select>, menus and multi-selects. */
     override fun onChoicePrompt(session: GeckoSession, prompt: PromptDelegate.ChoicePrompt): GeckoResult<PromptResponse>? {
-        if (activity.isFinishing) return GeckoResult.fromValue(prompt.dismiss())
+        if (unusable) return GeckoResult.fromValue(prompt.dismiss())
         val flat = ArrayList<PromptDelegate.ChoicePrompt.Choice>()
         val labels = ArrayList<String>()
         fun collect(choices: Array<PromptDelegate.ChoicePrompt.Choice>, group: String?) {
@@ -156,7 +169,7 @@ class PromptHandler(private val activity: Activity) : PromptDelegate {
             }
         }
         b.setOnDismissListener { once.complete(prompt.dismiss()) }
-        b.show()
+        b.showOr(once, prompt.dismiss())
         return once.result
     }
 }

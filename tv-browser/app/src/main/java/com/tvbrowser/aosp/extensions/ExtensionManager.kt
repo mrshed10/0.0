@@ -67,7 +67,11 @@ class ExtensionManager(
     private val bridgeDelegate = object : WebExtension.MessageDelegate {
         override fun onMessage(nativeApp: String, message: Any, sender: WebExtension.MessageSender): GeckoResult<Any>? {
             val json = message as? JSONObject ?: return GeckoResult.fromValue(JSONObject().put("error", "bad message"))
-            return GeckoResult.fromValue(deviceBridge.handle(json))
+            return try {
+                GeckoResult.fromValue(deviceBridge.handle(json))
+            } catch (t: Throwable) {
+                GeckoResult.fromValue(JSONObject().put("error", t.message ?: "error"))
+            }
         }
     }
 
@@ -77,7 +81,12 @@ class ExtensionManager(
         }
 
         override fun onOpenPopup(extension: WebExtension, action: WebExtension.Action): GeckoResult<GeckoSession>? =
-            popupHost?.invoke(extension)
+            try {
+                popupHost?.invoke(extension)
+            } catch (t: Throwable) {
+                Log.e(TAG, "popup failed", t)
+                null
+            }
     }
 
     private val tabDelegate = object : WebExtension.TabDelegate {
@@ -200,6 +209,24 @@ class ExtensionManager(
         val r = if (enabled) controller.enable(ext, WebExtensionController.EnableSource.USER)
         else controller.disable(ext, WebExtensionController.EnableSource.USER)
         r.accept({ done() }, { e -> say(e?.message ?: "error"); done() })
+    }
+
+    /** Enables/disables every installed add-on at once (quick CPU/RAM relief from Settings). */
+    fun setAllEnabled(enabled: Boolean, done: () -> Unit) {
+        list { exts ->
+            val targets = exts.filter { it.metaData.enabled != enabled }
+            if (targets.isEmpty()) {
+                done()
+                return@list
+            }
+            var remaining = targets.size
+            targets.forEach { ext ->
+                setEnabled(ext, enabled) {
+                    remaining--
+                    if (remaining == 0) done()
+                }
+            }
+        }
     }
 
     fun uninstall(ext: WebExtension, done: () -> Unit) {

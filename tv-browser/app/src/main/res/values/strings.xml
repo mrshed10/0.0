@@ -72,30 +72,87 @@
     <string name="tab_close">إغلاق التبويب</string>
 
     <!-- settings -->
-    <string name="set_home">الصفحة الرئيسية: %1$s</string>
     <string name="set_home_title">الصفحة الرئيسية</string>
-    <string name="set_search">محرك البحث: %1$s</string>
     <string name="set_search_title">محرك البحث</string>
-    <string name="set_max_tabs">أقصى عدد للتبويبات: %1$d</string>
     <string name="set_max_tabs_title">أقصى عدد للتبويبات</string>
-    <string name="set_live_tabs">تبويبات نشطة في الذاكرة: %1$d (الباقي يُجمَّد)</string>
     <string name="set_live_tabs_title">تبويبات نشطة في الذاكرة</string>
-    <string name="set_cursor_speed">سرعة المؤشر: %1$d</string>
     <string name="set_cursor_speed_title">سرعة المؤشر</string>
-    <string name="set_click_mouse">طريقة النقر: ماوس (يدعم التمرير فوق القوائم)</string>
-    <string name="set_click_touch">طريقة النقر: لمس</string>
-    <string name="set_page_volume_on">السماح للمواقع بالتحكم بالصوت (tvDevice): نعم</string>
-    <string name="set_page_volume_off">السماح للمواقع بالتحكم بالصوت (tvDevice): لا</string>
-    <string name="set_system_volume_ui">إظهار شريط صوت النظام أيضاً: %1$s</string>
-    <string name="set_clear_data">مسح بيانات التصفح (الكوكيز والذاكرة المؤقتة)</string>
-    <string name="set_about_config">إعدادات المحرك المتقدمة (about:config)</string>
-    <string name="set_memory">الذاكرة: %1$d / %2$d MB متاحة · %3$d من %4$d تبويب نشط · اضغط للتحرير</string>
     <string name="data_cleared">تم مسح البيانات</string>
-    <string name="memory_freed">تم تجميد التبويبات الخلفية</string>
+    <string name="memory_freed">تم تحرير الذاكرة</string>
 
     <string-array name="search_engines">
         <item>Google</item>
         <item>DuckDuckGo</item>
         <item>Bing</item>
     </string-array>
+
+    <!-- v1.1: quick access, settings, stability -->
+    <string name="quick_access">الوصول السريع</string>
+    <string name="quick_title">★ الوصول السريع · الذاكرة المتاحة: %1$s · (OK فتح · ضغط مطوّل/MENU تعديل)</string>
+    <string name="bookmark_this">إضافة الصفحة للمفضلة</string>
+    <string name="bm_add">إضافة موقع</string>
+    <string name="bm_add_item">➕  إضافة موقع جديد</string>
+    <string name="bm_edit">تعديل الموقع</string>
+    <string name="bm_open">فتح</string>
+    <string name="bm_move_up">نقل للأمام</string>
+    <string name="bm_move_down">نقل للخلف</string>
+    <string name="bm_delete">حذف</string>
+    <string name="bm_delete_confirm">حذف %1$s من المفضلة؟</string>
+    <string name="bm_manage">إدارة المواقع المفضلة</string>
+    <string name="bm_reset">↺  استعادة المواقع الافتراضية</string>
+    <string name="bm_title_hint">اسم الموقع</string>
+    <string name="save">حفظ</string>
+    <string name="count_sites">%1$d مواقع</string>
+
+    <string name="on">مفعّل</string>
+    <string name="off">متوقف</string>
+    <string name="none">لا يوجد</string>
+    <string name="every_min">كل %1$d دقيقة</string>
+    <string name="custom_url">عنوان مخصص…</string>
+    <string name="are_you_sure">هل أنت متأكد؟</string>
+
+    <string name="sec_general">عام</string>
+    <string name="sec_quick">الوصول السريع والمفضلة</string>
+    <string name="sec_adblock">حجب الإعلانات والإضافات</string>
+    <string name="sec_performance">الأداء والذاكرة (1GB)</string>
+    <string name="sec_data">البيانات والخصوصية</string>
+    <string name="sec_remote">الريموت والصوت</string>
+    <string name="sec_diag">التشخيص</string>
+
+    <string name="set_home_title">الصفحة الرئيسية</string>
+    <string name="set_search_title">محرك البحث</string>
+    <string name="set_restore_tabs">استعادة التبويبات عند التشغيل</string>
+    <string name="set_adblock_builtin">مانع الإعلانات المدمج (خفيف جداً)</string>
+    <string name="set_extensions_all">تشغيل كل الإضافات (uBlock وغيرها)</string>
+    <string name="ext_all_on">تم تفعيل الإضافات</string>
+    <string name="ext_all_off">تم تعطيل الإضافات (أخف على المعالج والذاكرة)</string>
+    <string name="set_live_tabs_title">صفحات تبقى في الذاكرة</string>
+    <string name="set_max_tabs_title">أقصى عدد للتبويبات</string>
+    <string name="set_cache_interval">مسح الذاكرة المؤقتة تلقائياً</string>
+    <string name="set_cpu_saver">توفير المعالج (30 إطاراً/ث)</string>
+    <string name="set_h264">فيديو H.264 خفيف (يوتيوب)</string>
+    <string name="set_block_images">إيقاف تحميل الصور</string>
+    <string name="set_free_memory">تحرير الذاكرة الآن</string>
+    <string name="set_clear_cache">مسح الذاكرة المؤقتة (Cache)</string>
+    <string name="set_clear_cookies">مسح الكوكيز وبيانات المواقع</string>
+    <string name="set_clear_all">مسح كل بيانات التصفح</string>
+    <string name="set_clear_on_exit">مسح البيانات عند الخروج</string>
+    <string name="set_cursor_speed_title">سرعة المؤشر</string>
+    <string name="set_click_title">طريقة النقر</string>
+    <string name="click_mouse">ماوس (يدعم القوائم المنسدلة)</string>
+    <string name="click_touch">لمس</string>
+    <string name="set_page_volume">السماح للمواقع بالتحكم بالصوت</string>
+    <string name="set_system_volume_ui">إظهار شريط صوت النظام</string>
+    <string name="set_restart">إعادة تشغيل المتصفح</string>
+    <string name="set_last_crash">آخر تقرير توقف</string>
+    <string name="set_about_config">إعدادات المحرك المتقدمة (about:config)</string>
+    <string name="soft_errors">أخطاء تمت معالجتها دون توقف:</string>
+
+    <string name="restart_needed">⟳ بعض الإعدادات تتطلب إعادة تشغيل المتصفح (الإعدادات ← التشخيص)</string>
+    <string name="restart_needed_short">مطلوبة ⟳</string>
+    <string name="safe_mode_started">الوضع الآمن: توقف المتصفح سابقاً، لذلك لم تُحمَّل آخر صفحة</string>
+    <string name="crash_title">توقف المتصفح في المرة السابقة</string>
+    <string name="crash_message">تم حفظ التقرير. إذا تكرر ذلك، صوّر هذه الشاشة وأرسلها للمطوّر.</string>
+    <string name="page_reloaded_memory">نفدت الذاكرة فأُعيد تحميل الصفحة</string>
+    <string name="page_too_heavy">هذه الصفحة ثقيلة جداً على ذاكرة الجهاز، فتمت العودة للوصول السريع</string>
 </resources>
