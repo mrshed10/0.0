@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">قارئ الميلان</string>
+    <string name="channel_name">قراءة الميلان</string>
+    <string name="channel_desc">إشعار صامت مطلوب من النظام لتشغيل القراءة في الخلفية</string>
+    <string name="notif_title">قراءة الميلان تعمل</string>
+    <string name="notif_text">يتم قراءة حركة الجهاز في الخلفية</string>
+    <string name="waiting">بانتظار قراءات الحساسات…</string>
+    <string name="recalibrate">إعادة المعايرة (الوضع الحالي = صفر)</string>
+    <string name="stop_service">إيقاف القراءة في الخلفية</string>
+    <string name="start_service">تشغيل القراءة</string>
+    <string name="no_sensors">الجهاز لا يحتوي على حساس التسارع أو المغناطيس</string>
+</resources>
