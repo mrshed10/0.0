@@ -14,7 +14,6 @@ enum class Vertical(val label: String) { UP("أعلى"), CENTER("وسط"), DOWN(
 data class TiltReading(
     val pitch: Float,      // أعلى(+)/أسفل(-)
     val roll: Float,       // يمين(+)/يسار(-)
-    val azimuth: Float,    // دوران حول المحور العمودي (البوصلة)
     val horizontal: Horizontal,
     val vertical: Vertical,
     val timestamp: Long
@@ -31,6 +30,10 @@ object TiltState {
     private val _running = MutableStateFlow(false)
     val running: StateFlow<Boolean> = _running.asStateFlow()
 
+    /** true إذا تبيّن أن الجهاز لا يحتوي على حساس تسارع */
+    private val _sensorMissing = MutableStateFlow(false)
+    val sensorMissing: StateFlow<Boolean> = _sensorMissing.asStateFlow()
+
     internal fun publish(r: TiltReading) {
         _reading.value = r
     }
@@ -38,5 +41,9 @@ object TiltState {
     internal fun setRunning(value: Boolean) {
         _running.value = value
         if (!value) _reading.value = null
+    }
+
+    internal fun setSensorMissing(value: Boolean) {
+        _sensorMissing.value = value
     }
 }

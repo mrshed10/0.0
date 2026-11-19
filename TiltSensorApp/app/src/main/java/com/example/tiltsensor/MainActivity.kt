@@ -39,10 +39,9 @@ class MainActivity : AppCompatActivity() {
         btnCalibrate = findViewById(R.id.btnCalibrate)
         btnToggle = findViewById(R.id.btnToggle)
 
-        if (!hasRequiredSensors()) {
-            tvDirection.setText(R.string.no_sensors)
-            btnCalibrate.isEnabled = false
-            btnToggle.isEnabled = false
+        // التحقق أولاً من وجود حساس التسارع؛ بدونه لا نشغّل الخدمة أصلاً
+        if (!hasAccelerometer()) {
+            showSensorMissing()
             return
         }
 
@@ -72,10 +71,15 @@ class MainActivity : AppCompatActivity() {
                             tvDirection.text = "${r.horizontal.label} / ${r.vertical.label}"
                             tvValues.text = String.format(
                                 Locale.US,
-                                "يمين/يسار (Roll):  %6.1f°\nأعلى/أسفل (Pitch): %6.1f°\nالدوران (Azimuth): %6.1f°",
-                                r.roll, r.pitch, r.azimuth
+                                "يمين/يسار (Roll):  %6.1f°\nأعلى/أسفل (Pitch): %6.1f°",
+                                r.roll, r.pitch
                             )
                         }
+                    }
+                }
+                launch {
+                    TiltState.sensorMissing.collect { missing ->
+                        if (missing) showSensorMissing()
                     }
                 }
                 launch {
@@ -100,11 +104,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun hasRequiredSensors(): Boolean {
-        val sm = getSystemService(SENSOR_SERVICE) as SensorManager
-        val ok = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null &&
-            sm.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) != null
-        if (!ok) Toast.makeText(this, R.string.no_sensors, Toast.LENGTH_LONG).show()
-        return ok
+    private fun hasAccelerometer(): Boolean {
+        val sm = getSystemService(SENSOR_SERVICE) as? SensorManager ?: return false
+        return sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null
+    }
+
+    private fun showSensorMissing() {
+        tvDirection.setText(R.string.no_sensors)
+        tvValues.text = ""
+        btnCalibrate.isEnabled = false
+        btnToggle.isEnabled = false
+        Toast.makeText(this, R.string.no_sensors, Toast.LENGTH_LONG).show()
     }
 }

@@ -20,9 +20,11 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import kotlin.math.sqrt
 
 /**
- * خدمة في المقدمة (Foreground Service) تقرأ الحساسات باستمرار حتى لو خرجت من التطبيق.
+ * خدمة في المقدمة (Foreground Service) تقرأ حساس التسارع فقط باستمرار حتى لو خرجت من التطبيق.
+ * لا تحتاج مغناطيس ولا جيروسكوب. إذا لم يوجد حساس تسارع تتوقف بأمان بدون انهيار.
  * لا ترسم أي شيء على الشاشة ولا تستخدم نوافذ عائمة. الإشعار الوحيد صامت وبأقل أولوية،
  * وهو شرط إلزامي من نظام أندرويد لأي خدمة تعمل في الخلفية بشكل مستمر.
  */
@@ -55,7 +57,6 @@ class TiltSensorService : Service(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var accelerometer: Sensor? = null
-    private var magnetometer: Sensor? = null
 
     // نقرأ الحساسات في خيط منفصل حتى لا نثقل الخيط الرئيسي
     private var sensorThread: HandlerThread? = null
@@ -72,16 +73,13 @@ class TiltSensorService : Service(), SensorEventListener {
         super.onCreate()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
         createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                stopListening()
-                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                stopSafely()
                 return START_NOT_STICKY
             }
             ACTION_RECALIBRATE -> {
@@ -100,6 +98,8 @@ class TiltSensorService : Service(), SensorEventListener {
         } else {
             0
         }
+        // نستدعي startForeground أولاً دائماً، لأن النظام يُنهي التطبيق إذا بدأت الخدمة
+        // عبر startForegroundService ثم توقفت قبل استدعائها.
         try {
             ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), type)
         } catch (e: Exception) {
@@ -107,18 +107,28 @@ class TiltSensorService : Service(), SensorEventListener {
             stopSelf()
             return
         }
-        startListening()
+        if (!startListening()) {
+            stopSafely()
+        }
     }
 
-    private fun startListening() {
-        if (listening) return
+    /** إيقاف آمن: إزالة الإشعار وإنهاء الخدمة بدون أي استثناء */
+    private fun stopSafely() {
+        stopListening()
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    /** يرجع true إذا بدأت القراءة بنجاح */
+    private fun startListening(): Boolean {
+        if (listening) return true
         val acc = accelerometer
-        val mag = magnetometer
-        if (acc == null || mag == null) {
-            Log.e(TAG, "الحساسات غير متوفرة: accelerometer=$acc magnetometer=$mag")
-            stopSelf()
-            return
+        if (acc == null) {
+            Log.e(TAG, "حساس التسارع غير متوفر في هذا الجهاز — إيقاف الخدمة")
+            TiltState.setSensorMissing(true)
+            return false
         }
+        TiltState.setSensorMissing(false)
 
         val thread = HandlerThread("TiltSensorThread").apply { start() }
         sensorThread = thread
@@ -126,11 +136,23 @@ class TiltSensorService : Service(), SensorEventListener {
         sensorHandler = handler
 
         processor.recalibrate()
-        sensorManager.registerListener(this, acc, SensorManager.SENSOR_DELAY_GAME, handler)
-        sensorManager.registerListener(this, mag, SensorManager.SENSOR_DELAY_GAME, handler)
+        val ok = try {
+            sensorManager.registerListener(this, acc, SensorManager.SENSOR_DELAY_GAME, handler)
+        } catch (e: Exception) {
+            Log.e(TAG, "فشل تسجيل حساس التسارع", e)
+            false
+        }
+        if (!ok) {
+            Log.e(TAG, "النظام رفض تسجيل حساس التسارع")
+            thread.quitSafely()
+            sensorThread = null
+            sensorHandler = null
+            return false
+        }
         listening = true
         TiltState.setRunning(true)
-        Log.i(TAG, "بدأت قراءة الحساسات")
+        Log.i(TAG, "بدأت قراءة حساس التسارع")
+        return true
     }
 
     private fun stopListening() {
@@ -141,17 +163,16 @@ class TiltSensorService : Service(), SensorEventListener {
         sensorHandler = null
         listening = false
         TiltState.setRunning(false)
-        Log.i(TAG, "توقفت قراءة الحساسات")
+        Log.i(TAG, "توقفت قراءة حساس التسارع")
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        when (event.sensor.type) {
-            Sensor.TYPE_ACCELEROMETER -> processor.onAccelerometer(event.values)
-            Sensor.TYPE_MAGNETIC_FIELD -> processor.onMagnetometer(event.values)
-            else -> return
-        }
+        if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
+        val v = event.values
+        val magnitude = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+        processor.onAccelerometer(v)
 
-        val reading = processor.compute(System.currentTimeMillis()) ?: return
+        val reading = processor.compute(magnitude, System.currentTimeMillis()) ?: return
 
         if (event.timestamp - lastPublishNs < publishIntervalNs) return
         lastPublishNs = event.timestamp
@@ -164,11 +185,7 @@ class TiltSensorService : Service(), SensorEventListener {
     }
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-        if (sensor.type == Sensor.TYPE_MAGNETIC_FIELD &&
-            accuracy == SensorManager.SENSOR_STATUS_UNRELIABLE
-        ) {
-            Log.w(TAG, "دقة المغناطيس منخفضة — حرّك الجهاز على شكل 8 للمعايرة")
-        }
+        // حساس التسارع لا يحتاج معايرة من المستخدم؛ لا شيء هنا
     }
 
     override fun onDestroy() {

@@ -9,5 +9,5 @@
     <string name="recalibrate">إعادة المعايرة (الوضع الحالي = صفر)</string>
     <string name="stop_service">إيقاف القراءة في الخلفية</string>
     <string name="start_service">تشغيل القراءة</string>
-    <string name="no_sensors">الجهاز لا يحتوي على حساس التسارع أو المغناطيس</string>
+    <string name="no_sensors">الجهاز لا يحتوي على حساس التسارع (Accelerometer)، لا يمكن قراءة الميلان</string>
 </resources>

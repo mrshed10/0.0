@@ -7,8 +7,8 @@
     <!-- أندرويد 13+ : إذن الإشعارات (اختياري، الخدمة تعمل حتى لو رُفض) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true" />
-    <uses-feature android:name="android.hardware.sensor.compass" android:required="true" />
+    <!-- required="false" حتى يتثبت التطبيق على أي جهاز؛ التحقق من الحساس يتم داخل الكود -->
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -33,7 +33,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Continuous device tilt reading using accelerometer and magnetometer" />
+                android:value="Continuous device tilt reading using the accelerometer" />
         </service>
     </application>
 </manifest>
