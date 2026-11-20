@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- شاشة الإعدادات -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layoutDirection="rtl">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- المساحة القصوى -->
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/max_storage"
+            app:helperText="@string/max_storage_help">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etMaxGb"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="numberDecimal" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- مدة المقطع -->
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:hint="@string/segment_minutes">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etSegment"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <!-- الجودة -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/quality"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgQuality"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <RadioButton
+                android:id="@+id/rbSd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/quality_sd" />
+
+            <RadioButton
+                android:id="@+id/rbHd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/quality_hd" />
+
+            <RadioButton
+                android:id="@+id/rbFhd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/quality_fhd" />
+        </RadioGroup>
+
+        <!-- الكاميرا -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/camera"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/rgCamera"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rbBack"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/camera_back" />
+
+            <RadioButton
+                android:id="@+id/rbFront"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="24dp"
+                android:text="@string/camera_front" />
+        </RadioGroup>
+
+        <!-- الصوت -->
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/swAudio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/record_audio" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:alpha="0.7"
+            android:text="@string/settings_note"
+            android:textSize="12sp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/save"
+            android:textSize="17sp" />
+
+        <!-- البطارية -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="@string/battery_section"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvBatteryStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnBattery"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/battery_button" />
+
+        <!-- التخزين -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="@string/storage_section"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvStorageInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textIsSelectable="true"
+            android:textSize="13sp" />
+    </LinearLayout>
+</ScrollView>

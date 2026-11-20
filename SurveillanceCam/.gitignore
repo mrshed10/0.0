@@ -1,0 +1,7 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+# نُبقي ملف الـ wrapper ليعمل ./gradlew مباشرة
+!gradle/wrapper/gradle-wrapper.jar

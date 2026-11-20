@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">كاميرا المراقبة</string>
+    <string name="title_clips">المقاطع المسجلة</string>
+    <string name="title_settings">الإعدادات</string>
+
+    <!-- الشاشة الرئيسية -->
+    <string name="start_recording">بدء التسجيل</string>
+    <string name="stop_recording">إيقاف التسجيل</string>
+    <string name="btn_clips">المقاطع</string>
+    <string name="btn_blackout">شاشة سوداء</string>
+    <string name="btn_settings">الإعدادات</string>
+    <string name="status_idle">متوقف — اضغط «بدء التسجيل»</string>
+    <string name="blackout_hint">التسجيل مستمر في الخلفية\nالمس الشاشة مرتين للعودة</string>
+
+    <!-- قائمة المقاطع -->
+    <string name="no_clips">لا توجد مقاطع مسجلة بعد</string>
+    <string name="cd_play">تشغيل</string>
+    <string name="cd_lock">قفل / حماية المقطع</string>
+    <string name="cd_delete">حذف المقطع</string>
+
+    <!-- الإعدادات -->
+    <string name="max_storage">الحد الأقصى لمساحة التسجيلات (جيجابايت)</string>
+    <string name="max_storage_help">عند الوصول للحد يُحذف أقدم مقطع غير مقفل تلقائياً.</string>
+    <string name="segment_minutes">مدة المقطع الواحد (دقائق)</string>
+    <string name="quality">جودة الفيديو</string>
+    <string name="quality_sd">منخفضة 480p</string>
+    <string name="quality_hd">عالية 720p</string>
+    <string name="quality_fhd">كاملة 1080p</string>
+    <string name="camera">الكاميرا</string>
+    <string name="camera_back">الخلفية</string>
+    <string name="camera_front">الأمامية</string>
+    <string name="record_audio">تسجيل الصوت</string>
+    <string name="battery_section">البطارية والعمل الطويل</string>
+    <string name="battery_button">ضبط البطارية على «غير مقيدة»</string>
+    <string name="storage_section">التخزين</string>
+    <string name="save">حفظ</string>
+    <string name="settings_note">تُطبَّق الجودة والكاميرا والصوت عند بدء التسجيل التالي، أما المساحة ومدة المقطع فتُطبَّق من المقطع التالي مباشرة.</string>
+</resources>
