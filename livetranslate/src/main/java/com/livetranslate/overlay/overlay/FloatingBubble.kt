@@ -27,7 +27,7 @@ import kotlin.math.roundToInt
 /**
  * زر عائم صغير يلتصق بحافة الشاشة الجانبية ويختفي جزئياً خلفها حتى لا يعيق التصفح:
  * - نقرة: تشغيل/إيقاف مؤقت للترجمة (أول نقرة تبدأ الجلسة).
- * - ضغطة مطوّلة: إنهاء جلسة الترجمة (أو إخفاء الزر إن لم تكن هناك جلسة).
+ * - ضغطة مطوّلة: قائمة صغيرة بجانب الزر: «واي فاي» (لوحة الواي فاي مباشرة) و«إنهاء» (إنهاء الجلسة أو إخفاء الزر).
  * - سحب: يتحرك بحرية ثم ينجذب لأقرب حافة جانبية عند الإفلات.
  * بعد ثوانٍ من عدم اللمس يصبح شبه شفاف.
  */
@@ -41,6 +41,7 @@ class FloatingBubble(
     interface Listener {
         fun onBubbleTap()
         fun onBubbleLongPress()
+        fun onBubbleWifi()
         fun onBubbleMoved(bounds: Box)
     }
 
@@ -53,6 +54,8 @@ class FloatingBubble(
     private val main = Handler(Looper.getMainLooper())
     private val view = BubbleView(context)
     private var snapAnimator: ValueAnimator? = null
+    private var menu: MenuView? = null
+    private val hideMenuRunnable = Runnable { hideMenu() }
 
     private val params = WindowManager.LayoutParams(
         size, size, windowType,
@@ -84,6 +87,7 @@ class FloatingBubble(
     }
 
     fun hide() {
+        hideMenu()
         snapAnimator?.cancel()
         main.removeCallbacksAndMessages(null)
         if (view.isAttachedToWindow) runCatching { wm.removeViewImmediate(view) }
@@ -109,6 +113,92 @@ class FloatingBubble(
         if (!view.isAttachedToWindow) return null
         val m = ScreenMetrics.of(context)
         return Box(params.x.coerceAtLeast(0), params.y, (params.x + size).coerceAtMost(m.width), params.y + size)
+    }
+
+    // ---------------------------------------------------------------- القائمة الصغيرة
+
+    private fun showMenu() {
+        hideMenu()
+        val m = ScreenMetrics.of(context)
+        val button = (40 * density).roundToInt()
+        val gap = (8 * density).roundToInt()
+        val menuView = MenuView(context, button, gap)
+        val width = button * 2 + gap * 3
+        val height = button + gap * 2
+        val onRight = params.x + size / 2 > m.width / 2
+        val menuParams = WindowManager.LayoutParams(
+            width, height, windowType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            windowAnimations = 0
+            title = "LiveTranslateBubbleMenu"
+            // بجانب الزر من جهة منتصف الشاشة
+            val visibleLeft = params.x.coerceAtLeast(0)
+            val visibleRight = (params.x + size).coerceAtMost(m.width)
+            x = if (onRight) visibleLeft - width else visibleRight
+            y = (params.y + size / 2 - height / 2).coerceIn(0, (m.height - height).coerceAtLeast(0))
+        }
+        if (runCatching { wm.addView(menuView, menuParams) }.isSuccess) {
+            menu = menuView
+            main.postDelayed(hideMenuRunnable, MENU_TIMEOUT_MS)
+        }
+    }
+
+    private fun hideMenu() {
+        main.removeCallbacks(hideMenuRunnable)
+        val m = menu ?: return
+        menu = null
+        if (m.isAttachedToWindow) runCatching { wm.removeViewImmediate(m) }
+    }
+
+    /** زرّان دائريان: واي فاي، وإنهاء. لمسة خارجها تغلقها. */
+    @SuppressLint("ViewConstructor")
+    private inner class MenuView(context: Context, private val button: Int, private val gap: Int) : View(context) {
+        private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val wifiIcon = ContextCompat.getDrawable(context, R.drawable.ic_wifi)!!.mutate()
+        private val closeIcon = ContextCompat.getDrawable(context, R.drawable.ic_close)!!.mutate()
+
+        private fun centerX(index: Int) = gap + button / 2f + index * (button + gap)
+
+        override fun onDraw(canvas: Canvas) {
+            val cy = height / 2f
+            val r = button / 2f
+            val inset = (button * 0.25f).roundToInt()
+            listOf(0xF21A73E8.toInt() to wifiIcon, 0xF2D93025.toInt() to closeIcon).forEachIndexed { i, (color, icon) ->
+                val cx = centerX(i)
+                fill.color = color
+                canvas.drawCircle(cx, cy, r, fill)
+                icon.setTint(Color.WHITE)
+                icon.setBounds(
+                    (cx - r + inset).roundToInt(), (cy - r + inset).roundToInt(),
+                    (cx + r - inset).roundToInt(), (cy + r - inset).roundToInt(),
+                )
+                icon.draw(canvas)
+            }
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_OUTSIDE -> hideMenu()
+                MotionEvent.ACTION_UP -> {
+                    val r = button / 2f
+                    val hit = (0..1).firstOrNull { hypot(event.x - centerX(it), event.y - height / 2f) <= r }
+                    if (hit != null) {
+                        performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                        hideMenu()
+                        if (hit == 0) listener.onBubbleWifi() else listener.onBubbleLongPress()
+                    }
+                }
+            }
+            return true
+        }
     }
 
     private fun edgeX(right: Boolean, screenWidth: Int) = if (right) screenWidth - size + hidden else -hidden
@@ -164,7 +254,7 @@ class FloatingBubble(
         private val longPress = Runnable {
             longPressed = true
             performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-            listener.onBubbleLongPress()
+            showMenu()
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -191,6 +281,7 @@ class FloatingBubble(
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    hideMenu()
                     snapAnimator?.cancel()
                     downRawX = event.rawX
                     downRawY = event.rawY
@@ -233,6 +324,7 @@ class FloatingBubble(
     }
 
     private companion object {
+        const val MENU_TIMEOUT_MS = 4000L
         val FADE_TOKEN = Any()
     }
 }

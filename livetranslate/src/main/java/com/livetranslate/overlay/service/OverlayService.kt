@@ -26,6 +26,7 @@ import com.livetranslate.overlay.R
 import com.livetranslate.overlay.capture.Box
 import com.livetranslate.overlay.overlay.FloatingBubble
 import com.livetranslate.overlay.translate.OcrPackStore
+import com.livetranslate.overlay.util.WifiShortcuts
 import com.livetranslate.overlay.a11y.TranslateAccessibilityService
 import com.livetranslate.overlay.capture.LiveTranslateController
 import com.livetranslate.overlay.capture.ScreenCapturer
@@ -384,6 +385,13 @@ class OverlayService : LifecycleService() {
                 prefs.bubbleEnabled = false
                 hideBubble()
                 stopIfIdle()
+            }
+        }
+
+        override fun onBubbleWifi() {
+            // لوحة الواي فاي السريعة فوق أي تطبيق (نافذة ظاهرة + إذن الظهور يسمحان بفتحها من الخلفية)
+            runCatching {
+                startActivity(WifiShortcuts.panelIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
         }
 
