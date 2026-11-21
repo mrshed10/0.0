@@ -38,6 +38,10 @@ import androidx.compose.material.icons.rounded.Accessibility
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material.icons.rounded.WifiOff
+import androidx.compose.runtime.DisposableEffect
+import com.livetranslate.overlay.util.WifiShortcuts
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Notifications
@@ -333,6 +337,8 @@ private fun SetupScreen() {
             ) { Text(stringResource(R.string.stop_translation)) }
         }
 
+        WifiCard()
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             FilledTonalButton(
                 onClick = { requestAddTile(context) },
@@ -400,6 +406,46 @@ private fun requestAddTile(context: Context) {
         Icon.createWithResource(context, R.drawable.ic_stat_translate),
         ContextCompat.getMainExecutor(context),
     ) { }
+}
+
+/** تحكم مباشر بالواي فاي: حالة الاتصال + لوحة النظام السريعة + الإعدادات الكاملة. */
+@Composable
+private fun WifiCard() {
+    val context = LocalContext.current
+    var connected by remember { mutableStateOf(WifiShortcuts.isWifiConnected(context)) }
+    DisposableEffect(Unit) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        val stop = WifiShortcuts.observe(context) { value -> main.post { connected = value } }
+        onDispose { stop() }
+    }
+    SectionCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (connected) Icons.Rounded.Wifi else Icons.Rounded.WifiOff, null,
+                tint = if (connected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.wifi_title), fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(if (connected) R.string.wifi_connected else R.string.wifi_disconnected),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = { runCatching { context.startActivity(WifiShortcuts.panelIntent()) } },
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.wifi_quick)) }
+            OutlinedButton(
+                onClick = { runCatching { context.startActivity(WifiShortcuts.settingsIntent()) } },
+                modifier = Modifier.weight(1f),
+            ) { Text(stringResource(R.string.wifi_settings)) }
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

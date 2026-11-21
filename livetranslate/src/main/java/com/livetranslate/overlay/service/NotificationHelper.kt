@@ -9,6 +9,7 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import com.livetranslate.overlay.MainActivity
 import com.livetranslate.overlay.R
+import com.livetranslate.overlay.util.WifiShortcuts
 
 /**
  * إشعار الخدمة الأمامية (شرط النظام لبقاء الترجمة تعمل في الخلفية).
@@ -33,6 +34,10 @@ object NotificationHelper {
         val stop = PendingIntent.getService(
             context, 1, OverlayService.intent(context, OverlayService.ACTION_STOP), flags,
         )
+        // لوحة الواي فاي السريعة مباشرة من الإشعار
+        val wifi = PendingIntent.getActivity(
+            context, 3, WifiShortcuts.panelIntent().addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), flags,
+        )
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_translate)
             .setContentTitle(context.getString(R.string.notif_title_active))
@@ -43,6 +48,7 @@ object NotificationHelper {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .addAction(0, context.getString(R.string.notif_action_wifi), wifi)
             .addAction(0, context.getString(R.string.notif_action_stop), stop)
             .build()
     }

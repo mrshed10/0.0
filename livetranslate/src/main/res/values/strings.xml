@@ -14,6 +14,7 @@
     <string name="notif_text_downloading">تجهيز حزمة %1$s في الخلفية…</string>
     <string name="notif_text_error">تعذّرت الترجمة: %1$s</string>
     <string name="notif_action_stop">إيقاف</string>
+    <string name="notif_action_wifi">واي فاي</string>
 
     <!-- خدمة إمكانية الوصول -->
     <string name="a11y_description">تُستخدم فقط لعرض الترجمة فوق النص الأصلي بعتامة كاملة مع بقاء اللمس والتمرير يعملان. لا تقرأ هذه الخدمة أي محتوى ولا تجمع أي بيانات.</string>
@@ -45,6 +46,11 @@
     <string name="extra_langs_body">لغات بحروف لا يقرؤها المحرك المضمّن (السيريلية، العربية، العبرية، اليونانية، التايلاندية…). اضغط اللغة لتنزيل حزمة قراءتها وترجمتها مرة واحدة؛ الروسية مُضافة تلقائياً. كل لغة مضافة تبطئ القراءة قليلاً (حتى 3 لغات معاً).</string>
     <string name="start_translation">بدء الترجمة الفورية</string>
     <string name="stop_translation">إيقاف الترجمة</string>
+    <string name="wifi_title">شبكة الواي فاي</string>
+    <string name="wifi_connected">متصل بشبكة واي فاي</string>
+    <string name="wifi_disconnected">غير متصل بالواي فاي</string>
+    <string name="wifi_quick">التحكم السريع</string>
+    <string name="wifi_settings">إعدادات الواي فاي</string>
     <string name="add_tile">إضافة زر «ترجمة الشاشة» للإعدادات السريعة</string>
     <string name="how_title">طريقة الاستخدام</string>
     <string name="how_body">١. اختر اللغتين وانتظر علامة «حزم اللغات جاهزة».\n٢. اضغط «بدء الترجمة الفورية» (أو زر الإعدادات السريعة) ووافق على التقاط الشاشة.\n٣. افتح أي تطبيق ومرّر بحرية: تحل الترجمة محل النص فور توقف الشاشة، والنص العمودي يُعرض مترجماً أفقياً.\n٤. الزر العائم على الحافة: نقرة للتشغيل/الإيقاف المؤقت، وضغطة مطوّلة لإنهاء الجلسة.
