@@ -23,3 +23,7 @@ jobs:
         with:
           name: saudi-salaries-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onetap-assist-debug-apk
+          path: onetap/build/outputs/apk/debug/*.apk

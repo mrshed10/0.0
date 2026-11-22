@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">مساعد بنقرة</string>
+    <string name="app_title">مساعد بنقرة واحدة</string>
+
+    <string name="section_setup">الإعداد</string>
+    <string name="perm_overlay_title">الظهور فوق التطبيقات الأخرى</string>
+    <string name="perm_overlay_desc">مطلوب لإظهار الزر العائم فوق التطبيقات الأخرى.</string>
+    <string name="perm_notif_title">الإشعارات (اختياري)</string>
+    <string name="perm_notif_desc">إشعار صغير فيه أزرار إظهار / إخفاء / إيقاف.</string>
+    <string name="status_granted">مُفعّل</string>
+    <string name="status_required">مطلوب</string>
+    <string name="status_off">غير مفعّل</string>
+    <string name="action_grant">منح الإذن</string>
+    <string name="action_allow">سماح</string>
+
+    <string name="button_state_running">الزر العائم ظاهر على الشاشة</string>
+    <string name="button_state_hidden">الزر العائم مخفي</string>
+    <string name="button_state_stopped">الزر العائم متوقف</string>
+    <string name="action_start">تشغيل الزر العائم</string>
+    <string name="action_stop">إيقاف</string>
+    <string name="action_show">إظهار</string>
+    <string name="action_hide">إخفاء</string>
+    <string name="action_test">جرّب إجراء النقر الآن</string>
+    <string name="need_overlay_first">فعّل إذن \"الظهور فوق التطبيقات\" أولاً.</string>
+
+    <string name="section_appearance">الزر العائم</string>
+    <string name="setting_size">الحجم: %1$d dp</string>
+    <string name="setting_opacity">الشفافية: %1$d%% ظاهر</string>
+    <string name="setting_snap">تثبيت على حافة الشاشة</string>
+    <string name="setting_snap_desc">ينزلق إلى أقرب حافة بعد تحريكه.</string>
+    <string name="setting_autohide">إخفاء تلقائي عند إطفاء الشاشة</string>
+    <string name="setting_autohide_desc">يختفي والشاشة مطفأة ويعود بعد فتح القفل.</string>
+    <string name="setting_haptics">اهتزاز عند النقر</string>
+
+    <string name="section_action">إجراء النقر</string>
+    <string name="tap_assist">مساعد النظام</string>
+    <string name="tap_assist_desc">ACTION_ASSIST — يفتح المساعد الرقمي الافتراضي (Gemini / مساعد Google / مدخل البحث بالدائرة حسب الجهاز).</string>
+    <string name="tap_voice">المساعد الصوتي</string>
+    <string name="tap_voice_desc">ACTION_VOICE_COMMAND — يبدأ المساعد بالاستماع.</string>
+    <string name="tap_search">بحث النظام</string>
+    <string name="tap_search_desc">يفتح البحث العام في الجهاز.</string>
+    <string name="tap_fallback_only">التطبيق أو الاختصار المختار فقط</string>
+    <string name="tap_fallback_only_desc">يفتح دائماً الهدف البديل أدناه.</string>
+    <string name="setting_autofallback">استخدم البديل إذا منع النظام الإجراء</string>
+    <string name="fallback_target">الهدف البديل</string>
+    <string name="fallback_none">لم يُحدَّد</string>
+    <string name="action_change">تغيير</string>
+
+    <string name="fallback_pick_title">اختر البديل</string>
+    <string name="fallback_pick_app">تطبيق…</string>
+    <string name="fallback_pick_shortcut">اختصار تطبيق…</string>
+    <string name="fallback_pick_lens">عدسة Google (تطبيق Google)</string>
+    <string name="fallback_pick_uri">رابط أو Intent مخصص…</string>
+    <string name="fallback_clear">مسح البديل</string>
+    <string name="pick_app_title">اختر تطبيقاً</string>
+    <string name="pick_shortcut_title">اختر اختصاراً</string>
+    <string name="loading">جارٍ التحميل…</string>
+    <string name="empty_list">لا يوجد شيء.</string>
+    <string name="custom_uri_title">رابط أو Intent مخصص</string>
+    <string name="custom_uri_hint">مثال: googleapp://lens أو intent:#Intent;action=…;end</string>
+    <string name="custom_uri_invalid">الرابط غير صالح.</string>
+    <string name="custom_uri_label">رابط مخصص</string>
+    <string name="shortcut_unsupported">هذا الاختصار يستخدم واجهة التثبيت الحديثة التي لا يقرؤها إلا مشغّل الشاشة الرئيسية. اختر تطبيقاً بدلاً منه.</string>
+    <string name="cancel">إلغاء</string>
+    <string name="save">حفظ</string>
+
+    <string name="section_help">طريقة الاستخدام</string>
+    <string name="help_text">• انقر الزر: يفتح المساعد.\n• اسحبه: انقله لأي مكان وسيلتصق بالحافة.\n• اضغط مطولاً: إخفاء (أعده من الإشعار أو من هذه الشاشة).\n• اسحبه إلى ✕ أسفل الشاشة: إغلاق.</string>
+    <string name="help_note">ملاحظة: لا يوفّر Android واجهة عامة تسمح للتطبيقات الخارجية بفتح \"البحث بالدائرة\" مباشرة. الزر يفتح مساعدك الافتراضي عبر ACTION_ASSIST الرسمي، ومنه تستخدم ميزات الشاشة (اسأل عن الشاشة، الترجمة، البحث في الشاشة). إن منعه جهازك يُستخدم الهدف البديل.</string>
+
+    <string name="channel_name">الزر العائم</string>
+    <string name="channel_desc">يُبقي زر مساعد بنقرة يعمل.</string>
+    <string name="notif_title_visible">زر المساعد نشِط</string>
+    <string name="notif_title_hidden">زر المساعد مخفي</string>
+    <string name="notif_text">انقر لفتح الإعدادات.</string>
+    <string name="toast_launch_failed">تعذّر فتح المساعد. اختر تطبيقاً بديلاً من إعدادات التطبيق.</string>
+    <string name="toast_hidden">تم إخفاء الزر — أعده من الإشعار.</string>
+    <string name="cd_floating_button">تشغيل المساعد</string>
+</resources>

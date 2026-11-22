@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OneTap Assist</string>
+    <string name="app_title">OneTap Assist Trigger</string>
+
+    <!-- Status / permissions -->
+    <string name="section_setup">Setup</string>
+    <string name="perm_overlay_title">Display over other apps</string>
+    <string name="perm_overlay_desc">Required to show the floating button on top of other apps.</string>
+    <string name="perm_notif_title">Notifications (optional)</string>
+    <string name="perm_notif_desc">Shows a small notification with Show / Hide / Stop controls.</string>
+    <string name="status_granted">Granted</string>
+    <string name="status_required">Required</string>
+    <string name="status_off">Off</string>
+    <string name="action_grant">Grant</string>
+    <string name="action_allow">Allow</string>
+
+    <string name="button_state_running">Floating button is on screen</string>
+    <string name="button_state_hidden">Floating button is hidden</string>
+    <string name="button_state_stopped">Floating button is off</string>
+    <string name="action_start">Start floating button</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_show">Show</string>
+    <string name="action_hide">Hide</string>
+    <string name="action_test">Test tap action now</string>
+    <string name="need_overlay_first">Grant \"Display over other apps\" first.</string>
+
+    <!-- Appearance -->
+    <string name="section_appearance">Floating button</string>
+    <string name="setting_size">Size: %1$d dp</string>
+    <string name="setting_opacity">Transparency: %1$d%% visible</string>
+    <string name="setting_snap">Anchor to screen edge</string>
+    <string name="setting_snap_desc">Slides to the nearest side after you move it.</string>
+    <string name="setting_autohide">Auto-hide when the screen turns off</string>
+    <string name="setting_autohide_desc">Removed while the screen is off, back after unlock.</string>
+    <string name="setting_haptics">Vibrate on tap</string>
+
+    <!-- Tap action -->
+    <string name="section_action">Tap action</string>
+    <string name="tap_assist">System assistant</string>
+    <string name="tap_assist_desc">ACTION_ASSIST — opens your default digital assistant (Gemini / Google Assistant / Circle to Search entry, depending on device).</string>
+    <string name="tap_voice">Voice assistant</string>
+    <string name="tap_voice_desc">ACTION_VOICE_COMMAND — starts the assistant listening.</string>
+    <string name="tap_search">System search</string>
+    <string name="tap_search_desc">Opens the device\'s global search.</string>
+    <string name="tap_fallback_only">Chosen app or shortcut only</string>
+    <string name="tap_fallback_only_desc">Always open the fallback target below.</string>
+    <string name="setting_autofallback">Use fallback if the system blocks the action</string>
+    <string name="fallback_target">Fallback target</string>
+    <string name="fallback_none">None selected</string>
+    <string name="action_change">Change</string>
+
+    <string name="fallback_pick_title">Choose fallback</string>
+    <string name="fallback_pick_app">An app…</string>
+    <string name="fallback_pick_shortcut">An app shortcut…</string>
+    <string name="fallback_pick_lens">Google Lens (Google app)</string>
+    <string name="fallback_pick_uri">Custom intent / deep link…</string>
+    <string name="fallback_clear">Clear fallback</string>
+    <string name="pick_app_title">Choose an app</string>
+    <string name="pick_shortcut_title">Choose a shortcut</string>
+    <string name="loading">Loading…</string>
+    <string name="empty_list">Nothing found.</string>
+    <string name="custom_uri_title">Custom intent or deep link</string>
+    <string name="custom_uri_hint">e.g. googleapp://lens or intent:#Intent;action=…;end</string>
+    <string name="custom_uri_invalid">That is not a valid URI.</string>
+    <string name="custom_uri_label">Custom link</string>
+    <string name="shortcut_unsupported">This shortcut uses the newer pinning API that only home-screen launchers can read. Choose an app instead.</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+
+    <!-- Help -->
+    <string name="section_help">How to use</string>
+    <string name="help_text">• Tap the button: launch the assistant.\n• Drag: move it anywhere; it snaps to the edge.\n• Long-press: hide it (bring it back from the notification or this screen).\n• Drag onto the ✕ at the bottom: close it.</string>
+    <string name="help_note">Note: Android has no public API that lets third-party apps open Circle to Search directly. The button opens your default assistant through the official ACTION_ASSIST; from there you can use its screen features (Ask about screen, Translate, Search screen). If your device blocks it, the fallback target is used.</string>
+
+    <!-- Overlay / notification -->
+    <string name="channel_name">Floating button</string>
+    <string name="channel_desc">Keeps the OneTap floating button running.</string>
+    <string name="notif_title_visible">OneTap button is active</string>
+    <string name="notif_title_hidden">OneTap button is hidden</string>
+    <string name="notif_text">Tap to open settings.</string>
+    <string name="toast_launch_failed">Couldn\'t open the assistant. Choose a fallback app in OneTap settings.</string>
+    <string name="toast_hidden">OneTap button hidden — restore it from the notification.</string>
+    <string name="cd_floating_button">Launch assistant</string>
+</resources>
