@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- القائمة العائمة: خلفية معتمة (النقر عليها يغلق القائمة) ولوحة جانبية بجهة الزر العائم -->
+<com.tvtools.floatingmenu.overlay.KeyInterceptLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/menu_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/scrim"
+    android:clickable="true">
+
+    <LinearLayout
+        android:id="@+id/panel"
+        android:layout_width="@dimen/panel_width"
+        android:layout_height="match_parent"
+        android:layout_gravity="right|center_vertical"
+        android:layout_margin="24dp"
+        android:background="@drawable/bg_panel"
+        android:clickable="true"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- الرأس -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_apps"
+                android:tint="@color/accent" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:text="@string/menu_title"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextClock
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="12dp"
+                android:format12Hour="h:mm"
+                android:format24Hour="HH:mm"
+                android:textColor="@color/text_secondary"
+                android:textSize="18sp" />
+
+            <ImageButton
+                android:id="@+id/btn_close"
+                style="@style/TvIconButton"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:contentDescription="@string/close"
+                android:src="@drawable/ic_close" />
+        </LinearLayout>
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:orientation="vertical"
+                android:paddingBottom="8dp">
+
+                <!-- الصوت -->
+                <TextView
+                    style="@style/SectionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_volume" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageButton
+                        android:id="@+id/btn_vol_down"
+                        style="@style/TvIconButton"
+                        android:contentDescription="@string/volume_down"
+                        android:src="@drawable/ic_volume_down" />
+
+                    <SeekBar
+                        android:id="@+id/seek_volume"
+                        android:layout_width="0dp"
+                        android:layout_height="64dp"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_seek"
+                        android:focusable="true"
+                        android:paddingStart="20dp"
+                        android:paddingEnd="20dp"
+                        android:progressBackgroundTint="@color/track"
+                        android:progressTint="@color/accent"
+                        android:thumbTint="@color/accent" />
+
+                    <ImageButton
+                        android:id="@+id/btn_vol_up"
+                        style="@style/TvIconButton"
+                        android:contentDescription="@string/volume_up"
+                        android:src="@drawable/ic_volume_up" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:clipChildren="false"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_mute"
+                        style="@style/TvButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:drawableStart="@drawable/ic_volume_off"
+                        android:text="@string/mute" />
+
+                    <TextView
+                        android:id="@+id/txt_volume"
+                        android:layout_width="96dp"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:textColor="@color/text_primary"
+                        android:textSize="22sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/txt_volume_note"
+                    style="@style/BodyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/volume_fixed_note"
+                    android:textColor="@color/warning"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
+
+                <!-- اختصارات النظام -->
+                <TextView
+                    style="@style/SectionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/section_shortcuts" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:id="@+id/btn_settings"
+                        style="@style/TvTile"
+                        android:layout_width="0dp"
+                        android:layout_height="112dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/settings"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_settings"
+                            android:tint="@color/text_primary" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:text="@string/settings"
+                            android:textColor="@color/text_primary"
+                            android:textSize="17sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/btn_wifi"
+                        style="@style/TvTile"
+                        android:layout_width="0dp"
+                        android:layout_height="112dp"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/wifi"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <ImageView
+                            android:id="@+id/img_wifi"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_wifi"
+                            android:tint="@color/text_primary" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/wifi"
+                            android:textColor="@color/text_primary"
+                            android:textSize="17sp" />
+
+                        <TextView
+                            android:id="@+id/txt_wifi_status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- التطبيقات المفضلة -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/SectionLabel"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/section_apps" />
+
+                    <Button
+                        android:id="@+id/btn_edit"
+                        style="@style/TvButton.Small"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:drawableStart="@drawable/ic_edit"
+                        android:text="@string/edit" />
+                </LinearLayout>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_apps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false"
+                    android:overScrollMode="never" />
+
+                <TextView
+                    android:id="@+id/txt_apps_empty"
+                    style="@style/BodyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/apps_empty" />
+
+                <!-- أسفل القائمة -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:clipChildren="false"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btn_hide_bubble"
+                        style="@style/TvButton.Small"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:drawableStart="@drawable/ic_visibility_off"
+                        android:text="@string/hide_bubble" />
+
+                    <Button
+                        android:id="@+id/btn_stop"
+                        style="@style/TvButton.Small"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:drawableStart="@drawable/ic_power"
+                        android:text="@string/service_stop" />
+                </LinearLayout>
+
+                <TextView
+                    style="@style/BodyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:text="@string/menu_keys_hint"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
+</com.tvtools.floatingmenu.overlay.KeyInterceptLayout>

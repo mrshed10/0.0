@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF0F1115</color>
+    <color name="card">#FF171A21</color>
+    <color name="panel">#F2161A22</color>
+    <color name="scrim">#73000000</color>
+    <color name="tile">#FF232733</color>
+    <color name="tile_hovered">#FF2B3040</color>
+    <color name="tile_focused">#FF323A50</color>
+    <color name="tile_pressed">#FF3B4560</color>
+    <color name="tile_activated">#FF1F3352</color>
+    <color name="tile_border">#1FFFFFFF</color>
+    <color name="accent">#FF4F8CFF</color>
+    <color name="accent_dim">#994F8CFF</color>
+    <color name="text_primary">#FFF2F4F8</color>
+    <color name="text_secondary">#FFA3AAB8</color>
+    <color name="success">#FF3DDC84</color>
+    <color name="danger">#FFFF5C5C</color>
+    <color name="warning">#FFFFB020</color>
+    <color name="track">#44FFFFFF</color>
+</resources>

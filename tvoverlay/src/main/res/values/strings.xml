@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">القائمة العائمة</string>
+    <string name="quick_menu_label">فتح القائمة العائمة</string>
+    <string name="main_subtitle">اختصارات سريعة فوق أي تطبيق: الصوت، الإعدادات، الواي فاي وتطبيقاتك المفضلة</string>
+
+    <!-- الصلاحيات -->
+    <string name="section_permissions">الصلاحيات المطلوبة</string>
+    <string name="perm_overlay_title">الظهور فوق التطبيقات الأخرى</string>
+    <string name="perm_overlay_desc">ضرورية ليظهر الزر العائم والقائمة فوق أي تطبيق أو فيديو. لا يقرأ التطبيق محتوى الشاشة.</string>
+    <string name="perm_granted">✓ ممنوحة</string>
+    <string name="perm_not_granted">✗ غير ممنوحة</string>
+    <string name="perm_grant">منح الصلاحية</string>
+    <string name="perm_adb_help">إذا لم تظهر شاشة منح الصلاحية على تلفازك (بعض أجهزة Google TV تخفيها)، فعّلها من الكمبيوتر عبر ADB:\n%1$s</string>
+    <string name="perm_apps_title">قراءة التطبيقات المثبتة</string>
+    <string name="perm_apps_desc">✓ مُعلنة داخل التطبيق ولا تحتاج موافقة. تُستخدم فقط لعرض قائمة التطبيقات لتختار منها اختصاراتك.</string>
+    <string name="perm_notif_title">الإشعارات (اختياري)</string>
+    <string name="perm_notif_desc">لإظهار إشعار الخدمة مع زرّي (فتح القائمة) و(إيقاف).</string>
+    <string name="perm_notif_grant">السماح بالإشعارات</string>
+    <string name="perm_dialog_title">صلاحية مطلوبة</string>
+    <string name="perm_dialog_message">ليعمل الزر العائم فوق التطبيقات الأخرى يجب منح صلاحية \"الظهور فوق التطبيقات الأخرى\".\n\nستُفتح شاشة الإعدادات، فعّل الخيار ثم اضغط رجوع.</string>
+    <string name="perm_dialog_ok">منح الآن</string>
+    <string name="perm_dialog_later">لاحقاً</string>
+    <string name="perm_settings_missing">شاشة الصلاحية غير متوفرة على هذا الجهاز. استخدم أمر ADB الظاهر.</string>
+    <string name="perm_required_toast">امنح صلاحية الظهور فوق التطبيقات أولاً</string>
+
+    <!-- التحكم -->
+    <string name="section_controls">التحكم</string>
+    <string name="service_running">● الخدمة تعمل في الخلفية</string>
+    <string name="service_stopped">○ الخدمة متوقفة</string>
+    <string name="service_start">تشغيل الخدمة</string>
+    <string name="service_stop">إيقاف الخدمة</string>
+    <string name="open_menu_now">فتح القائمة الآن</string>
+    <string name="manage_apps">إدارة التطبيقات المفضلة</string>
+    <string name="show_bubble">إظهار الزر العائم</string>
+    <string name="start_on_boot">التشغيل تلقائياً عند تشغيل التلفاز</string>
+    <string name="reset_position">إعادة الزر العائم لمكانه الافتراضي</string>
+    <string name="section_howto">طريقة الاستخدام</string>
+    <string name="howto_text">• بالماوس: انقر الزر العائم لفتح القائمة، واسحبه لنقله لأي مكان (يلتصق بأقرب حافة). انقر خارج القائمة لإغلاقها، واستخدم عجلة الماوس فوق شريط الصوت.\n• بالكيبورد: الأسهم للتنقل، Enter للتنفيذ، Esc للإغلاق، M للكتم، و + / - للصوت. Delete يحذف التطبيق المحدد.\n• بالريموت: الأسهم وOK ورجوع. افتح القائمة من أيقونة \"فتح القائمة العائمة\" في قائمة التطبيقات.\n• لحذف تطبيق من الاختصارات: زر \"تعديل\" ثم اختر التطبيق، أو انقر بالزر الأيمن / اضغط مطولاً عليه.</string>
+
+    <!-- القائمة العائمة -->
+    <string name="menu_title">القائمة السريعة</string>
+    <string name="section_volume">الصوت</string>
+    <string name="volume_up">رفع الصوت</string>
+    <string name="volume_down">خفض الصوت</string>
+    <string name="mute">كتم الصوت</string>
+    <string name="unmute">إلغاء الكتم</string>
+    <string name="muted_short">مكتوم</string>
+    <string name="volume_percent">%1$d%%</string>
+    <string name="volume_fixed_note">مستوى الصوت ثابت في هذا الجهاز (غالباً يُدار عبر HDMI-CEC أو مكبر خارجي).</string>
+    <string name="section_shortcuts">اختصارات</string>
+    <string name="settings">الإعدادات</string>
+    <string name="wifi">الواي فاي</string>
+    <string name="section_apps">تطبيقاتي</string>
+    <string name="edit">تعديل</string>
+    <string name="done">تم</string>
+    <string name="add_app">إضافة</string>
+    <string name="apps_empty">لا توجد اختصارات بعد. اضغط (+) لإضافة تطبيقاتك.</string>
+    <string name="hide_bubble">إخفاء الزر العائم</string>
+    <string name="close">إغلاق</string>
+    <string name="menu_keys_hint">Esc / رجوع: إغلاق • M: كتم • + / -: الصوت • Delete: حذف تطبيق</string>
+    <string name="bubble_hidden_toast">أُخفي الزر. افتح القائمة من أيقونة \"فتح القائمة العائمة\".</string>
+    <string name="app_removed">أُزيل %1$s من الاختصارات</string>
+    <string name="error_launch">تعذّر تشغيل التطبيق</string>
+    <string name="error_open_settings">تعذّر فتح الإعدادات على هذا الجهاز</string>
+    <string name="error_overlay">تعذّر إظهار القائمة. تأكد من صلاحية الظهور فوق التطبيقات.</string>
+
+    <string name="net_wifi">متصل بالواي فاي</string>
+    <string name="net_wifi_bars">واي فاي • الإشارة %1$d/4</string>
+    <string name="net_ethernet">متصل بكابل (إيثرنت)</string>
+    <string name="net_other">متصل</string>
+    <string name="net_none">غير متصل</string>
+    <string name="net_no_internet">بدون إنترنت</string>
+
+    <!-- اختيار التطبيقات -->
+    <string name="picker_title">اختر تطبيقات الاختصارات</string>
+    <string name="picker_count">المختارة: %1$d</string>
+    <string name="picker_search_hint">ابحث عن تطبيق…</string>
+    <string name="picker_hint">اضغط على أي تطبيق لإضافته أو إزالته. ابدأ الكتابة بالكيبورد للبحث مباشرة.</string>
+    <string name="picker_empty">لا توجد تطبيقات مطابقة</string>
+
+    <!-- الإشعار -->
+    <string name="channel_name">خدمة القائمة العائمة</string>
+    <string name="notif_title">القائمة العائمة تعمل</string>
+    <string name="notif_text">اضغط لفتح الإعدادات</string>
+    <string name="notif_open_menu">فتح القائمة</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="bubble_size">56dp</dimen>
+    <dimen name="bubble_margin">16dp</dimen>
+    <dimen name="panel_width">460dp</dimen>
+    <dimen name="tile_radius">18dp</dimen>
+</resources>
