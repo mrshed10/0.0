@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # لنشر ملف APK في إصدار (Release) برابط تحميل مباشر
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -27,3 +29,17 @@ jobs:
         with:
           name: onetap-assist-debug-apk
           path: onetap/build/outputs/apk/debug/*.apk
+      # رابط تحميل مباشر ثابت لآخر نسخة من مساعد بنقرة واحدة:
+      # https://github.com/<owner>/<repo>/releases/download/onetap-assist-latest/onetap-assist.apk
+      - name: Publish OneTap Assist APK (direct download link)
+        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/ccr-a4f62a72-cj0p3l' || github.ref == 'refs/heads/main')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp onetap/build/outputs/apk/debug/onetap-debug.apk onetap-assist.apk
+          gh release delete onetap-assist-latest --yes --cleanup-tag || true
+          gh release create onetap-assist-latest onetap-assist.apk \
+            --target "${{ github.sha }}" \
+            --title "مساعد بنقرة واحدة — آخر نسخة" \
+            --notes "نسخة تجريبية (debug) تُحدَّث تلقائياً مع كل تعديل. المصدر: ${{ github.sha }}" \
+            --prerelease

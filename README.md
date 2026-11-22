@@ -87,4 +87,5 @@ com.onetap.assist/
 ./gradlew :onetap:testDebugUnitTest
 ./gradlew :onetap:assembleDebug   # onetap/build/outputs/apk/debug/onetap-debug.apk
 ```
-يرفع GitHub Actions ملف APK باسم `onetap-assist-debug-apk`.
+يرفع GitHub Actions ملف APK باسم `onetap-assist-debug-apk`، ويُنشر أيضاً برابط تحميل مباشر ثابت:
+https://github.com/mrshed10/0.0/releases/download/onetap-assist-latest/onetap-assist.apk
