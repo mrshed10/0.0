@@ -27,10 +27,28 @@ android {
         }
     }
 
+    // توقيع ثابت لكل البناءات ⇒ يمكن تثبيت كل إصدار جديد فوق القديم.
+    // مفتاح اختبار عام (ليس سرياً): للنشر في المتاجر استبدله بمفتاح خاص محفوظ في GitHub Secrets.
+    signingConfigs {
+        create("safarTest") {
+            storeFile = file("safar-test.jks")
+            storePassword = "safar-test-123"
+            keyAlias = "safar"
+            keyPassword = "safar-test-123"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("safarTest")
+        }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // R8 معطّل حالياً: GeckoView وJackson (Anthropic SDK) يعتمدان على الانعكاس، والتصغير يحتاج اختباراً على جهاز
+            isMinifyEnabled = false
+            isShrinkResources = false
+            signingConfig = signingConfigs.getByName("safarTest")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -48,6 +66,8 @@ android {
     }
 
     packaging {
+        // ضغط مكتبات GeckoView الأصلية داخل الـ APK (بدونه يتجاوز الحجم 250MB ويتلف التحميل بسهولة)
+        jniLibs { useLegacyPackaging = true }
         resources {
             excludes += setOf(
                 "/META-INF/{AL2.0,LGPL2.1}",

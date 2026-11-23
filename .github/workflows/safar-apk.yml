@@ -29,11 +29,11 @@ jobs:
             https://repo1.maven.org/maven2/cz/adaptech/tesseract4android/maven-metadata.xml ; do
             c=$(curl -s -o /tmp/p -w '%{http_code}' -L "$u"); echo "::warning title=probe::$c $u $(head -c 300 /tmp/p | tr '\n' ' ')"
           done
-      - name: Build debug APKs + unit tests
+      - name: Build release APKs + unit tests
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew :app:assembleDebug :app:testDebugUnitTest --continue 2>&1 | tee build.log
+          ./gradlew :app:assembleRelease :app:testDebugUnitTest --continue 2>&1 | tee build.log
       - name: Report build errors as annotations
         if: failure()
         shell: bash
@@ -45,16 +45,27 @@ jobs:
             chunk="${chunk//'%'/'%25'}"; chunk="${chunk//$'\n'/'%0A'}"
             echo "::error title=build-$i::$chunk"
           done
-      - name: Rename APKs
+      - name: Rename, verify signature, checksum
+        shell: bash
         run: |
+          set -e
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk out/Safar-arm64.apk
-          cp app/build/outputs/apk/debug/app-x86_64-debug.apk out/Safar-x86_64.apk
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk out/Safar-arm64.apk
+          cp app/build/outputs/apk/release/app-x86_64-release.apk out/Safar-x86_64.apk
+          APKSIGNER=$(ls -d $ANDROID_HOME/build-tools/*/ | sort -V | tail -1)apksigner
+          for f in out/*.apk; do
+            "$APKSIGNER" verify --verbose "$f" | head -5
+          done
+          (cd out && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          {
+            echo "ARM64_SHA=$(sha256sum out/Safar-arm64.apk | cut -d' ' -f1)"
+            echo "ARM64_MB=$(du -m out/Safar-arm64.apk | cut -f1)"
+          } >> "$GITHUB_ENV"
           ls -lh out
       - uses: actions/upload-artifact@v4
         with:
           name: safar-apk
-          path: out/*.apk
+          path: out/*
       - name: Publish release (direct download link)
         uses: softprops/action-gh-release@v2
         with:
@@ -63,7 +74,12 @@ jobs:
           target_commitish: ${{ github.sha }}
           make_latest: false
           body: |
-            متصفح سفر — نسخة Debug للتجربة.
-            - Safar-arm64.apk: لمعظم الهواتف الحديثة
+            متصفح سفر — نسخة Release موقّعة بمفتاح ثابت (يمكن التحديث فوقها مستقبلاً).
+            - Safar-arm64.apk (${{ env.ARM64_MB }} MB): لمعظم الهواتف الحديثة
             - Safar-x86_64.apk: للمحاكي
-          files: out/*.apk
+
+            للتحقق من سلامة التحميل — SHA-256 لملف arm64:
+            `${{ env.ARM64_SHA }}`
+          files: |
+            out/*.apk
+            out/SHA256SUMS.txt
