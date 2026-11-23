@@ -47,7 +47,7 @@ mlkit-text-korean = { module = "com.google.mlkit:text-recognition-korean", versi
 mlkit-text-devanagari = { module = "com.google.mlkit:text-recognition-devanagari", version.ref = "mlkitTextRecognition" }
 mlkit-translate = { module = "com.google.mlkit:translate", version.ref = "mlkitTranslate" }
 mlkit-language-id = { module = "com.google.mlkit:language-id", version.ref = "mlkitLanguageId" }
-tesseract = { module = "com.github.adaptech-cz:Tesseract4Android", version.ref = "tesseract" }
+tesseract = { module = "com.github.adaptech-cz.Tesseract4Android:tesseract4android", version.ref = "tesseract" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
 desugar = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar" }
