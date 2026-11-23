@@ -1,0 +1,58 @@
+name: Safar APK
+
+on:
+  push:
+    branches: [safar-browser]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build debug APKs + unit tests
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug :app:testDebugUnitTest --continue 2>&1 | tee build.log
+      - name: Report build errors as annotations
+        if: failure()
+        shell: bash
+        run: |
+          msg=$(grep -E "^e: |error:|What went wrong|FAILED|Could not" -A2 build.log | sed 's#file:///home/runner/work/[^/]*/[^/]*/##' | head -c 60000)
+          for i in 0 1 2 3 4 5 6 7 8 9; do
+            chunk=$(echo "$msg" | sed -n "$((i*25+1)),$((i*25+25))p")
+            [ -z "$chunk" ] && break
+            chunk="${chunk//'%'/'%25'}"; chunk="${chunk//$'\n'/'%0A'}"
+            echo "::error title=build-$i::$chunk"
+          done
+      - name: Rename APKs
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-arm64-v8a-debug.apk out/Safar-arm64.apk
+          cp app/build/outputs/apk/debug/app-x86_64-debug.apk out/Safar-x86_64.apk
+          ls -lh out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safar-apk
+          path: out/*.apk
+      - name: Publish release (direct download link)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: safar-v0.1.${{ github.run_number }}
+          name: Safar Browser 0.1.${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          body: |
+            متصفح سفر — نسخة Debug للتجربة.
+            - Safar-arm64.apk: لمعظم الهواتف الحديثة
+            - Safar-x86_64.apk: للمحاكي
+          files: out/*.apk

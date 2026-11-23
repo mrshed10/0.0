@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Safar Live Translate",
+  "version": "1.0",
+  "description": "ترجمة حية للنصوص والصور/المانغا والفيديو داخل المتصفح",
+  "browser_specific_settings": { "gecko": { "id": "livetranslate@safar.app" } },
+  "permissions": ["nativeMessaging", "nativeMessagingFromContent", "geckoViewAddons", "<all_urls>"],
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "css": ["overlay.css"],
+    "run_at": "document_idle",
+    "all_frames": true
+  }]
+}

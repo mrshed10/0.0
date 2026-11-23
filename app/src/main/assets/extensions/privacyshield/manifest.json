@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+  "name": "Safar Privacy Shield",
+  "version": "1.0",
+  "description": "إخفاء عنوان IP المحلي (WebRTC) وتشويش قراءة Canvas مع استثناءات لكل موقع",
+  "browser_specific_settings": { "gecko": { "id": "privacyshield@safar.app" } },
+  "permissions": ["privacy", "storage", "nativeMessaging", "geckoViewAddons", "<all_urls>"],
+  "background": { "scripts": ["background.js"] },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["canvas.js"],
+    "run_at": "document_start",
+    "all_frames": true,
+    "match_about_blank": true
+  }]
+}
