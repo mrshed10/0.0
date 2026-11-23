@@ -11,6 +11,7 @@ import app.safar.browser.engine.geckoResult
 import app.safar.browser.translate.ocr.Box
 import app.safar.browser.translate.ocr.BubbleAnalyzer
 import app.safar.browser.translate.ocr.OcrBlock
+import app.safar.browser.translate.ocr.OcrPostProcessor
 import app.safar.browser.translate.ocr.OcrRouter
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -65,6 +66,8 @@ class LiveTranslateController(
     private val settings: () -> BrowserSettings,
     private val router: ProviderRouter,
     private val ocr: OcrRouter,
+    /** الصفحة مصوّرة بينما الوضع "نصوص" ⇒ التبديل لوضع الصور/المانغا. */
+    private val onSuggestManga: () -> Unit = {},
 ) {
     var geckoView: GeckoView? = null
 
@@ -78,6 +81,9 @@ class LiveTranslateController(
     private val subtitleHistory = ArrayDeque<String>()
     /** لقطة واحدة في كل مرة (OCR ثقيل). */
     private val captureLock = Mutex()
+    /** بصمة آخر لقطة لكل تبويب: لا نعيد ترجمة نفس الشاشة إن لم يتغير محتواها أو موقعها. */
+    private val lastHash = mutableMapOf<GeckoSession, Long>()
+    private val hideAcks = mutableMapOf<Int, CompletableDeferred<Unit>>()
 
     private val _status = MutableStateFlow(TranslateStatus())
     val status: StateFlow<TranslateStatus> = _status
@@ -95,7 +101,46 @@ class LiveTranslateController(
     }
 
     fun detach(session: GeckoSession) {
-        ports.remove(session); innerWidth.remove(session); lastSubtitle.remove(session)
+        ports.remove(session); innerWidth.remove(session); lastSubtitle.remove(session); lastHash.remove(session)
+    }
+
+    private fun topPorts(session: GeckoSession?) = session?.let { s -> ports[s]?.filter { it.sender.isTopLevel } }.orEmpty()
+
+    /** مسح ترجمات المربع العائم من الصفحة فوراً (عند بدء تحريكه/تكبيره). */
+    fun clearFloatingOverlays(session: GeckoSession?) {
+        topPorts(session).forEach { runCatching { it.postMessage(JSONObject().put("cmd", "clearOverlays").put("scope", "float")) } }
+    }
+
+    /**
+     * إخفاء طبقة الترجمة في الصفحة ⇒ انتظار تأكيد السكربت بعد إعادة الرسم ⇒ تنفيذ الالتقاط ⇒ إعادة الإظهار.
+     * يضمن أن OCR يقرأ الصفحة الأصلية فقط ولا يعيد ترجمة ترجماتنا.
+     */
+    private suspend fun <T> withOverlaysHidden(session: GeckoSession?, block: suspend () -> T): T {
+        val targets = topPorts(session)
+        if (targets.isEmpty()) return block()
+        val id = requestIds.getAndIncrement()
+        val ack = CompletableDeferred<Unit>()
+        hideAcks[id] = ack
+        targets.forEach { runCatching { it.postMessage(JSONObject().put("cmd", "hide").put("id", id)) } }
+        withTimeoutOrNull(800) { ack.await() }
+        hideAcks.remove(id)
+        try {
+            return block()
+        } finally {
+            targets.forEach { runCatching { it.postMessage(JSONObject().put("cmd", "show")) } }
+        }
+    }
+
+    /** بصمة سريعة للصورة (شبكة 32×32 من الإضاءة المكمّاة) لاكتشاف "لم يتغير شيء". */
+    private fun quickHash(bmp: Bitmap, region: Rect? = null): Long {
+        val r = region ?: Rect(0, 0, bmp.width, bmp.height)
+        var h = 1125899906842597L
+        for (gy in 0 until 32) for (gx in 0 until 32) {
+            val x = (r.left + (r.width() - 1) * gx / 31).coerceIn(0, bmp.width - 1)
+            val y = (r.top + (r.height() - 1) * gy / 31).coerceIn(0, bmp.height - 1)
+            h = 31 * h + (BubbleAnalyzer.lum(bmp.getPixel(x, y)) shr 4)
+        }
+        return h * 31 + r.hashCode()
     }
 
     /** عند الانتقال لموقع آخر: نعيد اكتشاف لغة المانغا. */
@@ -134,6 +179,14 @@ class LiveTranslateController(
                 "translate" -> scope.geckoResult<Any> { handleTranslate(msg) }
                 "captureViewport" -> scope.geckoResult<Any> { handleCaptureViewport(msg, session) }
                 "captureRegion" -> scope.geckoResult<Any> { handleCaptureRegion(msg, session) }
+                "suggestManga" -> {
+                    if (sender.isTopLevel) onSuggestManga()
+                    GeckoResult.fromValue(JSONObject())
+                }
+                "hiddenAck" -> {
+                    hideAcks.remove(msg.optInt("id"))?.complete(Unit)
+                    GeckoResult.fromValue(JSONObject())
+                }
                 "rectTextResult" -> {
                     rectRequests.remove(msg.optInt("id"))?.complete(msg.optString("text"))
                     GeckoResult.fromValue(JSONObject())
@@ -149,7 +202,8 @@ class LiveTranslateController(
                 override fun onPortMessage(message: Any, port: WebExtension.Port) {
                     val m = message as? JSONObject ?: return
                     if (m.optString("type") == "viewport" && port.sender.isTopLevel) {
-                        innerWidth[session] = m.optDouble("innerWidth", 0.0)
+                        // عرض منطقة العرض المرئية (visualViewport) بوحدات CSS — يراعي التكبير بالإصبعين
+                        innerWidth[session] = m.optDouble("vw", m.optDouble("innerWidth", 0.0))
                     }
                 }
                 override fun onDisconnect(port: WebExtension.Port) {
@@ -218,14 +272,42 @@ class LiveTranslateController(
         else blocks.sortedWith(compareBy({ (it.box.top / row).toInt() }, { it.box.left }))
     }
 
-    /** OCR للشاشة كاملة + تحليل الفقاعات + ترجمة. region (اختياري) يختار الكتل التي يقع مركزها داخله. */
-    suspend fun ocrTranslate(bitmap: Bitmap, kind: ContentKind, region: Rect? = null): List<TranslatedBox> {
+    /**
+     * OCR للشاشة كاملة ⇒ تصفية الرموز العشوائية ⇒ تحليل الفقاعات ⇒ تجميع كتل الفقاعة الواحدة داخل حدودها الفعلية
+     * ⇒ ترجمة بترتيب القراءة.
+     * @param region (اختياري) يختار الفقاعات التي يقع مركزها داخله (المربع العائم).
+     * @param covered مناطق مترجمة مسبقاً (بكسلات اللقطة): لا نعيد ترجمتها.
+     */
+    suspend fun ocrTranslate(bitmap: Bitmap, kind: ContentKind, region: Rect? = null, covered: List<Box> = emptyList()): List<TranslatedBox> {
         val t = settings().translate
         val res = ocr.recognize(bitmap, t.source, kind, t.ocr)
-        var blocks = res.blocks
+        fun center(b: Box) = Pair((b.left + b.right) / 2, (b.top + b.bottom) / 2)
+        var blocks = res.blocks.filter { b ->
+            val (cx, cy) = center(b.box)
+            covered.none { c -> cx >= c.left && cx <= c.right && cy >= c.top && cy <= c.bottom }
+        }
+        if (blocks.isEmpty()) return emptyList()
+
+        val w = bitmap.width; val h = bitmap.height
+        val px = withContext(Dispatchers.Default) { IntArray(w * h).also { bitmap.getPixels(it, 0, w, 0, 0, w, h) } }
+
+        // تحليل أولي لكل كتلة (مع استبعاد الكتل الأخرى من حلقة الخلفية) ثم تجميع الكتل التي تشترك في فقاعة واحدة
+        val merged = withContext(Dispatchers.Default) {
+            val boxes = blocks.map { it.box }
+            val first = boxes.mapIndexed { i, b -> BubbleAnalyzer.analyze(px, w, h, b, boxes.filterIndexed { j, _ -> j != i }) }
+            BubbleAnalyzer.groupByBubble(boxes, first).map { idx ->
+                if (idx.size == 1) blocks[idx[0]]
+                else {
+                    val parts = idx.map { blocks[it] }.sortedWith(compareBy({ it.box.top }, { if (res.lang == "ja") -it.box.right else it.box.left }))
+                    val union = parts.map { it.box }.reduce { a, b -> a.union(b) }
+                    OcrBlock(OcrPostProcessor.joinLines(parts.map { it.text }), union, parts.flatMap { it.lines })
+                }
+            }
+        }
+        blocks = merged
         if (region != null) {
             blocks = blocks.filter { b ->
-                val cx = (b.box.left + b.box.right) / 2; val cy = (b.box.top + b.box.bottom) / 2
+                val (cx, cy) = center(b.box)
                 cx >= region.left && cx <= region.right && cy >= region.top && cy <= region.bottom
             }
         }
@@ -235,10 +317,8 @@ class LiveTranslateController(
         val translated = translateCached(blocks.map { it.text }, kind, ctx, res.lang)
 
         val bubbles = withContext(Dispatchers.Default) {
-            val w = bitmap.width; val h = bitmap.height
-            val px = IntArray(w * h)
-            bitmap.getPixels(px, 0, w, 0, 0, w, h)
-            blocks.map { BubbleAnalyzer.analyze(px, w, h, it.box) }
+            val boxes = blocks.map { it.box }
+            boxes.mapIndexed { i, b -> BubbleAnalyzer.analyze(px, w, h, b, boxes.filterIndexed { j, _ -> j != i }) }
         }
         return blocks.mapIndexed { i, b ->
             val bb = bubbles[i]
@@ -259,11 +339,27 @@ class LiveTranslateController(
             .put("dark", b.darkText)
     })
 
+    /** الترجمة المستمرة: السكربت أخفى طبقته بنفسه قبل الطلب، فاللقطة نظيفة. */
     private suspend fun handleCaptureViewport(msg: JSONObject, session: GeckoSession?): JSONObject = captureLock.withLock {
         val bmp = capture(session) ?: return@withLock JSONObject().put("boxes", JSONArray()).put("error", "no-capture")
-        val css = msg.optDouble("innerWidth", bmp.width.toDouble()) / bmp.width
+        val vw = msg.optDouble("vw", msg.optDouble("innerWidth", bmp.width.toDouble()))
+        val css = vw / bmp.width
+        val hash = withContext(Dispatchers.Default) { quickHash(bmp) }
+        if (!msg.optBoolean("force") && session != null && lastHash[session] == hash) {
+            return@withLock JSONObject().put("unchanged", true)
+        }
+        // المناطق المترجمة مسبقاً (CSS نسبة للشاشة) ⇒ بكسلات اللقطة
+        val covered = msg.optJSONArray("covered")?.let { arr ->
+            List(arr.length()) { i ->
+                val o = arr.getJSONObject(i)
+                Box((o.getDouble("x") / css).toFloat(), (o.getDouble("y") / css).toFloat(),
+                    ((o.getDouble("x") + o.getDouble("w")) / css).toFloat(), ((o.getDouble("y") + o.getDouble("h")) / css).toFloat())
+            }
+        }.orEmpty()
         try {
-            JSONObject().put("boxes", boxesJson(ocrTranslate(bmp, ContentKind.MANGA), css))
+            val boxes = ocrTranslate(bmp, ContentKind.MANGA, covered = covered)
+            session?.let { lastHash[it] = hash }
+            JSONObject().put("boxes", boxesJson(boxes, css))
         } catch (e: Throwable) {
             JSONObject().put("boxes", JSONArray()).put("error", e.message ?: "error")
         }
@@ -323,13 +419,14 @@ class LiveTranslateController(
             if (!domText.isNullOrBlank()) return RegionResult(translateCached(listOf(domText), ContentKind.TEXT).first(), 0)
         }
         return captureLock.withLock {
-            val bmp = capture(session) ?: return@withLock RegionResult("", 0)
+            val bmp = withOverlaysHidden(session) { capture(session) } ?: return@withLock RegionResult("", 0)
             val boxes = ocrTranslate(bmp, ContentKind.MANGA, viewRect)
             if (boxes.isNotEmpty() && kind != ContentKind.TEXT && session != null) {
                 val iw = innerWidth[session]?.takeIf { it > 0 }
                 val css = (iw ?: bmp.width.toDouble()) / bmp.width
-                ports[session]?.filter { it.sender.isTopLevel }?.forEach {
-                    it.postMessage(JSONObject().put("cmd", "overlays").put("boxes", boxesJson(boxes, css)))
+                topPorts(session).forEach {
+                    // replace=float: يمسح ترجمات المربع السابقة قبل رسم الجديدة (لا تراكم)
+                    it.postMessage(JSONObject().put("cmd", "overlays").put("scope", "float").put("boxes", boxesJson(boxes, css)))
                 }
             }
             RegionResult(boxes.joinToString("\n") { it.translated }, boxes.size)

@@ -4,8 +4,6 @@ import android.graphics.Bitmap
 import app.safar.browser.data.ContentKind
 import app.safar.browser.data.OcrEngineId
 import app.safar.browser.translate.ScriptDetector
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 
 data class OcrResult(val blocks: List<OcrBlock>, /** لغة مخمّنة من النص المستخرج (أو null) */ val lang: String?)
 
@@ -32,28 +30,34 @@ class OcrRouter(private val mlKit: MlKitOcr, private val tesseract: TesseractOcr
             else -> autoDetect(prepared.bitmap, kind)
         }
         val inv = 1f / prepared.scale
-        val gap = if (kind == ContentKind.MANGA) 22f else 12f
+        // دمج محافظ: أسطر الفقاعة الواحدة فقط. تجميع الفقاعة الكاملة يتم لاحقاً بحدودها الفعلية (BubbleAnalyzer)
+        val gap = if (kind == ContentKind.MANGA) 6f else 10f
         val blocks = OcrPostProcessor.process(raw.map { it.copy(box = it.box.scaled(inv)) }, gap)
         val lang = if (sourceLang != "auto") sourceLang else ScriptDetector.guess(blocks.joinToString(" ") { it.text })
         return OcrResult(blocks, lang)
     }
 
+    /**
+     * اكتشاف نظام الكتابة تلقائياً:
+     *  1) المعرّف الياباني (يقرأ اللاتينية أيضاً): إن غلبت الكانا/الكانجي ⇒ ياباني/صيني.
+     *  2) وإلا الكوري: إن غلب الهانغول ⇒ كوري.
+     *  3) وإلا لاتيني (إنجليزي...) بالمعرّف اللاتيني الأدق، فلا تُقرأ خطوط الرسم كحروف يابانية.
+     * يُثبَّت الاختيار للموقع الحالي لتسريع اللقطات التالية.
+     */
     private suspend fun autoDetect(bmp: Bitmap, kind: ContentKind): List<OcrBlock> {
         stickyScript?.let { s ->
             val r = mlKit.recognize(bmp, s)
-            // إن لم يعد يجد شيئاً مراراً (فصل بلغة أخرى؟) نعيد الاكتشاف
             if (r.isNotEmpty()) { stickyHits = 0; return r }
             if (++stickyHits < 3) return r
             resetDetection()
         }
-        val candidates = if (kind == ContentKind.MANGA) listOf("ja", "ko") else listOf("ja", "ko", "zh")
-        val results = coroutineScope {
-            candidates.map { c -> async { c to runCatching { mlKit.recognize(bmp, c) }.getOrDefault(emptyList()) } }
-                .map { it.await() }
-        }
-        val best = results.maxByOrNull { (script, blocks) -> ScriptDetector.nativeScore(blocks.joinToString(" ") { it.text }, script) }
-            ?: return emptyList()
-        if (best.second.isNotEmpty()) stickyScript = best.first
-        return best.second
+        val ja = runCatching { mlKit.recognize(bmp, "ja") }.getOrDefault(emptyList())
+        val jaGuess = ScriptDetector.guess(ja.joinToString(" ") { it.text })
+        if (jaGuess == "ja" || jaGuess == "zh") { stickyScript = jaGuess; return if (jaGuess == "ja") ja else mlKit.recognize(bmp, "zh") }
+        val ko = runCatching { mlKit.recognize(bmp, "ko") }.getOrDefault(emptyList())
+        if (ScriptDetector.guess(ko.joinToString(" ") { it.text }) == "ko") { stickyScript = "ko"; return ko }
+        val latin = runCatching { mlKit.recognize(bmp, "latin") }.getOrDefault(emptyList())
+        if (latin.isNotEmpty() || ja.isNotEmpty()) stickyScript = "latin"
+        return latin
     }
 }

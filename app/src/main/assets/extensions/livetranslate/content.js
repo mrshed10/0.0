@@ -20,12 +20,26 @@
   port.onMessage.addListener((msg) => {
     if (msg.cmd === "config") applyConfig(msg);
     else if (msg.cmd === "rectText" && isTop) replyRectText(msg);
-    else if (msg.cmd === "overlays" && isTop) placeBoxes(msg.boxes || [], scrollX, scrollY, false);
+    else if (msg.cmd === "overlays" && isTop) placeBoxes(msg.boxes || [], vvPageLeft(), vvPageTop(), msg.scope || "float");
+    else if (msg.cmd === "clearOverlays" && isTop) clearOverlays(msg.scope);
+    else if (msg.cmd === "hide" && isTop) hideForCapture(msg.id);
+    else if (msg.cmd === "show" && isTop) showAfterCapture();
   });
 
-  function reportViewport() { if (isTop) port.postMessage({ type: "viewport", innerWidth: window.innerWidth }); }
+  // منطقة العرض المرئية (تراعي التكبير بإصبعين): اللقطة تطابقها، لا الـ layout viewport
+  const VV = window.visualViewport;
+  const vvW = () => (VV ? VV.width : innerWidth);
+  const vvH = () => (VV ? VV.height : innerHeight);
+  const vvPageLeft = () => (VV ? VV.pageLeft : scrollX);
+  const vvPageTop = () => (VV ? VV.pageTop : scrollY);
+  const vvOffLeft = () => (VV ? VV.offsetLeft : 0);
+  const vvOffTop = () => (VV ? VV.offsetTop : 0);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  function reportViewport() { if (isTop) port.postMessage({ type: "viewport", innerWidth, vw: vvW() }); }
   reportViewport();
   window.addEventListener("resize", reportViewport, { passive: true });
+  if (VV) VV.addEventListener("resize", reportViewport, { passive: true });
 
   function applyConfig(next) {
     const prev = cfg;
@@ -34,7 +48,7 @@
     if (restartKey(prev) !== restartKey(cfg)) {
       stopAll();
       if (cfg.enabled && cfg.mode === "CONTINUOUS") {
-        if (cfg.kind === "TEXT") startText();
+        if (cfg.kind === "TEXT") { startText(); if (isTop) setTimeout(checkImagePage, 1500); }
         else if (cfg.kind === "MANGA" && isTop) startManga();
         else if (cfg.kind === "VIDEO") startVideo();
       }
@@ -43,7 +57,30 @@
     if (prev.style !== cfg.style || prev.opacity !== cfg.opacity || prev.visible !== cfg.visible || prev.rtl !== cfg.rtl) restyleAll();
   }
 
-  function stopAll() { stopText(); stopManga(); stopVideo(); }
+  /** صفحة مصوّرة (قارئ مانغا) في وضع النصوص ⇒ نقترح على التطبيق التبديل لوضع الصور تلقائياً. */
+  function checkImagePage() {
+    if (!(cfg.enabled && cfg.mode === "CONTINUOUS" && cfg.kind === "TEXT")) return;
+    const vw = innerWidth, vh = innerHeight;
+    let imgArea = 0;
+    for (const el of document.querySelectorAll("img, canvas, picture")) {
+      const r = el.getBoundingClientRect();
+      const w = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)), h = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      imgArea += w * h;
+    }
+    let textChars = 0;
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    let n;
+    while ((n = walker.nextNode()) && textChars < 400) {
+      if (!n.nodeValue.trim()) continue;
+      range.selectNodeContents(n);
+      const r = range.getBoundingClientRect();
+      if (r.bottom > 0 && r.top < vh && r.width) textChars += n.nodeValue.trim().length;
+    }
+    if (imgArea / (vw * vh) > 0.45 && textChars < 400) send({ type: "suggestManga" }).catch(() => {});
+  }
+
+  function stopAll() { stopText(); stopManga(); stopVideo(); clearOverlays(); }
 
   /* ============================== نصوص ============================== */
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "CODE", "PRE", "TEXTAREA", "INPUT", "SELECT",
@@ -191,9 +228,16 @@
   }
 
   /* ============================== مانغا / صور ============================== */
-  let layer = null, scrollTimer = null, mangaOn = false, capturing = false, lastHref = location.href;
-  const doneBands = new Map(); // band -> عدد المحاولات/النجاح
-  const rendered = [];         // بيانات الفقاعات المرسومة لإعادة الرسم عند تغيير النمط
+  /*
+   * دورة الترجمة المستمرة (مستقلة تماماً عن المربع العائم، على كامل الشاشة المرئية):
+   *   إخفاء طبقة الترجمة ← انتظار إعادة الرسم ← التقاط الصفحة الأصلية ← OCR وتجميع الفقاعات ← ترجمة
+   *   ← مسح الترجمات القديمة في الشاشة ← رسم الجديدة.
+   * المشغّلات: فتح الصفحة، توقف التمرير (500ms)، تحميل صور، تكبير/تصغير، تغيّر الصفحة.
+   * التكرار ممنوع: التطبيق يقارن بصمة اللقطة ويرد "unchanged" إن لم يتغير شيء.
+   */
+  let layer = null, scrollTimer = null, tickTimer = null, mangaOn = false, capturing = false;
+  let lastHref = location.href, lastScale = VV ? VV.scale : 1, failStreak = 0, forceNext = true;
+  const items = []; // {data, ox, oy, rect:{x,y,w,h} بإحداثيات الصفحة, scope:"cont"|"float", nodes}
 
   function ensureLayer() {
     if (layer && layer.isConnected) return layer;
@@ -206,77 +250,104 @@
 
   function applyLayerVisibility() { if (layer) layer.style.display = cfg.visible === false ? "none" : ""; }
 
-  function hasImagesInView() {
-    const vh = innerHeight, vw = innerWidth;
-    for (const el of document.querySelectorAll("img, canvas, picture, svg image, [style*='background-image']")) {
-      const r = el.getBoundingClientRect();
-      if (r.width > 100 && r.height > 100 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw) return true;
-    }
-    return false;
+  // --- إخفاء/إظهار حول لحظة الالتقاط (يستخدمه التطبيق للمربع العائم أيضاً)
+  async function hideLayer() {
+    if (layer) layer.style.visibility = "hidden";
+    await raf2();
+    await sleep(90); // مهلة ليصل الإطار الجديد (بدون الطبقة) إلى المركّب قبل الالتقاط
+  }
+  async function hideForCapture(id) {
+    await hideLayer();
+    send({ type: "hiddenAck", id }).catch(() => {});
+  }
+  function showAfterCapture() { if (layer) layer.style.visibility = "visible"; }
+
+  function schedule(delay = 500) {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(captureViewport, delay);
   }
 
   function onScroll() {
-    if (location.href !== lastHref) { lastHref = location.href; clearOverlays(); } // تنقل داخل SPA
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(captureViewport, 450); // بعد توقف التمرير
+    if (location.href !== lastHref) { lastHref = location.href; clearOverlays("cont"); forceNext = true; } // صفحة جديدة (SPA)
+    schedule(500); // بعد توقف التمرير
+  }
+
+  function onZoom() {
+    if (!VV || Math.abs(VV.scale - lastScale) < 0.01) { onScroll(); return; }
+    lastScale = VV.scale; forceNext = true; schedule(500);
   }
 
   function onImageLoad(e) {
-    if (mangaOn && e.target && e.target.tagName === "IMG") { doneBands.clear(); onScroll(); }
+    if (mangaOn && e.target && e.target.tagName === "IMG") { forceNext = true; schedule(500); }
+  }
+
+  function viewportRect() { return { x: vvPageLeft(), y: vvPageTop(), w: vvW(), h: vvH() }; }
+  const inside = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && a.x + a.w <= b.x + b.w + 1 && a.y + a.h <= b.y + b.h + 1;
+  const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  function overlapRatio(a, b) {
+    const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    if (w <= 0 || h <= 0) return 0;
+    return (w * h) / Math.min(a.w * a.h, b.w * b.h);
   }
 
   async function captureViewport() {
     if (!mangaOn || document.visibilityState !== "visible") return;
-    if (capturing) { onScroll(); return; } // لقطة جارية: أعد الجدولة بدلاً من التجاهل
-    if (!hasImagesInView()) return;
-    const band = Math.round(scrollY / 40) + ":" + Math.round(scrollX / 40) + ":" + innerWidth;
-    const st = doneBands.get(band);
-    if (st === "ok" || (typeof st === "number" && st >= 3)) return;
+    if (capturing) { schedule(400); return; }
     capturing = true;
-    const l = ensureLayer();
-    l.style.visibility = "hidden"; // لا نريد أن يقرأ OCR ترجماتنا السابقة
-    await raf2();
-    const sy = scrollY, sx = scrollX;
+    ensureLayer();
+    await hideLayer();
+    const vr = viewportRect();
+    const ox = vr.x, oy = vr.y;
+    // ترجمات تتجاوز حافة الشاشة: نبقيها ونطلب عدم إعادة ترجمة ما تحتها (فقاعة مقصوصة بالحافة)
+    const covered = items.filter((it) => it.scope === "cont" && overlaps(it.rect, vr) && !inside(it.rect, vr))
+      .map((it) => ({ x: it.rect.x - ox, y: it.rect.y - oy, w: it.rect.w, h: it.rect.h }));
     let res = null;
-    try { res = await send({ type: "captureViewport", innerWidth, innerHeight }); } catch (e) { res = null; }
-    l.style.visibility = "visible";
+    try { res = await send({ type: "captureViewport", vw: vr.w, innerWidth, covered, force: forceNext }); } catch (e) { res = null; }
+    showAfterCapture();
     capturing = false;
     if (!mangaOn) return;
     if (!res || res.error) {
-      // فشل (شبكة، نموذج قيد التنزيل...) ⇒ إعادة محاولة لاحقاً بدل تعليق الصفحة بلا نتيجة
-      doneBands.set(band, (typeof st === "number" ? st : 0) + 1);
-      setTimeout(onScroll, 3000);
+      // فشل مؤقت (شبكة، نموذج قيد التنزيل...) ⇒ إعادة محاولة بدل التعليق بلا نتيجة
+      if (++failStreak <= 3) schedule(3000);
       return;
     }
-    doneBands.set(band, "ok");
-    placeBoxes(res.boxes || [], sx, sy, true);
+    failStreak = 0;
+    forceNext = false;
+    if (res.unchanged) return; // نفس المحتوى والموقع: لا إعادة ترجمة
+    // مسح القديم داخل الشاشة ثم رسم الجديد
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      if (it.scope === "cont" && inside(it.rect, vr)) { it.nodes.forEach((n) => n.remove()); items.splice(i, 1); }
+    }
+    placeBoxes(res.boxes || [], ox, oy, "cont");
   }
 
-  /** يرسم مجموعة فقاعات بإحداثيات نسبة للشاشة (CSS px) مع إزاحة التمرير. */
-  function placeBoxes(boxes, sx, sy, replaceViewport) {
+  /** رسم فقاعات بإحداثيات نسبة للشاشة المرئية (CSS px) + إزاحة الصفحة. */
+  function placeBoxes(boxes, ox, oy, scope) {
     const l = ensureLayer();
-    if (replaceViewport) {
-      for (let i = rendered.length - 1; i >= 0; i--) {
-        const r = rendered[i];
-        if (r.top >= sy - 10 && r.top <= sy + innerHeight) { r.nodes.forEach((n) => n.remove()); rendered.splice(i, 1); }
-      }
-    }
+    if (scope === "float") clearOverlays("float"); // ترجمات المربع السابقة تُمسح قبل الجديدة
     for (const b of boxes) {
-      const item = { data: b, sx, sy, top: b.box.y + sy, nodes: [] };
+      const rect = { x: b.box.x + ox, y: b.box.y + oy, w: b.box.w, h: b.box.h };
+      // لا تراكب: أي ترجمة قديمة تغطي نفس الفقاعة تُزال
+      for (let i = items.length - 1; i >= 0; i--) {
+        if (overlapRatio(items[i].rect, rect) > 0.3) { items[i].nodes.forEach((n) => n.remove()); items.splice(i, 1); }
+      }
+      const item = { data: b, ox, oy, rect, scope, nodes: [] };
       renderBubble(l, item);
-      rendered.push(item);
+      items.push(item);
     }
   }
 
   function restyleAll() {
     applyLayerVisibility();
     if (!layer) return;
-    for (const item of rendered) { item.nodes.forEach((n) => n.remove()); item.nodes = []; renderBubble(layer, item); }
+    for (const item of items) { item.nodes.forEach((n) => n.remove()); item.nodes = []; renderBubble(layer, item); }
   }
 
-  function clearOverlays() {
-    rendered.splice(0).forEach((r) => r.nodes.forEach((n) => n.remove()));
-    doneBands.clear();
+  function clearOverlays(scope) {
+    for (let i = items.length - 1; i >= 0; i--) {
+      if (!scope || items[i].scope === scope) { items[i].nodes.forEach((n) => n.remove()); items.splice(i, 1); }
+    }
   }
 
   function hexToRgb(hex) {
@@ -286,13 +357,13 @@
 
   /**
    * رسم فقاعة واحدة حسب النمط:
-   *  CLEAN       : طلاء مكان النص الأصلي بلون الفقاعة (داخل حدودها فقط) + الترجمة داخل الفقاعة.
-   *               إن لم تكن الخلفية موحّدة (رسم/screentone) نتحول تلقائياً إلى "نص فقط" حتى لا نشوّه الرسم.
-   *  TRANSLUCENT : خلفية بلون الفقاعة بعتامة 0..35% (بدون أي ضبابية).
-   *  TEXT_ONLY   : نص فقط مع حافة/توهج خفيف للوضوح.
+   *  CLEAN       : طلاء مكان النص الأصلي بلون الفقاعة (أبيض للفقاعات البيضاء) داخل حدودها فقط + الترجمة داخلها.
+   *               على الرسم/الخلفيات المنقطة: نص فقط بتوهج خفيف (لا صناديق رمادية، لا تشويه).
+   *  TRANSLUCENT : خلفية بلون الفقاعة بعتامة 0..35% (بدون ضبابية).
+   *  TEXT_ONLY   : نص فقط مع حافة/توهج خفيف.
    */
   function renderBubble(l, item) {
-    const b = item.data, sx = item.sx, sy = item.sy;
+    const b = item.data, ox = item.ox, oy = item.oy;
     const [r, g, bl] = hexToRgb(b.bg);
     const style = cfg.style || "CLEAN";
     const opacity = Math.max(0, Math.min(35, cfg.opacity == null ? 20 : cfg.opacity)) / 100;
@@ -302,8 +373,7 @@
     if (canClean) {
       const c = document.createElement("div");
       c.className = "safar-lt-clean";
-      const pad = 1;
-      c.style.cssText = `left:${b.clean.x + sx - pad}px;top:${b.clean.y + sy - pad}px;width:${b.clean.w + 2 * pad}px;height:${b.clean.h + 2 * pad}px;background:rgb(${r},${g},${bl});`;
+      c.style.cssText = `left:${b.clean.x + ox - 1}px;top:${b.clean.y + oy - 1}px;width:${b.clean.w + 2}px;height:${b.clean.h + 2}px;background:rgb(${r},${g},${bl});`;
       l.appendChild(c); item.nodes.push(c);
     }
 
@@ -311,25 +381,18 @@
     const t = document.createElement("div");
     t.className = "safar-lt-text";
     t.dir = cfg.rtl ? "rtl" : "ltr";
-    t.style.left = (area.x + sx) + "px";
-    t.style.top = (area.y + sy) + "px";
+    t.style.left = (area.x + ox) + "px";
+    t.style.top = (area.y + oy) + "px";
     t.style.width = Math.max(area.w, 36) + "px";
     t.style.height = Math.max(area.h, 18) + "px";
+    t.style.color = darkText ? "#111" : "#fff";
     const span = document.createElement("span");
     span.textContent = b.text;
     t.appendChild(span);
 
-    if (canClean) {
-      t.style.color = darkText ? "#111" : "#fff";
-    } else if (style === "TRANSLUCENT") {
-      t.style.background = `rgba(${r},${g},${bl},${opacity})`;
-      t.style.color = darkText ? "#111" : "#fff";
+    if (!canClean) {
       t.classList.add(darkText ? "safar-glow-light" : "safar-glow-dark");
-    } else {
-      // TEXT_ONLY (أو CLEAN على خلفية غير موحّدة): نص فقط + توهج خفيف يضمن القراءة فوق الرسم
-      t.style.color = darkText ? "#111" : "#fff";
-      t.classList.add(darkText ? "safar-glow-light" : "safar-glow-dark");
-      if (opacity > 0 && style !== "TEXT_ONLY") t.style.background = `rgba(${r},${g},${bl},${opacity})`;
+      if (style === "TRANSLUCENT" && opacity > 0) t.style.background = `rgba(${r},${g},${bl},${opacity})`;
     }
 
     // لمسة: إظهار النص الأصلي / العودة للترجمة
@@ -360,23 +423,27 @@
   }
 
   function startManga() {
-    mangaOn = true;
+    mangaOn = true; forceNext = true; failStreak = 0;
     ensureLayer();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("resize", onZoom, { passive: true });
+    if (VV) { VV.addEventListener("resize", onZoom, { passive: true }); VV.addEventListener("scroll", onScroll, { passive: true }); }
     document.addEventListener("load", onImageLoad, true); // صور كسولة التحميل
-    onScroll();
+    window.addEventListener("popstate", onScroll);
+    schedule(300); // فور فتح الصفحة
+    // محاولات إضافية قليلة لصور تتأخر في التحميل (بدون فحص دوري دائم حتى لا تومض الترجمات)
+    tickTimer = [1800, 4500].map((d) => setTimeout(() => { if (mangaOn && !capturing) captureViewport(); }, d));
   }
-
-  function onResize() { clearOverlays(); onScroll(); }
 
   function stopManga() {
     mangaOn = false;
+    clearTimeout(scrollTimer); (tickTimer || []).forEach(clearTimeout); tickTimer = null;
     window.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", onResize);
+    window.removeEventListener("resize", onZoom);
+    if (VV) { VV.removeEventListener("resize", onZoom); VV.removeEventListener("scroll", onScroll); }
     document.removeEventListener("load", onImageLoad, true);
-    clearOverlays();
-    if (layer) { layer.remove(); layer = null; }
+    window.removeEventListener("popstate", onScroll);
+    clearOverlays("cont");
   }
 
   /* ============================== فيديو ============================== */
@@ -422,9 +489,9 @@
         if (v.paused || v.ended || document.visibilityState !== "visible") return;
         const r = v.getBoundingClientRect();
         if (r.width < 200 || r.bottom < 0 || r.top > innerHeight) return;
-        const rect = { x: r.left, y: r.top + r.height * 0.62, w: r.width, h: r.height * 0.38 };
+        const rect = { x: r.left - vvOffLeft(), y: r.top - vvOffTop() + r.height * 0.62, w: r.width, h: r.height * 0.38 };
         try {
-          const res = await send({ type: "captureRegion", rect, innerWidth });
+          const res = await send({ type: "captureRegion", rect, innerWidth: vvW() });
           if (!res || res.unchanged) return;
           sub.textContent = res.text || "";
           sub.dir = cfg.rtl ? "rtl" : "ltr";
@@ -449,7 +516,8 @@
 
   /* ============================== المربع العائم (نص داخل مستطيل) ============================== */
   function replyRectText(msg) {
-    const { x, y, w, h } = msg.rect;
+    const { w, h } = msg.rect;
+    const x = msg.rect.x + vvOffLeft(), y = msg.rect.y + vvOffTop();
     const parts = [];
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     const range = document.createRange();

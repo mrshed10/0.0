@@ -109,6 +109,7 @@ fun BrowserScreen(
                             }
                         },
                         onToggleVisible = { vm.updateTranslate { it.copy(overlaysVisible = !it.overlaysVisible) } },
+                        onInteractionStart = { vm.translate.clearFloatingOverlays(vm.tabs.selected?.session) },
                         onClose = { vm.updateTranslate { it.copy(mode = TranslateDisplayMode.CONTINUOUS, enabled = false) } },
                     )
                 }

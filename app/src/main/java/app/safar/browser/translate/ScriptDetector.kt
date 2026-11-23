@@ -29,8 +29,12 @@ object ScriptDetector {
             "hi" to devanagari.findAll(text).count(),
             "en" to latin.findAll(text).count(),
         )
-        // الكانجي (Han) مشترك؛ وجود أي كانا يعني اليابانية
-        if (counts.getValue("ja") > 0 && counts.getValue("ja") + counts.getValue("zh") >= counts.getValue("ko")) return "ja"
+        // خطوط الرسم قد تُقرأ ككانا مفردة (ノ ー ツ) ⇒ نشترط عدداً ونسبة معقولة قبل الحكم باليابانية
+        val kanaN = counts.getValue("ja"); val hanN = counts.getValue("zh"); val latinN = counts.getValue("en")
+        if (kanaN >= 3 && kanaN + hanN >= 0.3 * latinN && kanaN + hanN >= counts.getValue("ko")) return "ja"
+        counts["ja"] = 0
+        if (hanN < 3 || hanN < 0.3 * latinN) counts["zh"] = 0
+        if (counts.getValue("ko") < 3 || counts.getValue("ko") < 0.3 * latinN) counts["ko"] = 0
         val best = counts.maxByOrNull { it.value } ?: return null
         return if (best.value >= 2) best.key else null
     }

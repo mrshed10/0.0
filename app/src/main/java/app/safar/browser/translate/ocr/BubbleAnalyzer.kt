@@ -25,6 +25,8 @@ object BubbleAnalyzer {
         val uniform: Boolean,
         /** هل يجب أن يكون النص داكناً (خلفية فاتحة)؟ */
         val darkText: Boolean,
+        /** المساحة الداخلية للفقاعة حتى الحد الأسود (null إن لم تُحدد) — لتجميع كتل الفقاعة الواحدة. */
+        val interior: Box? = null,
     )
 
     fun lum(c: Int): Int = (((c shr 16) and 0xFF) * 299 + ((c shr 8) and 0xFF) * 587 + (c and 0xFF) * 114) / 1000
@@ -34,7 +36,11 @@ object BubbleAnalyzer {
             abs(((a shr 8) and 0xFF) - ((b shr 8) and 0xFF)) <= tol &&
             abs((a and 0xFF) - (b and 0xFF)) <= tol
 
-    fun analyze(px: IntArray, w: Int, h: Int, text: Box): Bubble {
+    /**
+     * @param exclude صناديق كتل النص الأخرى: تُستبعد بكسلاتها من حلقة تقدير الخلفية
+     *                (في الفقاعات المزدحمة تقع الأسطر المجاورة داخل الحلقة فتُفسد الحكم بأن الخلفية موحّدة).
+     */
+    fun analyze(px: IntArray, w: Int, h: Int, text: Box, exclude: List<Box> = emptyList()): Bubble {
         val tl = text.left.toInt().coerceIn(0, w - 1)
         val tt = text.top.toInt().coerceIn(0, h - 1)
         val tr = text.right.toInt().coerceIn(tl + 1, w)
@@ -42,11 +48,13 @@ object BubbleAnalyzer {
 
         // ---- 1) الحلقة المحيطة بالنص
         val ring = ArrayList<Int>()
-        val inner = 3; val outer = 9
+        val inner = 2; val outer = 7
         for (y in max(0, tt - outer) until min(h, tb + outer)) {
             for (x in max(0, tl - outer) until min(w, tr + outer)) {
                 val insideInner = x >= tl - inner && x < tr + inner && y >= tt - inner && y < tb + inner
-                if (!insideInner) ring += px[y * w + x]
+                if (insideInner) continue
+                if (exclude.any { e -> x >= e.left && x < e.right && y >= e.top && y < e.bottom }) continue
+                ring += px[y * w + x]
             }
         }
         if (ring.isEmpty()) return Bubble(null, text, 0xFFFFFF, false, true)
@@ -55,8 +63,9 @@ object BubbleAnalyzer {
         val lums = ring.map { lum(it) }
         val mean = lums.average()
         val std = sqrt(lums.sumOf { (it - mean) * (it - mean) } / lums.size)
-        val closeFrac = lums.count { abs(it - bgLum) <= 35 }.toDouble() / lums.size
-        val uniform = std < 28 && closeFrac >= 0.82
+        val closeFrac = lums.count { abs(it - bgLum) <= 40 }.toDouble() / lums.size
+        // الفقاعات البيضاء تبقى "موحّدة" حتى لو لامست الحلقةُ الحدَّ الأسود أو بقايا الحروف
+        val uniform = (std < 38 && closeFrac >= 0.72) || (bgLum >= 200 && closeFrac >= 0.6)
         val darkText = bgLum > 110
 
         if (!uniform) {
@@ -90,8 +99,10 @@ object BubbleAnalyzer {
             push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1)
         }
         val edges = (if (minX <= wl) 1 else 0) + (if (maxX >= wr) 1 else 0) + (if (minY <= wt) 1 else 0) + (if (maxY >= wb) 1 else 0)
+        // هامش يغطي حواف الحروف المنعّمة (antialiasing) حتى لا تبقى ظلال للنص الأصلي
+        val pad = max(3, ((tb - tt) * 0.12f).toInt()).coerceAtMost(8)
         val clean = Box(
-            (tl - 4).toFloat(), (tt - 4).toFloat(), (tr + 4).toFloat(), (tb + 4).toFloat(),
+            (tl - pad).toFloat(), (tt - pad).toFloat(), (tr + pad).toFloat(), (tb + pad).toFloat(),
         )
         if (edges >= 2) {
             // تسرّب: فقاعة بلا حدود أو نص على خلفية مفتوحة ⇒ نستخدم محيط النص مع هامش
@@ -103,7 +114,35 @@ object BubbleAnalyzer {
         val sx = interior.width * 0.15f; val sy = interior.height * 0.15f
         val inscribed = Box(interior.left + sx, interior.top + sy, interior.right - sx, interior.bottom - sy).union(text)
         val area = intersect(inscribed, interior) ?: text
-        return Bubble(intersect(clean, interior) ?: clamp(clean, w, h), area, bg and 0xFFFFFF, true, darkText)
+        return Bubble(intersect(clean, interior) ?: clamp(clean, w, h), area, bg and 0xFFFFFF, true, darkText, interior)
+    }
+
+    /**
+     * تجميع الكتل التي تقع في الفقاعة نفسها (مثل أعمدة النص الياباني العمودي) اعتماداً على حدود الفقاعة الفعلية،
+     * لا على المسافة ⇒ فقاعتان متجاورتان لا تُدمجان أبداً لأن الحد الأسود يفصل بينهما.
+     * @return مجموعات فهارس.
+     */
+    fun groupByBubble(blocks: List<Box>, bubbles: List<Bubble>): List<List<Int>> {
+        val parent = IntArray(blocks.size) { it }
+        fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; parent[x] = r; return r }
+        fun inside(b: Box, r: Box): Boolean {
+            val cx = (b.left + b.right) / 2; val cy = (b.top + b.bottom) / 2
+            return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom
+        }
+        for (i in blocks.indices) for (j in i + 1 until blocks.size) {
+            val ii = bubbles[i].interior ?: continue
+            val jj = bubbles[j].interior ?: continue
+            if (inside(blocks[j], ii) && inside(blocks[i], jj) && iou(ii, jj) > 0.5f) parent[find(j)] = find(i)
+        }
+        return blocks.indices.groupBy { find(it) }.values.toList()
+    }
+
+    fun iou(a: Box, b: Box): Float {
+        val l = max(a.left, b.left); val t = max(a.top, b.top)
+        val r = min(a.right, b.right); val bt = min(a.bottom, b.bottom)
+        if (r <= l || bt <= t) return 0f
+        val inter = (r - l) * (bt - t)
+        return inter / (a.width * a.height + b.width * b.height - inter)
     }
 
     fun medianColor(colors: List<Int>): Int {

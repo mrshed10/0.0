@@ -12,9 +12,56 @@ object OcrPostProcessor {
     private val noise = Regex("""^[\p{P}\p{S}\s\d]{0,3}$""")
 
     fun process(blocks: List<OcrBlock>, mergeGapPx: Float = 18f): List<OcrBlock> =
-        merge(blocks, mergeGapPx)
+        merge(blocks.filterNot { isGarbage(it) }, mergeGapPx)
             .map { it.copy(text = fixCommonErrors(joinLines(it.lines))) }
-            .filterNot { isNoise(it.text) }
+            .filterNot { isGarbage(it) }
+
+    private val letter = Regex("""\p{L}""")
+    private val okSingle = setOf("I", "a", "A", "O", "o")
+
+    /**
+     * رموز عشوائية ناتجة عن خطوط الرسم: أحرف مفردة، رموز، كتل صغيرة جداً،
+     * أو سلاسل أغلبها أحرف منفصلة ("l I | i ,"). الحرف الياباني/الكوري المفرد يُقبل فقط إن كان كبيراً (مؤثر صوتي).
+     */
+    fun isGarbage(b: OcrBlock): Boolean {
+        val s = b.text.trim()
+        if (isNoise(s)) return true
+        if (b.box.height < 7f || b.box.width < 7f) return true
+        val compact = s.filterNot { it.isWhitespace() }
+        val letters = letter.findAll(compact).count()
+        if (letters == 0) return true
+        if (cjk.containsMatchIn(s)) {
+            return letters == 1 && b.box.height < 18f
+        }
+        if (letters < 2) return true
+        if (letters.toDouble() / compact.length < 0.5) return true
+        val tokens = s.split(Regex("""\s+""")).filter { it.isNotEmpty() }
+        if (tokens.size >= 2) {
+            val singles = tokens.count { t -> letter.findAll(t).count() <= 1 && t !in okSingle }
+            if (singles.toDouble() / tokens.size > 0.6) return true
+        }
+        // كلمات "مشوهة": ما يخرجه OCR اللاتيني من خطوط الرسم أو من حروف غير لاتينية (مثل "hiibiN" و"JQvWAY")
+        val words = tokens.map { it.filter { c -> c.isLetterOrDigit() } }.filter { it.length >= 3 }
+        if (words.isNotEmpty() && words.count(::isWeirdWord).toDouble() / words.size > 0.4) return true
+        return false
+    }
+
+    private val vowels = Regex("""[aeiouyAEIOUY]""")
+
+    /** كلمة لاتينية غير طبيعية: تبديل حالة الأحرف داخلها، أو أرقام مختلطة بأحرف، أو بلا حروف علة. */
+    fun isWeirdWord(w: String): Boolean {
+        if (!w.all { it.code < 0x250 }) return false // ليست لاتينية
+        val letters = w.filter { it.isLetter() }
+        if (letters.isEmpty()) return false
+        if (w.any { it.isDigit() } && letters.length >= 2) return true
+        // حرف صغير يليه كبير داخل الكلمة (hiibiN, iYYOC, JQvWAY) لا يحدث في الحوار الحقيقي
+        for (i in 1 until letters.length) if (letters[i - 1].isLowerCase() && letters[i].isUpperCase()) return true
+        if (letters.length >= 4 && !vowels.containsMatchIn(letters)) return true
+        // 6 حروف ساكنة متتالية أو أكثر ("čpssss") لا تكاد توجد في كلمات حقيقية
+        var run = 0
+        for (c in letters) { run = if (vowels.matches(c.toString())) 0 else run + 1; if (run >= 6) return true }
+        return false
+    }
 
     fun isNoise(t: String): Boolean {
         val s = t.trim()

@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.safar.browser.data.OverlayStyle
 import app.safar.browser.translate.LiveTranslateController.RegionResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -78,6 +79,8 @@ fun FloatingGlassBox(
     onOpacityChange: (Int) -> Unit,
     onStyleCycle: () -> Unit,
     onToggleVisible: () -> Unit,
+    /** بدء تحريك/تكبير المربع: يمسح الترجمات المعروضة فوراً. */
+    onInteractionStart: () -> Unit,
     onClose: () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -111,6 +114,18 @@ fun FloatingGlassBox(
 
     LaunchedEffect(live) { while (live) { runOnce(); delay(2500) } }
 
+    // التقاط واحد فقط بعد إفلات الإصبع (Debounce 350ms)، مع مسح فوري عند بدء التحريك/التكبير
+    val pending = remember { arrayOfNulls<Job>(1) }
+    fun interactionStarted() {
+        pending[0]?.cancel()
+        result = ""; info = null
+        onInteractionStart()
+    }
+    fun interactionEnded() {
+        pending[0]?.cancel()
+        pending[0] = scope.launch { delay(350); runOnce() }
+    }
+
     val shape = RoundedCornerShape(14.dp)
     val alpha = opacity.coerceIn(0, 35) / 100f
     val lightText = Color.White
@@ -130,7 +145,11 @@ fun FloatingGlassBox(
                     .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
                     .background(Color(0xB31E2A38))
                     .pointerInput(parent) {
-                        detectDragGestures { change, drag ->
+                        detectDragGestures(
+                            onDragStart = { interactionStarted() },
+                            onDragEnd = { interactionEnded() },
+                            onDragCancel = { interactionEnded() },
+                        ) { change, drag ->
                             change.consume()
                             pos = Offset(
                                 (pos.x + drag.x).coerceIn(0f, (parent.width - size.x).coerceAtLeast(0f)),
@@ -204,7 +223,11 @@ fun FloatingGlassBox(
                         .padding(4.dp)
                         .background(Color(0x66000000), RoundedCornerShape(6.dp))
                         .pointerInput(parent) {
-                            detectDragGestures { change, drag ->
+                            detectDragGestures(
+                                onDragStart = { interactionStarted() },
+                                onDragEnd = { interactionEnded() },
+                                onDragCancel = { interactionEnded() },
+                            ) { change, drag ->
                                 change.consume()
                                 size = Offset(
                                     (size.x + drag.x).coerceIn(minW, parent.width.toFloat()),

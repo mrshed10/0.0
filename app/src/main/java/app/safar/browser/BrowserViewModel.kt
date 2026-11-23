@@ -9,6 +9,7 @@ import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.safar.browser.data.BrowserSettings
+import app.safar.browser.data.ContentKind
 import app.safar.browser.data.ProviderId
 import app.safar.browser.data.SearchEngines
 import app.safar.browser.data.SecureKeyStore
@@ -77,6 +78,16 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
     )
     val translate: LiveTranslateController = LiveTranslateController(
         c.runtime, viewModelScope, { settings.value }, router, OcrRouter(MlKitOcr(), TesseractOcr(app)),
+        onSuggestManga = {
+            if (settings.value.translate.content == ContentKind.TEXT) {
+                updateTranslate { it.copy(content = ContentKind.MANGA) }
+                viewModelScope.launch {
+                    translate.setNote("صفحة مصوّرة: تم التبديل إلى وضع الصور / المانغا")
+                    kotlinx.coroutines.delay(4000)
+                    translate.setNote(null)
+                }
+            }
+        },
     )
 
     val installRequest = MutableStateFlow<InstallRequest?>(null)
