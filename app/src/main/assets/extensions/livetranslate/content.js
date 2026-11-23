@@ -10,21 +10,53 @@
   const APP = "safar";
   const isTop = window === window.top;
   let cfg = { enabled: false, mode: "CONTINUOUS", kind: "TEXT" };
-  let port;
-  try { port = browser.runtime.connectNative(APP); } catch (e) { return; }
+  let port = null;
 
-  const send = (msg) => browser.runtime.sendNativeMessage(APP, msg);
+  /*
+   * كل طلبات الصفحة للتطبيق تمر عبر المنفذ (Port) كطلب/رد مرقّم (RPC) مع مهلة،
+   * بدلاً من runtime.sendNativeMessage الذي لا يصل على بعض الأجهزة/الإصدارات فتتوقف الترجمة المستمرة بصمت.
+   */
+  const pendingRpc = new Map();
+  let rpcSeq = 1;
+  function send(msg, timeoutMs = 45000) {
+    return new Promise((resolve, reject) => {
+      if (!port) { reject(new Error("no-port")); return; }
+      const id = rpcSeq++;
+      const timer = setTimeout(() => { pendingRpc.delete(id); reject(new Error("timeout")); }, timeoutMs);
+      pendingRpc.set(id, { resolve, timer });
+      try { port.postMessage(Object.assign({ rpc: id }, msg)); }
+      catch (e) { clearTimeout(timer); pendingRpc.delete(id); reject(e); }
+    });
+  }
+
+  function connect() {
+    try { port = browser.runtime.connectNative(APP); } catch (e) { port = null; return false; }
+    port.onMessage.addListener(onPortMessage);
+    port.onDisconnect.addListener(() => {
+      port = null;
+      for (const [, p] of pendingRpc) clearTimeout(p.timer);
+      pendingRpc.clear();
+      setTimeout(connect, 1000); // إعادة الاتصال (مثلاً بعد العودة من bfcache)
+    });
+    reportViewport();
+    return true;
+  }
   const continuous = () => cfg.enabled && cfg.mode === "CONTINUOUS";
   const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  port.onMessage.addListener((msg) => {
+  function onPortMessage(msg) {
+    if (msg.cmd === "rpc") {
+      const p = pendingRpc.get(msg.rpc);
+      if (p) { clearTimeout(p.timer); pendingRpc.delete(msg.rpc); p.resolve(msg.data); }
+      return;
+    }
     if (msg.cmd === "config") applyConfig(msg);
     else if (msg.cmd === "rectText" && isTop) replyRectText(msg);
     else if (msg.cmd === "overlays" && isTop) placeBoxes(msg.boxes || [], vvPageLeft(), vvPageTop(), msg.scope || "float");
     else if (msg.cmd === "clearOverlays" && isTop) clearOverlays(msg.scope);
     else if (msg.cmd === "hide" && isTop) hideForCapture(msg.id);
     else if (msg.cmd === "show" && isTop) showAfterCapture();
-  });
+  }
 
   // منطقة العرض المرئية (تراعي التكبير بإصبعين): اللقطة تطابقها، لا الـ layout viewport
   const VV = window.visualViewport;
@@ -36,8 +68,7 @@
   const vvOffTop = () => (VV ? VV.offsetTop : 0);
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-  function reportViewport() { if (isTop) port.postMessage({ type: "viewport", innerWidth, vw: vvW() }); }
-  reportViewport();
+  function reportViewport() { if (isTop && port) { try { port.postMessage({ type: "viewport", innerWidth, vw: vvW() }); } catch (e) {} } }
   window.addEventListener("resize", reportViewport, { passive: true });
   if (VV) VV.addEventListener("resize", reportViewport, { passive: true });
 
@@ -532,4 +563,5 @@
     }
     send({ type: "rectTextResult", id: msg.id, text: parts.join(" ").slice(0, 4000) }).catch(() => {});
   }
+  connect();
 })();

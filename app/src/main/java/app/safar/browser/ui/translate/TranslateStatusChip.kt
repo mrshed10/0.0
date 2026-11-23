@@ -53,7 +53,9 @@ fun TranslateStatusChip(
                     status.note != null -> status.note
                     status.busy -> "جارٍ الترجمة…"
                     status.error != null -> "تعذرت الترجمة — المس للتفاصيل"
-                    status.lastProvider != null -> status.lastProvider.labelAr + (status.detectedSource?.let { " • $it" } ?: "")
+                    status.lastProvider != null -> status.lastProvider.labelAr + (status.detectedSource?.let { " • $it" } ?: "") +
+                        (status.info?.let { " • $it" } ?: "")
+                    status.info != null -> status.info
                     else -> "الترجمة مفعّلة"
                 },
                 color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,

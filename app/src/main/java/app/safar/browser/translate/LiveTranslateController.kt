@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -38,6 +39,8 @@ data class TranslateStatus(
     val error: String? = null,
     /** رسالة معلومات مؤقتة (مثل تنزيل نموذج اللغة لأول مرة). */
     val note: String? = null,
+    /** آخر دورة ترجمة مستمرة (للتأكد بصرياً أنها تعمل). */
+    val info: String? = null,
 )
 
 /** فقاعة مترجمة. الإحداثيات بالبكسل داخل اللقطة. */
@@ -201,6 +204,8 @@ class LiveTranslateController(
             port.setDelegate(object : WebExtension.PortDelegate {
                 override fun onPortMessage(message: Any, port: WebExtension.Port) {
                     val m = message as? JSONObject ?: return
+                    // طلبات السكربت عبر المنفذ (Port) بدلاً من sendNativeMessage: نفس القناة التي يعمل بها المربع العائم
+                    if (m.has("rpc")) { handleRpc(m, session, port); return }
                     if (m.optString("type") == "viewport" && port.sender.isTopLevel) {
                         // عرض منطقة العرض المرئية (visualViewport) بوحدات CSS — يراعي التكبير بالإصبعين
                         innerWidth[session] = m.optDouble("vw", m.optDouble("innerWidth", 0.0))
@@ -211,6 +216,26 @@ class LiveTranslateController(
                 }
             })
             port.postMessage(configJson())
+        }
+    }
+
+    private fun handleRpc(m: JSONObject, session: GeckoSession, port: WebExtension.Port) {
+        val id = m.optInt("rpc")
+        scope.launch(Dispatchers.Main) {
+            val data: JSONObject = try {
+                when (m.optString("type")) {
+                    "translate" -> handleTranslate(m)
+                    "captureViewport" -> handleCaptureViewport(m, session)
+                    "captureRegion" -> handleCaptureRegion(m, session)
+                    "hiddenAck" -> { hideAcks.remove(m.optInt("id"))?.complete(Unit); JSONObject() }
+                    "rectTextResult" -> { rectRequests.remove(m.optInt("id"))?.complete(m.optString("text")); JSONObject() }
+                    "suggestManga" -> { if (port.sender.isTopLevel) onSuggestManga(); JSONObject() }
+                    else -> JSONObject().put("error", "unknown")
+                }
+            } catch (e: Throwable) {
+                JSONObject().put("error", e.message ?: "error")
+            }
+            runCatching { port.postMessage(JSONObject().put("cmd", "rpc").put("rpc", id).put("data", data)) }
         }
     }
 
@@ -295,7 +320,7 @@ class LiveTranslateController(
         val merged = withContext(Dispatchers.Default) {
             val boxes = blocks.map { it.box }
             val first = boxes.mapIndexed { i, b -> BubbleAnalyzer.analyze(px, w, h, b, boxes.filterIndexed { j, _ -> j != i }) }
-            BubbleAnalyzer.groupByBubble(boxes, first).map { idx ->
+            BubbleAnalyzer.groupByBubble(boxes, first, px, w, h).map { idx ->
                 if (idx.size == 1) blocks[idx[0]]
                 else {
                     val parts = idx.map { blocks[it] }.sortedWith(compareBy({ it.box.top }, { if (res.lang == "ja") -it.box.right else it.box.left }))
@@ -320,9 +345,14 @@ class LiveTranslateController(
             val boxes = blocks.map { it.box }
             boxes.mapIndexed { i, b -> BubbleAnalyzer.analyze(px, w, h, b, boxes.filterIndexed { j, _ -> j != i }) }
         }
+        // مساحات الكتابة لا تتراكب أبداً: إن تداخلت مساحتا فقاعتين نعود لمحيط نص كل منهما
+        val areas = bubbles.map { it.textArea }.toMutableList()
+        for (i in areas.indices) for (j in i + 1 until areas.size) {
+            if (BubbleAnalyzer.iou(areas[i], areas[j]) > 0.05f) { areas[i] = blocks[i].box; areas[j] = blocks[j].box }
+        }
         return blocks.mapIndexed { i, b ->
             val bb = bubbles[i]
-            TranslatedBox(b.box, b.text, translated[i], bb.clean, bb.textArea, bb.bg, bb.uniform, bb.darkText)
+            TranslatedBox(b.box, b.text, translated[i], bb.clean, areas[i], bb.bg, bb.uniform, bb.darkText)
         }
     }
 
@@ -357,8 +387,10 @@ class LiveTranslateController(
             }
         }.orEmpty()
         try {
+            _status.value = _status.value.copy(info = "مستمرة: جارٍ القراءة…")
             val boxes = ocrTranslate(bmp, ContentKind.MANGA, covered = covered)
             session?.let { lastHash[it] = hash }
+            _status.value = _status.value.copy(info = "مستمرة: ${boxes.size} فقاعة")
             JSONObject().put("boxes", boxesJson(boxes, css))
         } catch (e: Throwable) {
             JSONObject().put("boxes", JSONArray()).put("error", e.message ?: "error")
