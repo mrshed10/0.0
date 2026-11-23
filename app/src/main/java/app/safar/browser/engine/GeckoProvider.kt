@@ -38,9 +38,8 @@ object GeckoProvider {
                     .build()
             )
             .allowInsecureConnections(insecure(s))
-            // GV-API: متاح في GeckoView الحديثة (FPP). احذفه إن لم يتوفر في إصدارك.
-            .fingerprintingProtection(s.blockCanvas)
-        return GeckoRuntime.create(context, builder.build())
+        // FPP لا يتوفر في Builder؛ يُضبط على إعدادات الـ Runtime بعد إنشائه (داخل apply)
+        return GeckoRuntime.create(context, builder.build()).also { apply(it, s) }
     }
 
     /** يُستدعى عند تغيّر الإعدادات أثناء التشغيل. */
