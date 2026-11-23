@@ -20,6 +20,7 @@
   port.onMessage.addListener((msg) => {
     if (msg.cmd === "config") applyConfig(msg);
     else if (msg.cmd === "rectText" && isTop) replyRectText(msg);
+    else if (msg.cmd === "overlays" && isTop) placeBoxes(msg.boxes || [], scrollX, scrollY, false);
   });
 
   function reportViewport() { if (isTop) port.postMessage({ type: "viewport", innerWidth: window.innerWidth }); }
@@ -27,14 +28,19 @@
   window.addEventListener("resize", reportViewport, { passive: true });
 
   function applyConfig(next) {
-    const prevKey = cfg.enabled + cfg.mode + cfg.kind + cfg.target;
+    const prev = cfg;
     cfg = next;
-    if (prevKey === cfg.enabled + cfg.mode + cfg.kind + cfg.target) return;
-    stopAll();
-    if (!continuous()) return;
-    if (cfg.kind === "TEXT") startText();
-    else if (cfg.kind === "MANGA" && isTop) startManga();
-    else if (cfg.kind === "VIDEO") startVideo();
+    const restartKey = (c) => [c.enabled, c.mode, c.kind, c.target, c.source].join("|");
+    if (restartKey(prev) !== restartKey(cfg)) {
+      stopAll();
+      if (cfg.enabled && cfg.mode === "CONTINUOUS") {
+        if (cfg.kind === "TEXT") startText();
+        else if (cfg.kind === "MANGA" && isTop) startManga();
+        else if (cfg.kind === "VIDEO") startVideo();
+      }
+    }
+    // تغيّر النمط/الشفافية/الإظهار: إعادة رسم فورية بدون إعادة OCR
+    if (prev.style !== cfg.style || prev.opacity !== cfg.opacity || prev.visible !== cfg.visible || prev.rtl !== cfg.rtl) restyleAll();
   }
 
   function stopAll() { stopText(); stopManga(); stopVideo(); }
@@ -45,6 +51,8 @@
   const originals = new Map();     // textNode -> النص الأصلي
   const written = new WeakMap();   // textNode -> النص الذي كتبناه (لتجاهل طفراتنا)
   const queued = new WeakSet();
+  const attempts = new WeakMap(); // عدد محاولات الترجمة الفاشلة لكل عقدة
+  let retryTimer = null;
   const observedEls = new WeakSet();
   let pending = [];
   let io = null, mo = null, flushTimer = null, inFlight = 0;
@@ -117,12 +125,23 @@
     }
   }
 
+  // عند الفشل لا نُسقط العقد: نعيد المحاولة بعد مهلة متزايدة (حتى 3 مرات)
+  function retryLater(nodes) {
+    for (const n of nodes) {
+      queued.delete(n);
+      const a = (attempts.get(n) || 0) + 1;
+      attempts.set(n, a);
+      if (a <= 3 && n.isConnected) { queued.add(n); pending.push(n); }
+    }
+    if (!retryTimer) retryTimer = setTimeout(() => { retryTimer = null; scheduleFlush(0); }, 2500);
+  }
+
   async function translateBatch(nodes) {
     const texts = nodes.map((n) => n.nodeValue.trim());
     let res;
     try { res = await send({ type: "translate", kind: "TEXT", texts, title: document.title }); }
-    catch (e) { nodes.forEach((n) => queued.delete(n)); return; }
-    if (!res || res.error || !res.translations) { nodes.forEach((n) => queued.delete(n)); return; }
+    catch (e) { retryLater(nodes); return; }
+    if (!res || res.error || !res.translations) { retryLater(nodes); return; }
     if (!continuous() || cfg.kind !== "TEXT") return;
     nodes.forEach((n, i) => {
       queued.delete(n);
@@ -166,94 +185,197 @@
     if (io) io.disconnect(); if (mo) mo.disconnect();
     io = mo = null; pending = [];
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
     for (const [n, orig] of originals) { if (n.isConnected && written.get(n) === n.nodeValue) n.nodeValue = orig; }
     originals.clear();
   }
 
   /* ============================== مانغا / صور ============================== */
-  let layer = null, scrollTimer = null, mangaOn = false, capturing = false;
-  const doneBands = new Set();
+  let layer = null, scrollTimer = null, mangaOn = false, capturing = false, lastHref = location.href;
+  const doneBands = new Map(); // band -> عدد المحاولات/النجاح
+  const rendered = [];         // بيانات الفقاعات المرسومة لإعادة الرسم عند تغيير النمط
 
   function ensureLayer() {
     if (layer && layer.isConnected) return layer;
     layer = document.createElement("div");
     layer.className = "safar-lt-layer";
     document.documentElement.appendChild(layer);
+    applyLayerVisibility();
     return layer;
   }
 
+  function applyLayerVisibility() { if (layer) layer.style.display = cfg.visible === false ? "none" : ""; }
+
   function hasImagesInView() {
     const vh = innerHeight, vw = innerWidth;
-    for (const el of document.querySelectorAll("img, canvas, picture, [style*='background-image']")) {
+    for (const el of document.querySelectorAll("img, canvas, picture, svg image, [style*='background-image']")) {
       const r = el.getBoundingClientRect();
-      if (r.width > 120 && r.height > 120 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw) return true;
+      if (r.width > 100 && r.height > 100 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw) return true;
     }
     return false;
   }
 
   function onScroll() {
+    if (location.href !== lastHref) { lastHref = location.href; clearOverlays(); } // تنقل داخل SPA
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(captureViewport, 450); // بعد توقف التمرير
   }
 
+  function onImageLoad(e) {
+    if (mangaOn && e.target && e.target.tagName === "IMG") { doneBands.clear(); onScroll(); }
+  }
+
   async function captureViewport() {
-    if (!mangaOn || capturing || document.visibilityState !== "visible" || !hasImagesInView()) return;
+    if (!mangaOn || document.visibilityState !== "visible") return;
+    if (capturing) { onScroll(); return; } // لقطة جارية: أعد الجدولة بدلاً من التجاهل
+    if (!hasImagesInView()) return;
     const band = Math.round(scrollY / 40) + ":" + Math.round(scrollX / 40) + ":" + innerWidth;
-    if (doneBands.has(band)) return;
+    const st = doneBands.get(band);
+    if (st === "ok" || (typeof st === "number" && st >= 3)) return;
     capturing = true;
     const l = ensureLayer();
     l.style.visibility = "hidden"; // لا نريد أن يقرأ OCR ترجماتنا السابقة
     await raf2();
     const sy = scrollY, sx = scrollX;
-    let res;
-    try { res = await send({ type: "captureViewport", innerWidth, innerHeight }); }
-    catch (e) { res = null; }
+    let res = null;
+    try { res = await send({ type: "captureViewport", innerWidth, innerHeight }); } catch (e) { res = null; }
     l.style.visibility = "visible";
     capturing = false;
-    if (!res || !mangaOn) return;
-    doneBands.add(band);
-    // احذف المربعات القديمة داخل نفس نطاق الشاشة
-    for (const b of [...l.children]) {
-      const top = parseFloat(b.style.top);
-      if (top >= sy - 10 && top <= sy + innerHeight) b.remove();
+    if (!mangaOn) return;
+    if (!res || res.error) {
+      // فشل (شبكة، نموذج قيد التنزيل...) ⇒ إعادة محاولة لاحقاً بدل تعليق الصفحة بلا نتيجة
+      doneBands.set(band, (typeof st === "number" ? st : 0) + 1);
+      setTimeout(onScroll, 3000);
+      return;
     }
-    for (const b of res.boxes || []) addBox(l, b, sx, sy);
+    doneBands.set(band, "ok");
+    placeBoxes(res.boxes || [], sx, sy, true);
   }
 
-  function addBox(l, b, sx, sy) {
-    const d = document.createElement("div");
-    d.className = "safar-lt-box";
-    d.style.left = (b.x + sx) + "px";
-    d.style.top = (b.y + sy) + "px";
-    d.style.width = Math.max(b.w, 40) + "px";
-    d.style.minHeight = b.h + "px";
-    const fs = Math.max(10, Math.min(18, Math.sqrt((b.w * b.h) / Math.max(b.text.length, 1)) * 0.8));
-    d.style.fontSize = fs + "px";
-    d.textContent = b.text;
-    d.dataset.orig = b.orig || "";
-    d.dataset.tr = b.text;
+  /** يرسم مجموعة فقاعات بإحداثيات نسبة للشاشة (CSS px) مع إزاحة التمرير. */
+  function placeBoxes(boxes, sx, sy, replaceViewport) {
+    const l = ensureLayer();
+    if (replaceViewport) {
+      for (let i = rendered.length - 1; i >= 0; i--) {
+        const r = rendered[i];
+        if (r.top >= sy - 10 && r.top <= sy + innerHeight) { r.nodes.forEach((n) => n.remove()); rendered.splice(i, 1); }
+      }
+    }
+    for (const b of boxes) {
+      const item = { data: b, sx, sy, top: b.box.y + sy, nodes: [] };
+      renderBubble(l, item);
+      rendered.push(item);
+    }
+  }
+
+  function restyleAll() {
+    applyLayerVisibility();
+    if (!layer) return;
+    for (const item of rendered) { item.nodes.forEach((n) => n.remove()); item.nodes = []; renderBubble(layer, item); }
+  }
+
+  function clearOverlays() {
+    rendered.splice(0).forEach((r) => r.nodes.forEach((n) => n.remove()));
+    doneBands.clear();
+  }
+
+  function hexToRgb(hex) {
+    const v = parseInt((hex || "#ffffff").slice(1), 16);
+    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
+  }
+
+  /**
+   * رسم فقاعة واحدة حسب النمط:
+   *  CLEAN       : طلاء مكان النص الأصلي بلون الفقاعة (داخل حدودها فقط) + الترجمة داخل الفقاعة.
+   *               إن لم تكن الخلفية موحّدة (رسم/screentone) نتحول تلقائياً إلى "نص فقط" حتى لا نشوّه الرسم.
+   *  TRANSLUCENT : خلفية بلون الفقاعة بعتامة 0..35% (بدون أي ضبابية).
+   *  TEXT_ONLY   : نص فقط مع حافة/توهج خفيف للوضوح.
+   */
+  function renderBubble(l, item) {
+    const b = item.data, sx = item.sx, sy = item.sy;
+    const [r, g, bl] = hexToRgb(b.bg);
+    const style = cfg.style || "CLEAN";
+    const opacity = Math.max(0, Math.min(35, cfg.opacity == null ? 20 : cfg.opacity)) / 100;
+    const canClean = style === "CLEAN" && b.uniform && b.clean;
+    const darkText = b.dark !== false;
+
+    if (canClean) {
+      const c = document.createElement("div");
+      c.className = "safar-lt-clean";
+      const pad = 1;
+      c.style.cssText = `left:${b.clean.x + sx - pad}px;top:${b.clean.y + sy - pad}px;width:${b.clean.w + 2 * pad}px;height:${b.clean.h + 2 * pad}px;background:rgb(${r},${g},${bl});`;
+      l.appendChild(c); item.nodes.push(c);
+    }
+
+    const area = (style === "CLEAN" && b.uniform) ? b.area : b.box;
+    const t = document.createElement("div");
+    t.className = "safar-lt-text";
+    t.dir = cfg.rtl ? "rtl" : "ltr";
+    t.style.left = (area.x + sx) + "px";
+    t.style.top = (area.y + sy) + "px";
+    t.style.width = Math.max(area.w, 36) + "px";
+    t.style.height = Math.max(area.h, 18) + "px";
+    const span = document.createElement("span");
+    span.textContent = b.text;
+    t.appendChild(span);
+
+    if (canClean) {
+      t.style.color = darkText ? "#111" : "#fff";
+    } else if (style === "TRANSLUCENT") {
+      t.style.background = `rgba(${r},${g},${bl},${opacity})`;
+      t.style.color = darkText ? "#111" : "#fff";
+      t.classList.add(darkText ? "safar-glow-light" : "safar-glow-dark");
+    } else {
+      // TEXT_ONLY (أو CLEAN على خلفية غير موحّدة): نص فقط + توهج خفيف يضمن القراءة فوق الرسم
+      t.style.color = darkText ? "#111" : "#fff";
+      t.classList.add(darkText ? "safar-glow-light" : "safar-glow-dark");
+      if (opacity > 0 && style !== "TEXT_ONLY") t.style.background = `rgba(${r},${g},${bl},${opacity})`;
+    }
+
     // لمسة: إظهار النص الأصلي / العودة للترجمة
-    d.addEventListener("click", (e) => {
+    t.addEventListener("click", (e) => {
       e.stopPropagation(); e.preventDefault();
-      const showOrig = !d.classList.contains("safar-show-orig");
-      d.classList.toggle("safar-show-orig", showOrig);
-      d.textContent = showOrig ? d.dataset.orig : d.dataset.tr;
+      const showOrig = !t.classList.contains("safar-show-orig");
+      t.classList.toggle("safar-show-orig", showOrig);
+      span.textContent = showOrig ? b.orig : b.text;
+      item.nodes.forEach((n) => { if (n !== t) n.style.visibility = showOrig ? "hidden" : ""; });
+      fitText(t, span);
     });
-    l.appendChild(d);
+    l.appendChild(t); item.nodes.push(t);
+    fitText(t, span);
+  }
+
+  /** ملاءمة حجم الخط لمساحة الفقاعة (بحث ثنائي) حتى لا تتكدس الكلمات أو تخرج عن الحدود. */
+  function fitText(box, span) {
+    const maxW = box.clientWidth - 4, maxH = box.clientHeight - 2;
+    let lo = 7, hi = Math.max(8, Math.min(30, maxH));
+    span.style.fontSize = hi + "px";
+    if (span.offsetHeight <= maxH && span.scrollWidth <= maxW + 1) return;
+    for (let i = 0; i < 8; i++) {
+      const mid = (lo + hi) / 2;
+      span.style.fontSize = mid + "px";
+      if (span.offsetHeight <= maxH && span.scrollWidth <= maxW + 1) lo = mid; else hi = mid;
+    }
+    span.style.fontSize = lo + "px";
   }
 
   function startManga() {
     mangaOn = true;
     ensureLayer();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", () => { doneBands.clear(); onScroll(); }, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    document.addEventListener("load", onImageLoad, true); // صور كسولة التحميل
     onScroll();
   }
+
+  function onResize() { clearOverlays(); onScroll(); }
 
   function stopManga() {
     mangaOn = false;
     window.removeEventListener("scroll", onScroll);
-    doneBands.clear();
+    window.removeEventListener("resize", onResize);
+    document.removeEventListener("load", onImageLoad, true);
+    clearOverlays();
     if (layer) { layer.remove(); layer = null; }
   }
 
@@ -289,7 +411,7 @@
         if (!cues) { sub.style.display = "none"; return; }
         try {
           const res = await send({ type: "translate", kind: "VIDEO", texts: [cues], title: document.title });
-          if (res && res.translations) { sub.textContent = res.translations[0]; sub.style.display = ""; subPosition(v, sub, false); }
+          if (res && res.translations) { sub.textContent = res.translations[0]; sub.dir = cfg.rtl ? "rtl" : "ltr"; sub.style.display = ""; subPosition(v, sub, false); }
         } catch (e) {}
       };
       track.addEventListener("cuechange", onCue);
@@ -305,6 +427,7 @@
           const res = await send({ type: "captureRegion", rect, innerWidth });
           if (!res || res.unchanged) return;
           sub.textContent = res.text || "";
+          sub.dir = cfg.rtl ? "rtl" : "ltr";
           sub.style.display = res.text ? "" : "none";
           subPosition(v, sub, true);
         } catch (e) {}

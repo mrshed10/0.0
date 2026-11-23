@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.safar.browser.BrowserViewModel
 import app.safar.browser.data.AddressBarPosition
 import app.safar.browser.data.GestureAction
+import app.safar.browser.data.OverlayStyle
 import app.safar.browser.data.ToolbarItem
 import app.safar.browser.data.TranslateDisplayMode
 import app.safar.browser.ui.translate.FloatingGlassBox
@@ -89,12 +90,25 @@ fun BrowserScreen(
             if (settings.translate.enabled) {
                 TranslateStatusChip(
                     status = status,
+                    overlaysVisible = settings.translate.overlaysVisible,
                     onClick = { showTranslate = true },
+                    onToggleVisible = { vm.updateTranslate { it.copy(overlaysVisible = !it.overlaysVisible) } },
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                 )
                 if (settings.translate.mode == TranslateDisplayMode.FLOATING) {
                     FloatingGlassBox(
                         onTranslate = { rect -> vm.translate.translateRegion(rect, vm.tabs.selected?.session) },
+                        opacity = settings.translate.overlayOpacity,
+                        style = settings.translate.overlayStyle,
+                        visible = settings.translate.overlaysVisible,
+                        onOpacityChange = { v -> vm.updateTranslate { it.copy(overlayOpacity = v) } },
+                        onStyleCycle = {
+                            vm.updateTranslate {
+                                val all = OverlayStyle.entries
+                                it.copy(overlayStyle = all[(all.indexOf(it.overlayStyle) + 1) % all.size])
+                            }
+                        },
+                        onToggleVisible = { vm.updateTranslate { it.copy(overlaysVisible = !it.overlaysVisible) } },
                         onClose = { vm.updateTranslate { it.copy(mode = TranslateDisplayMode.CONTINUOUS, enabled = false) } },
                     )
                 }

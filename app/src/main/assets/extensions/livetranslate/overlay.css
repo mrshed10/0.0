@@ -1,15 +1,28 @@
 .safar-lt-layer { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483646; pointer-events: none; }
-.safar-lt-box {
+
+/* طلاء مكان النص الأصلي بلون الفقاعة نفسه (مستطيل داخل حدود الفقاعة فقط ⇒ الخطوط السوداء تبقى سليمة) */
+.safar-lt-clean { position: absolute; box-sizing: border-box; pointer-events: none; border-radius: 6px; }
+
+/* الترجمة داخل الفقاعة: توسيط، التفاف كلمات طبيعي، بدون ضبابية وبدون ظل ثقيل */
+.safar-lt-text {
   position: absolute; box-sizing: border-box; pointer-events: auto;
-  background: rgba(255, 255, 255, 0.94); color: #111; border-radius: 10px;
-  padding: 2px 4px; display: flex; align-items: center; justify-content: center; text-align: center;
-  font: 600 13px/1.25 system-ui, "Noto Sans Arabic", sans-serif; overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0,0,0,.25); direction: auto; unicode-bidi: plaintext;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 0 2px; border-radius: 10px; overflow: hidden;
+  font-family: "Noto Sans Arabic", "Noto Naskh Arabic", system-ui, sans-serif;
+  font-weight: 700; line-height: 1.22; unicode-bidi: plaintext;
+  word-break: normal; overflow-wrap: break-word; hyphens: none;
 }
-.safar-lt-box.safar-show-orig { background: rgba(255, 244, 200, 0.96); }
+.safar-lt-text > span { display: inline-block; max-width: 100%; }
+.safar-lt-text[dir="rtl"] { direction: rtl; }
+
+/* توهج خفيف جداً للنص فوق الرسم (نمط "نص فقط") */
+.safar-glow-light { text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; }
+.safar-glow-dark  { text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; }
+
+.safar-lt-text.safar-show-orig { outline: 2px dashed rgba(255, 170, 0, .9); }
+
 .safar-lt-sub {
   position: absolute; z-index: 2147483647; pointer-events: none; text-align: center;
-  font: 600 17px/1.35 system-ui, "Noto Sans Arabic", sans-serif; color: #fff;
-  text-shadow: 0 0 3px #000, 0 0 6px #000; padding: 2px 8px; unicode-bidi: plaintext;
-  background: rgba(0,0,0,.35); border-radius: 6px;
+  font: 700 17px/1.35 "Noto Sans Arabic", system-ui, sans-serif; color: #fff;
+  text-shadow: 0 0 2px #000, 0 0 3px #000, 1px 1px 0 #000, -1px -1px 0 #000; padding: 2px 8px; unicode-bidi: plaintext;
 }

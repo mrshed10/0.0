@@ -33,6 +33,7 @@ import app.safar.browser.translate.providers.ClaudeProvider
 import app.safar.browser.translate.providers.DeepLProvider
 import app.safar.browser.translate.providers.GeminiProvider
 import app.safar.browser.translate.providers.GoogleCloudProvider
+import app.safar.browser.translate.providers.GoogleFreeProvider
 import app.safar.browser.translate.providers.OnDeviceProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,7 +62,13 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
 
     private val router = ProviderRouter(
         mapOf(
-            ProviderId.ON_DEVICE to OnDeviceProvider(),
+            ProviderId.ON_DEVICE to OnDeviceProvider { downloading ->
+                // ML Kit ينزّل نموذج اللغة (~30MB) عند أول استخدام لكل زوج لغات
+                viewModelScope.launch {
+                    translate.setNote(if (downloading) "جارٍ تجهيز نموذج اللغة على الجهاز (مرة واحدة)…" else null)
+                }
+            },
+            ProviderId.GOOGLE_FREE to GoogleFreeProvider(),
             ProviderId.GOOGLE to GoogleCloudProvider { keys.get(SecureKeyStore.Name.GOOGLE) },
             ProviderId.DEEPL to DeepLProvider { keys.get(SecureKeyStore.Name.DEEPL) },
             ProviderId.CLAUDE to ClaudeProvider({ keys.get(SecureKeyStore.Name.CLAUDE) }, { settings.value.translate.claudeModel }),
@@ -113,8 +120,12 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
 
     override fun onTabCreated(tab: BrowserTab) = translate.attach(tab.session)
 
+    private var lastHost: String? = null
+
     override fun onLocationChanged(tab: BrowserTab) {
         if (privacy.applyExceptionFor(tab, settings.value)) tab.session.reload()
+        val host = UrlUtils.host(tab.url)
+        if (tab.id == tabs.selectedId && host != lastHost) { lastHost = host; translate.onNavigated() }
     }
 
     override fun onExternalResponse(tab: BrowserTab, response: WebResponse) =

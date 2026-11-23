@@ -17,7 +17,10 @@ import kotlinx.coroutines.tasks.await
  * ترجمة على الجهاز (ML Kit): مجانية، خاصة تماماً، تعمل دون إنترنت بعد تنزيل نموذج اللغة (~30MB).
  * هي الافتراضي عند عدم وجود مفاتيح، والملاذ الأخير في سلسلة البدائل.
  */
-class OnDeviceProvider : TranslationProvider {
+class OnDeviceProvider(
+    /** يُستدعى بـ true قبل تنزيل نموذج لغة (قد يستغرق دقيقة في أول مرة) و false بعده. */
+    private val onModelDownload: (Boolean) -> Unit = {},
+) : TranslationProvider {
     override val id = ProviderId.ON_DEVICE
     override fun isConfigured() = true
 
@@ -39,15 +42,22 @@ class OnDeviceProvider : TranslationProvider {
                 Translation.getClient(TranslatorOptions.Builder().setSourceLanguage(srcLang).setTargetLanguage(tgtLang).build())
             }
         }
-        translator.downloadModelIfNeeded(DownloadConditions.Builder().build()).await()
+        onModelDownload(true)
+        try {
+            translator.downloadModelIfNeeded(DownloadConditions.Builder().build()).await()
+        } finally {
+            onModelDownload(false)
+        }
         val out = req.texts.map { translator.translate(it).await() }
         return TranslationResult(out, src, id)
     }
 
     private suspend fun detect(texts: List<String>): String {
         val sample = texts.joinToString(" ").take(1000)
-        val tag = langId.identifyLanguage(sample).await()
-        if (tag == "und") throw ProviderException("ML Kit: could not detect language")
-        return tag.substringBefore('-')
+        val tag = runCatching { langId.identifyLanguage(sample).await() }.getOrDefault("und")
+        if (tag != "und") return tag.substringBefore('-')
+        // نص قصير أو مخرجات OCR: نخمّن من نظام الكتابة بدلاً من الفشل
+        return app.safar.browser.translate.ScriptDetector.guess(sample)
+            ?: throw ProviderException("ML Kit: could not detect language")
     }
 }

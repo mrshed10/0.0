@@ -29,17 +29,19 @@ class ProviderRouter(private val providers: Map<ProviderId, TranslationProvider>
 
     private fun autoOrder(req: TranslationRequest): List<ProviderId> {
         val llm = listOf(ProviderId.CLAUDE, ProviderId.GEMINI)
+        // المجانيان (Google المجانية ثم ML Kit) في آخر كل سلسلة: يضمنان نتيجة حتى بدون أي مفتاح
+        val free = listOf(ProviderId.GOOGLE_FREE, ProviderId.ON_DEVICE)
         return when (req.kind) {
             ContentKind.MANGA, ContentKind.VIDEO ->
-                llm + listOf(ProviderId.DEEPL, ProviderId.GOOGLE, ProviderId.ON_DEVICE)
+                llm + listOf(ProviderId.DEEPL, ProviderId.GOOGLE) + free
             ContentKind.TEXT -> when {
                 // الحوار أولاً: أسطر الحوار قصيرة غالباً ولا يجب معاملتها كعناصر واجهة
                 dialogueScore(req.texts) >= 0.4 ->
-                    llm + listOf(ProviderId.DEEPL, ProviderId.GOOGLE, ProviderId.ON_DEVICE)
+                    llm + listOf(ProviderId.DEEPL, ProviderId.GOOGLE) + free
                 isShortUiText(req.texts) ->
-                    listOf(ProviderId.GOOGLE, ProviderId.ON_DEVICE, ProviderId.DEEPL) + llm
+                    listOf(ProviderId.GOOGLE, ProviderId.GOOGLE_FREE, ProviderId.DEEPL) + llm + ProviderId.ON_DEVICE
                 else ->
-                    listOf(ProviderId.DEEPL, ProviderId.GOOGLE) + llm + ProviderId.ON_DEVICE
+                    listOf(ProviderId.DEEPL, ProviderId.GOOGLE) + llm + free
             }
         }
     }

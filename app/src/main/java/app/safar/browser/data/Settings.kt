@@ -44,13 +44,22 @@ enum class ContentKind(val labelAr: String) {
     VIDEO("فيديو"),
 }
 
-enum class ProviderId(val labelAr: String) {
-    AUTO("تلقائي (ذكي)"),
-    ON_DEVICE("على الجهاز (ML Kit)"),
-    GOOGLE("Google Cloud Translation"),
-    DEEPL("DeepL API"),
-    CLAUDE("Claude"),
-    GEMINI("Gemini"),
+/** needsKey = يتطلب مفتاح API من المستخدم. */
+enum class ProviderId(val labelAr: String, val needsKey: Boolean) {
+    AUTO("تلقائي (ذكي)", false),
+    GOOGLE_FREE("ترجمة Google المجانية", false),
+    ON_DEVICE("على الجهاز (ML Kit، بلا إنترنت)", false),
+    GOOGLE("Google Cloud Translation", true),
+    DEEPL("DeepL API", true),
+    CLAUDE("Claude (ذكاء اصطناعي)", true),
+    GEMINI("Gemini (ذكاء اصطناعي)", true),
+}
+
+/** طريقة رسم الترجمة فوق الصور/المانغا. */
+enum class OverlayStyle(val labelAr: String) {
+    CLEAN("تنظيف الفقاعة"),
+    TRANSLUCENT("خلفية شبه شفافة"),
+    TEXT_ONLY("نص فقط"),
 }
 
 enum class OcrEngineId(val labelAr: String) {
@@ -72,7 +81,14 @@ data class TranslateSettings(
     val geminiModel: String = "gemini-2.5-flash",
     /** تعليمات إضافية لنماذج الذكاء الاصطناعي (مسرد أسماء، أسلوب، ...). */
     val llmInstructions: String = "",
+    /** نمط عرض الترجمة فوق الصور + نسبة عتامة الخلفية (0..35%). */
+    val overlayStyle: OverlayStyle = OverlayStyle.CLEAN,
+    val overlayOpacity: Int = 20,
+    /** إظهار/إخفاء الترجمات بلمسة واحدة دون إيقاف الترجمة. */
+    val overlaysVisible: Boolean = true,
 )
+
+val RTL_LANGS = setOf("ar", "fa", "he", "ur")
 
 @Serializable
 data class BrowserSettings(

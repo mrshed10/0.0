@@ -30,6 +30,8 @@ object LlmPrompt {
                 appendLine("- The segments are OCR output from manga/comic speech bubbles, in reading order. OCR may contain broken characters or line breaks; silently repair obvious OCR errors before translating.")
                 appendLine("- Sound effects (SFX) should become short, natural onomatopoeia in the target language.")
                 appendLine("- Keep translations concise so they fit inside speech bubbles.")
+                appendLine("- Write it the way a professional scanlation/localization team would: natural spoken dialogue that matches each character's voice, emotion and the scene's context, never stiff word-for-word phrasing.")
+                appendLine("- Segments are consecutive bubbles of the same page; use the surrounding bubbles to resolve pronouns, omitted subjects and jokes.")
             }
             ContentKind.VIDEO -> {
                 appendLine("- The segments are video subtitles. Keep them short and readable at subtitle speed.")
@@ -37,6 +39,9 @@ object LlmPrompt {
             ContentKind.TEXT -> {
                 appendLine("- The segments are text nodes from a web page; some are fragments of the same sentence split by inline markup. Translate each so that concatenation still reads naturally.")
             }
+        }
+        if (req.target == "ar") {
+            appendLine("- Arabic style: fluent, simple Modern Standard Arabic with a light conversational tone (as in professionally dubbed anime); short sentences; natural Arabic exclamations; no diacritics except where needed to avoid ambiguity.")
         }
         if (req.instructions.isNotBlank()) {
             appendLine("Additional user instructions (glossary/style):")
