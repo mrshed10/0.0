@@ -60,7 +60,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
     val tabs = TabManager(c.runtime, this)
     val privacy = PrivacyController(c.runtime)
 
-    private val router = ProviderRouter(
+    private val router: ProviderRouter = ProviderRouter(
         mapOf(
             ProviderId.ON_DEVICE to OnDeviceProvider { downloading ->
                 // ML Kit ينزّل نموذج اللغة (~30MB) عند أول استخدام لكل زوج لغات
@@ -75,7 +75,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
             ProviderId.GEMINI to GeminiProvider({ keys.get(SecureKeyStore.Name.GEMINI) }, { settings.value.translate.geminiModel }),
         )
     )
-    val translate = LiveTranslateController(
+    val translate: LiveTranslateController = LiveTranslateController(
         c.runtime, viewModelScope, { settings.value }, router, OcrRouter(MlKitOcr(), TesseractOcr(app)),
     )
 
