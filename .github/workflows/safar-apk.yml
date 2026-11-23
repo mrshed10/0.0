@@ -18,6 +18,17 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
+      - name: Probe Tesseract coordinates
+        continue-on-error: true
+        shell: bash
+        run: |
+          for u in \
+            https://jitpack.io/com/github/adaptech-cz/Tesseract4Android/4.7.0/Tesseract4Android-4.7.0.pom \
+            https://jitpack.io/com/github/adaptech-cz/Tesseract4Android/tesseract4android/4.7.0/tesseract4android-4.7.0.pom \
+            https://repo1.maven.org/maven2/cz/adaptech/tesseract4android/tesseract4android/maven-metadata.xml \
+            https://repo1.maven.org/maven2/cz/adaptech/tesseract4android/maven-metadata.xml ; do
+            c=$(curl -s -o /tmp/p -w '%{http_code}' -L "$u"); echo "::warning title=probe::$c $u $(head -c 300 /tmp/p | tr '\n' ' ')"
+          done
       - name: Build debug APKs + unit tests
         shell: bash
         run: |

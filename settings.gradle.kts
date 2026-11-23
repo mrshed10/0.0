@@ -12,6 +12,8 @@ dependencyResolutionManagement {
         mavenCentral()
         // GeckoView (محرك Firefox) يُنشر على مستودع Mozilla
         maven("https://maven.mozilla.org/maven2/")
+        // Tesseract4Android منشورة على JitPack فقط
+        maven("https://jitpack.io") { content { includeGroupByRegex("com\\.github\\..*") } }
     }
 }
 rootProject.name = "SafarBrowser"
