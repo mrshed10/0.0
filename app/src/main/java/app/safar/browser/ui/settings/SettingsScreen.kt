@@ -34,6 +34,7 @@ import app.safar.browser.data.SecureDnsMode
 import app.safar.browser.data.SecureKeyStore
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.dp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
