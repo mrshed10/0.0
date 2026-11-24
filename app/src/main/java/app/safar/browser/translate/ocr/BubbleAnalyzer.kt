@@ -109,7 +109,7 @@ object BubbleAnalyzer {
         )
         if (edges >= 2) {
             // تسرّب: فقاعة بلا حدود أو نص على خلفية مفتوحة ⇒ نستخدم محيط النص مع هامش
-            val area = expand(text, 0.15f, w, h)
+            val area = expand(text, 0.04f, w, h)
             return Bubble(clamp(clean, w, h), area, bg and 0xFFFFFF, true, darkText)
         }
         val interior = Box(minX.toFloat(), minY.toFloat(), maxX.toFloat(), maxY.toFloat())
@@ -125,7 +125,14 @@ object BubbleAnalyzer {
      * لا على المسافة ⇒ فقاعتان متجاورتان لا تُدمجان أبداً لأن الحد الأسود يفصل بينهما.
      * @return مجموعات فهارس.
      */
-    fun groupByBubble(blocks: List<Box>, bubbles: List<Bubble>, px: IntArray? = null, w: Int = 0, h: Int = 0): List<List<Int>> {
+    /**
+     * @param allowColumns دمج أعمدة متجاورة أفقياً (للنص الياباني/الصيني العمودي فقط). في اللغات الأفقية
+     *                     كانت هذه القاعدة تدمج فقاعتين متلاصقتين جنباً إلى جنب فيخرج النص عن حدودهما.
+     */
+    fun groupByBubble(
+        blocks: List<Box>, bubbles: List<Bubble>, px: IntArray? = null, w: Int = 0, h: Int = 0,
+        allowColumns: Boolean = false,
+    ): List<List<Int>> {
         val parent = IntArray(blocks.size) { it }
         fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; parent[x] = r; return r }
         fun inside(b: Box, r: Box): Boolean {
@@ -138,7 +145,7 @@ object BubbleAnalyzer {
             val byInterior = ii != null && jj != null && inside(blocks[j], ii) && inside(blocks[i], jj) && iou(ii, jj) > 0.5f
             // بديل لا يعتمد على حدود الفقاعة: أسطر متتالية قريبة، بلا خط فاصل داكن بينها
             val byGap = !byInterior && px != null && bubbles[i].uniform && bubbles[j].uniform &&
-                sameBubbleByGap(px, w, h, blocks[i], blocks[j], bubbles[i].bg)
+                sameBubbleByGap(px, w, h, blocks[i], blocks[j], bubbles[i].bg, allowColumns)
             if (byInterior || byGap) parent[find(j)] = find(i)
         }
         return blocks.indices.groupBy { find(it) }.values.toList()
@@ -148,7 +155,7 @@ object BubbleAnalyzer {
      * سطران (أو عمودان للنص الياباني) من الفقاعة نفسها؟ متجاوران بمسافة ≤ 1.3 ارتفاع سطر،
      * ولا يقطع المسافةَ بينهما خطٌّ داكن (حد فقاعة/إطار لوحة) ⇒ فقاعتان متجاورتان لا تُدمجان.
      */
-    fun sameBubbleByGap(px: IntArray, w: Int, h: Int, a: Box, b: Box, bg: Int): Boolean {
+    fun sameBubbleByGap(px: IntArray, w: Int, h: Int, a: Box, b: Box, bg: Int, allowColumns: Boolean = false): Boolean {
         val bgLum = lum(bg)
         fun dark(x: Int, y: Int) = abs(lum(px[y.coerceIn(0, h - 1) * w + x.coerceIn(0, w - 1)]) - bgLum) > 70
         val hOverlap = min(a.right, b.right) - max(a.left, b.left)
@@ -165,6 +172,7 @@ object BubbleAnalyzer {
             }
             return true
         }
+        if (!allowColumns) return false
         val vOverlap = min(a.bottom, b.bottom) - max(a.top, b.top)
         val hGap = max(a.left, b.left) - min(a.right, b.right)
         val colW = min(a.width, b.width)

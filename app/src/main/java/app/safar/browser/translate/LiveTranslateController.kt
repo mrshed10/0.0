@@ -53,6 +53,8 @@ data class TranslatedBox(
     val bg: Int = 0xFFFFFF,
     val uniform: Boolean = false,
     val darkText: Boolean = true,
+    /** عدد أسطر النص الأصلي (لتقدير حجم خطه). */
+    val lines: Int = 1,
 )
 
 /**
@@ -339,7 +341,7 @@ class LiveTranslateController(
         val merged = withContext(Dispatchers.Default) {
             val boxes = blocks.map { it.box }
             val first = boxes.mapIndexed { i, b -> BubbleAnalyzer.analyze(px, w, h, b, boxes.filterIndexed { j, _ -> j != i }) }
-            BubbleAnalyzer.groupByBubble(boxes, first, px, w, h).map { idx ->
+            BubbleAnalyzer.groupByBubble(boxes, first, px, w, h, allowColumns = res.lang == "ja" || res.lang == "zh").map { idx ->
                 if (idx.size == 1) blocks[idx[0]]
                 else {
                     val parts = idx.map { blocks[it] }.sortedWith(compareBy({ it.box.top }, { if (res.lang == "ja") -it.box.right else it.box.left }))
@@ -371,7 +373,7 @@ class LiveTranslateController(
         }
         return blocks.mapIndexed { i, b ->
             val bb = bubbles[i]
-            TranslatedBox(b.box, b.text, translated[i], bb.clean, areas[i], bb.bg, bb.uniform, bb.darkText)
+            TranslatedBox(b.box, b.text, translated[i], bb.clean, areas[i], bb.bg, bb.uniform, bb.darkText, b.lines.size.coerceAtLeast(1))
         }
     }
 
@@ -386,6 +388,8 @@ class LiveTranslateController(
             .put("bg", BubbleAnalyzer.hex(b.bg))
             .put("uniform", b.uniform)
             .put("dark", b.darkText)
+            // ارتفاع سطر النص الأصلي (CSS px): أساس حجم خط الترجمة كي يبقى متناسقاً مع الرسم
+            .put("lh", b.box.height / b.lines * css)
     })
 
     /** الترجمة المستمرة: السكربت أخفى طبقته بنفسه قبل الطلب، فاللقطة نظيفة. */

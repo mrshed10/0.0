@@ -359,6 +359,7 @@
   function placeBoxes(boxes, ox, oy, scope) {
     const l = ensureLayer();
     if (scope === "float") clearOverlays("float"); // ترجمات المربع السابقة تُمسح قبل الجديدة
+    const batch = [];
     for (const b of boxes) {
       const rect = { x: b.box.x + ox, y: b.box.y + oy, w: b.box.w, h: b.box.h };
       // لا تراكب: أي ترجمة قديمة تغطي نفس الفقاعة تُزال
@@ -368,13 +369,16 @@
       const item = { data: b, ox, oy, rect, scope, nodes: [] };
       renderBubble(l, item);
       items.push(item);
+      batch.push(item);
     }
+    harmonize(batch);
   }
 
   function restyleAll() {
     applyLayerVisibility();
     if (!layer) return;
     for (const item of items) { item.nodes.forEach((n) => n.remove()); item.nodes = []; renderBubble(layer, item); }
+    harmonize(items);
   }
 
   function clearOverlays(scope) {
@@ -389,9 +393,9 @@
   }
 
   /**
-   * رسم فقاعة واحدة حسب النمط:
-   *  CLEAN       : طلاء مكان النص الأصلي بلون الفقاعة (أبيض للفقاعات البيضاء) داخل حدودها فقط + الترجمة داخلها.
-   *               على الرسم/الخلفيات المنقطة: نص فقط بتوهج خفيف (لا صناديق رمادية، لا تشويه).
+   * رسم فقاعة واحدة بأسلوب ترجمة Google: خط خفيف وصغير ومتناسق، داخل الفقاعة دائماً.
+   *  CLEAN       : الفقاعة الموحّدة تُطلى بلونها (أبيض غالباً) داخل حدودها، والترجمة داخلها بهامش داخلي آمن.
+   *               على الرسم/الخلفيات المنقطة: رقعة ناعمة الحواف بلون الخلفية تغطي النص الأصلي فقط.
    *  TRANSLUCENT : خلفية بلون الفقاعة بعتامة 0..35% (بدون ضبابية).
    *  TEXT_ONLY   : نص فقط مع حافة/توهج خفيف.
    */
@@ -400,30 +404,43 @@
     const [r, g, bl] = hexToRgb(b.bg);
     const style = cfg.style || "CLEAN";
     const opacity = Math.max(0, Math.min(35, cfg.opacity == null ? 20 : cfg.opacity)) / 100;
-    const canClean = style === "CLEAN" && b.uniform && b.clean;
     const darkText = b.dark !== false;
+    const solidClean = style === "CLEAN" && b.uniform && b.clean;
+    const softClean = style === "CLEAN" && !solidClean;
 
-    if (canClean) {
+    if (solidClean) {
       const c = document.createElement("div");
       c.className = "safar-lt-clean";
       c.style.cssText = `left:${b.clean.x + ox - 1}px;top:${b.clean.y + oy - 1}px;width:${b.clean.w + 2}px;height:${b.clean.h + 2}px;background:rgb(${r},${g},${bl});`;
       l.appendChild(c); item.nodes.push(c);
+    } else if (softClean) {
+      // رقعة ناعمة (حواف متدرجة) فوق النص الأصلي فقط — تخفيه دون صندوق حاد يشوّه الرسم
+      const c = document.createElement("div");
+      c.className = "safar-lt-clean safar-lt-soft";
+      const p = 3;
+      c.style.cssText = `left:${b.box.x + ox - p}px;top:${b.box.y + oy - p}px;width:${b.box.w + 2 * p}px;height:${b.box.h + 2 * p}px;` +
+        `background:rgba(${r},${g},${bl},0.93);box-shadow:0 0 6px 4px rgba(${r},${g},${bl},0.93);`;
+      l.appendChild(c); item.nodes.push(c);
     }
 
-    const area = (style === "CLEAN" && b.uniform) ? b.area : b.box;
+    // مساحة الكتابة + هامش داخلي آمن حتى لا يلامس النص حواف الفقاعة
+    const base = solidClean ? b.area : b.box;
+    const inset = Math.max(2, Math.min(10, Math.min(base.w, base.h) * 0.08));
+    const area = { x: base.x + inset, y: base.y + inset, w: Math.max(24, base.w - 2 * inset), h: Math.max(14, base.h - 2 * inset) };
+
     const t = document.createElement("div");
     t.className = "safar-lt-text";
     t.dir = cfg.rtl ? "rtl" : "ltr";
     t.style.left = (area.x + ox) + "px";
     t.style.top = (area.y + oy) + "px";
-    t.style.width = Math.max(area.w, 36) + "px";
-    t.style.height = Math.max(area.h, 18) + "px";
-    t.style.color = darkText ? "#111" : "#fff";
+    t.style.width = area.w + "px";
+    t.style.height = area.h + "px";
+    t.style.color = darkText ? "#1a1a1a" : "#fff";
     const span = document.createElement("span");
     span.textContent = b.text;
     t.appendChild(span);
 
-    if (!canClean) {
+    if (!solidClean && !softClean) {
       t.classList.add(darkText ? "safar-glow-light" : "safar-glow-dark");
       if (style === "TRANSLUCENT" && opacity > 0) t.style.background = `rgba(${r},${g},${bl},${opacity})`;
     }
@@ -435,24 +452,46 @@
       t.classList.toggle("safar-show-orig", showOrig);
       span.textContent = showOrig ? b.orig : b.text;
       item.nodes.forEach((n) => { if (n !== t) n.style.visibility = showOrig ? "hidden" : ""; });
-      fitText(t, span);
+      fitText(t, span, item.maxFont);
     });
     l.appendChild(t); item.nodes.push(t);
-    fitText(t, span);
+    // الحد الأعلى للخط: قريب من حجم النص الأصلي (لا يكبر عنه) — مثل Google
+    item.maxFont = Math.max(9, Math.min(17, (b.lh || 16) * 0.82));
+    item.span = span; item.textBox = t;
+    item.fitted = fitText(t, span, item.maxFont);
   }
 
-  /** ملاءمة حجم الخط لمساحة الفقاعة (بحث ثنائي) حتى لا تتكدس الكلمات أو تخرج عن الحدود. */
-  function fitText(box, span) {
-    const maxW = box.clientWidth - 4, maxH = box.clientHeight - 2;
-    let lo = 7, hi = Math.max(8, Math.min(30, maxH));
+  const MIN_FONT = 7;
+
+  /**
+   * أكبر حجم خط (بحث ثنائي) يجعل النص كله داخل المساحة، بين MIN_FONT والحد الأعلى.
+   * الأسطر متوازنة (text-wrap: balance) والكلمات الطويلة تلتف بدل أن تخرج عن الحدود.
+   * @return الحجم المختار.
+   */
+  function fitText(box, span, maxFont) {
+    const maxW = box.clientWidth, maxH = box.clientHeight;
+    const fits = () => span.offsetHeight <= maxH && span.scrollWidth <= maxW + 0.5;
+    let hi = Math.max(MIN_FONT, Math.min(maxFont || 17, maxH));
     span.style.fontSize = hi + "px";
-    if (span.offsetHeight <= maxH && span.scrollWidth <= maxW + 1) return;
-    for (let i = 0; i < 8; i++) {
+    if (fits()) return hi;
+    let lo = MIN_FONT;
+    for (let i = 0; i < 9; i++) {
       const mid = (lo + hi) / 2;
       span.style.fontSize = mid + "px";
-      if (span.offsetHeight <= maxH && span.scrollWidth <= maxW + 1) lo = mid; else hi = mid;
+      if (fits()) lo = mid; else hi = mid;
     }
     span.style.fontSize = lo + "px";
+    return lo;
+  }
+
+  /** تناسق الأحجام في الصفحة: لا تكبر فقاعة عن الوسيط بأكثر من 15% (مظهر مرتب كترجمة Google). */
+  function harmonize(batch) {
+    const sizes = batch.map((it) => it.fitted).filter(Boolean).sort((a, b) => a - b);
+    if (sizes.length < 3) return;
+    const cap = sizes[Math.floor(sizes.length / 2)] * 1.15;
+    for (const it of batch) {
+      if (it.fitted > cap) { it.span.style.fontSize = cap + "px"; it.fitted = cap; }
+    }
   }
 
   function startManga() {
