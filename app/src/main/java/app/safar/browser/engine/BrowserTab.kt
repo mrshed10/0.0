@@ -21,6 +21,10 @@ class BrowserTab(
     var isSecure by mutableStateOf(false)
     var mediaPlaying by mutableStateOf(false)
     var fullscreen by mutableStateOf(false)
+    /** وضع الموقع المصمم للكمبيوتر لهذا التبويب. */
+    var desktopMode by mutableStateOf(false)
+    /** مجموعة التبويب (null = بدون مجموعة). */
+    var groupId by mutableStateOf<Long?>(null)
 
     /** آخر SessionState مسلسل (لاستعادة الجلسة). */
     var sessionState: String? = null

@@ -52,6 +52,8 @@ fun AddressBar(
     onSubmit: (String) -> Unit,
     onShieldClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** زر الاختصار السريع (يظهر عند عدم الكتابة). */
+    quickAction: (@Composable () -> Unit)? = null,
 ) {
     val focus = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
@@ -114,6 +116,7 @@ fun AddressBar(
                     focused = st.isFocused
                 },
         )
+        if (!focused) quickAction?.invoke()
         when {
             focused && tfv.text.isNotEmpty() ->
                 IconButton(onClick = { tfv = TextFieldValue("") }) { Icon(Icons.Filled.Close, "مسح") }

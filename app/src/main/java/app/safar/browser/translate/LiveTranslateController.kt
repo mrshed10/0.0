@@ -71,6 +71,8 @@ class LiveTranslateController(
     private val ocr: OcrRouter,
     /** الصفحة مصوّرة بينما الوضع "نصوص" ⇒ التبديل لوضع الصور/المانغا. */
     private val onSuggestManga: () -> Unit = {},
+    /** مستوى التكبير المحفوظ لموقع (من رابط الصفحة). */
+    private val zoomFor: (String?) -> Int = { 100 },
 ) {
     var geckoView: GeckoView? = null
 
@@ -87,6 +89,7 @@ class LiveTranslateController(
     /** بصمة آخر لقطة لكل تبويب: لا نعيد ترجمة نفس الشاشة إن لم يتغير محتواها أو موقعها. */
     private val lastHash = mutableMapOf<GeckoSession, Long>()
     private val hideAcks = mutableMapOf<Int, CompletableDeferred<Unit>>()
+    private val pageTextRequests = mutableMapOf<Int, CompletableDeferred<Pair<String, String>>>()
 
     private val _status = MutableStateFlow(TranslateStatus())
     val status: StateFlow<TranslateStatus> = _status
@@ -159,6 +162,21 @@ class LiveTranslateController(
 
     fun clearCache() = cache.clear()
 
+    /** تطبيق مستوى تكبير على الصفحة الحالية فوراً. */
+    fun setZoom(session: GeckoSession?, pct: Int) {
+        topPorts(session).forEach { runCatching { it.postMessage(JSONObject().put("cmd", "zoom").put("value", pct)) } }
+    }
+
+    /** نص الصفحة ولغتها (للاستماع إلى الصفحة). */
+    suspend fun requestPageText(session: GeckoSession?): Pair<String, String>? {
+        val port = topPorts(session).firstOrNull() ?: return null
+        val id = requestIds.getAndIncrement()
+        val d = CompletableDeferred<Pair<String, String>>()
+        pageTextRequests[id] = d
+        port.postMessage(JSONObject().put("cmd", "pageText").put("id", id))
+        return withTimeoutOrNull(4000) { d.await() }.also { pageTextRequests.remove(id) }
+    }
+
     private fun configJson(): JSONObject {
         val t = settings().translate
         return JSONObject()
@@ -215,7 +233,7 @@ class LiveTranslateController(
                     ports[session]?.remove(port)
                 }
             })
-            port.postMessage(configJson())
+            port.postMessage(configJson().put("zoom", zoomFor(port.sender.url)))
         }
     }
 
@@ -230,6 +248,7 @@ class LiveTranslateController(
                     "hiddenAck" -> { hideAcks.remove(m.optInt("id"))?.complete(Unit); JSONObject() }
                     "rectTextResult" -> { rectRequests.remove(m.optInt("id"))?.complete(m.optString("text")); JSONObject() }
                     "suggestManga" -> { if (port.sender.isTopLevel) onSuggestManga(); JSONObject() }
+                    "pageTextResult" -> { pageTextRequests.remove(m.optInt("id"))?.complete(m.optString("text") to m.optString("lang")); JSONObject() }
                     else -> JSONObject().put("error", "unknown")
                 }
             } catch (e: Throwable) {

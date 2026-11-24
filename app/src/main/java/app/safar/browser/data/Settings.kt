@@ -90,6 +90,52 @@ data class TranslateSettings(
 
 val RTL_LANGS = setOf("ar", "fa", "he", "ur")
 
+/** نظام أسماء النطاقات الآمن (DNS over HTTPS). */
+enum class SecureDnsMode(val labelAr: String) {
+    OFF("متوقف"),
+    AUTOMATIC("استخدام مقدم الخدمة الحالي (تلقائي)"),
+    PROVIDER("اختيار مقدم خدمة آخر"),
+}
+
+enum class DnsProvider(val labelAr: String, val uri: String) {
+    CLOUDFLARE("Cloudflare (1.1.1.1)", "https://mozilla.cloudflare-dns.com/dns-query"),
+    GOOGLE("Google (Public DNS)", "https://dns.google/dns-query"),
+    CLEANBROWSING_FAMILY("CleanBrowsing (Family Filter)", "https://doh.cleanbrowsing.org/doh/family-filter/"),
+    OPENDNS("OpenDNS", "https://doh.opendns.com/dns-query"),
+    CUSTOM("مخصص", ""),
+}
+
+/** زر الاختصار السريع بجانب شريط العنوان (مثل Chrome). */
+enum class QuickAction(val labelAr: String) {
+    AUTO("حسب معدل استخدامك"),
+    NEW_TAB("علامة تبويب جديدة"),
+    SHARE("مشاركة هذه الصفحة"),
+    VOICE_SEARCH("بحث صوتي"),
+    TRANSLATE("ترجمة"),
+    BOOKMARK("الإضافة إلى الإشارات المرجعية"),
+    READ_ALOUD("الاستماع إلى هذه الصفحة"),
+}
+
+@Serializable
+data class Shortcut(val title: String, val url: String)
+
+/** تخصيص صفحة علامة التبويب الجديدة. */
+@Serializable
+data class NewTabSettings(
+    val showShortcuts: Boolean = true,
+    val showBookmarks: Boolean = true,
+    val showRecent: Boolean = true,
+    /** 0 = لون الثيم، وإلا مؤشر في NEW_TAB_BACKGROUNDS */
+    val background: Int = 0,
+    val shortcuts: List<Shortcut> = listOf(
+        Shortcut("Wikipedia", "https://ar.wikipedia.org"),
+        Shortcut("YouTube", "https://m.youtube.com"),
+        Shortcut("GitHub", "https://github.com"),
+    ),
+)
+
+val NEW_TAB_BACKGROUNDS = listOf(0x00000000, 0xFF1E3A5F.toInt(), 0xFF2E4A2E.toInt(), 0xFF4A2E4A.toInt(), 0xFF3A3A3A.toInt(), 0xFF5C3B1E.toInt())
+
 @Serializable
 data class BrowserSettings(
     val onboardingDone: Boolean = false,
@@ -124,7 +170,44 @@ data class BrowserSettings(
     val extensionSources: Map<String, String> = emptyMap(),
     // الترجمة
     val translate: TranslateSettings = TranslateSettings(),
+    // DNS الآمن
+    val secureDns: SecureDnsMode = SecureDnsMode.OFF,
+    val dnsProvider: DnsProvider = DnsProvider.CLOUDFLARE,
+    val customDnsUri: String = "",
+    // زر الاختصار السريع
+    val quickActionEnabled: Boolean = true,
+    val quickAction: QuickAction = QuickAction.AUTO,
+    /** عدّاد استخدام الإجراءات لاختيار "حسب معدل الاستخدام". */
+    val actionUsage: Map<String, Int> = emptyMap(),
+    // التكبير والتصغير
+    val showZoomInMenu: Boolean = true,
+    val forceEnableZoom: Boolean = false,
+    /** مستوى التكبير المحفوظ لكل موقع (نسبة مئوية). */
+    val siteZoom: Map<String, Int> = emptyMap(),
+    // وضع سطح المكتب
+    val desktopByDefault: Boolean = false,
+    val desktopSites: Set<String> = emptySet(),
+    val autoDesktopForWebStore: Boolean = true,
+    // صفحة علامة التبويب الجديدة
+    val newTab: NewTabSettings = NewTabSettings(),
 )
+
+/** عنوان DoH الفعلي حسب الإعدادات (null = بلا DoH). */
+fun BrowserSettings.dohUri(): String? = when (secureDns) {
+    SecureDnsMode.OFF -> null
+    SecureDnsMode.AUTOMATIC -> DnsProvider.CLOUDFLARE.uri
+    SecureDnsMode.PROVIDER -> if (dnsProvider == DnsProvider.CUSTOM) customDnsUri.trim().takeIf { isValidDohUri(it) } else dnsProvider.uri
+}
+
+fun isValidDohUri(u: String): Boolean =
+    Regex("""^https://[A-Za-z0-9.-]+(:\d{1,5})?(/[^\s]*)?$""").matches(u.trim())
+
+/** اختيار وظيفة الزر السريع: المحدد، أو الأكثر استخداماً في وضع "تلقائي". */
+fun BrowserSettings.effectiveQuickAction(): QuickAction {
+    if (quickAction != QuickAction.AUTO) return quickAction
+    return actionUsage.filterKeys { k -> QuickAction.entries.any { it.name == k && it != QuickAction.AUTO } }
+        .maxByOrNull { it.value }?.key?.let { QuickAction.valueOf(it) } ?: QuickAction.NEW_TAB
+}
 
 data class Language(val code: String, val nameAr: String)
 

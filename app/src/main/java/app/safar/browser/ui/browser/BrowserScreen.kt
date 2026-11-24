@@ -1,6 +1,13 @@
 package app.safar.browser.ui.browser
 
+import android.content.Intent
+import android.speech.RecognizerIntent
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import app.safar.browser.data.QuickAction
+import app.safar.browser.data.effectiveQuickAction
+import app.safar.browser.extensions.ChromeStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,8 +48,19 @@ fun BrowserScreen(
     openSettings: () -> Unit,
     openExtensions: () -> Unit,
     openBookmarks: () -> Unit,
+    openHistory: () -> Unit,
+    openNewTabSettings: () -> Unit,
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val bookmarks by vm.bookmarks.collectAsStateWithLifecycle()
+    val history by vm.history.collectAsStateWithLifecycle()
+    val speaking by vm.pageReader.speaking.collectAsStateWithLifecycle()
+    var showRecent by remember { mutableStateOf(false) }
+    var showClearData by remember { mutableStateOf(false) }
+    var showStore by remember { mutableStateOf(false) }
+    val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { vm.load(it) }
+    }
     val status by vm.translate.status.collectAsStateWithLifecycle()
     val installed by vm.extensions.installed.collectAsStateWithLifecycle()
     val tab = vm.tabs.selected
@@ -69,6 +87,24 @@ fun BrowserScreen(
         onSwipeUp = if (settings.swipeUpOpensTabs) ({ showTabs = true }) else null,
     )
 
+    val runQuick: (QuickAction) -> Unit = { a ->
+        vm.countAction(a)
+        when (a) {
+            QuickAction.NEW_TAB, QuickAction.AUTO -> vm.newTab()
+            QuickAction.SHARE -> vm.share()
+            QuickAction.VOICE_SEARCH -> runCatching {
+                voiceLauncher.launch(
+                    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                        .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+                        .putExtra(RecognizerIntent.EXTRA_PROMPT, "تحدّث للبحث")
+                )
+            }
+            QuickAction.TRANSLATE -> showTranslate = true
+            QuickAction.BOOKMARK -> vm.toggleBookmark()
+            QuickAction.READ_ALOUD -> vm.readAloud()
+        }
+    }
+
     val addressBar = @Composable {
         AddressBar(
             tab = tab,
@@ -76,6 +112,12 @@ fun BrowserScreen(
             onSubmit = vm::load,
             onShieldClick = vm::toggleSiteException,
             modifier = gestures,
+            quickAction = if (settings.quickActionEnabled) {
+                {
+                    val qa = settings.effectiveQuickAction()
+                    QuickActionButton(qa, speaking) { runQuick(qa) }
+                }
+            } else null,
         )
     }
 
@@ -86,6 +128,15 @@ fun BrowserScreen(
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             GeckoViewHost(tab, onViewReady = { vm.translate.geckoView = it })
+
+            // صفحة علامة التبويب الجديدة الأصلية
+            if (tab != null && tab.url == "about:blank" && !tab.loading) {
+                NewTabPage(settings.newTab, bookmarks, history, onOpen = vm::load, onCustomize = openNewTabSettings)
+            }
+            // صفحة إضافة في متجر Chrome ⇒ زر "إضافة إلى سفر"
+            if (ChromeStore.extensionId(tab?.url) != null) {
+                WebStoreBanner(onClick = { showStore = true }, modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp))
+            }
 
             if (settings.translate.enabled) {
                 TranslateStatusChip(
@@ -155,23 +206,42 @@ fun BrowserScreen(
                         }
                     },
                     menu = {
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            val close = { menuOpen = false }
-                            MenuItem("تبويب جديد", close) { vm.newTab() }
-                            MenuItem("تبويب متخفٍ جديد", close) { vm.newTab(private = true) }
-                            MenuItem(
-                                if (tab != null && vm.isBookmarked(tab.url)) "إزالة الإشارة المرجعية" else "إضافة إشارة مرجعية", close,
-                            ) { vm.toggleBookmark() }
-                            MenuItem("الإشارات المرجعية", close) { openBookmarks() }
-                            MenuItem("الترجمة الحية", close) { showTranslate = true }
-                            MenuItem(
-                                if (vm.currentHostExcepted()) "تفعيل الحماية لهذا الموقع" else "استثناء هذا الموقع من الحماية", close,
-                            ) { vm.toggleSiteException() }
-                            MenuItem("مشاركة", close) { vm.share() }
-                            HorizontalDivider()
-                            MenuItem("الإضافات", close) { openExtensions() }
-                            MenuItem("الإعدادات", close) { openSettings() }
-                        }
+                        MainMenu(
+                            expanded = menuOpen,
+                            onDismiss = { menuOpen = false },
+                            canGoBack = tab?.canGoBack == true,
+                            canGoForward = tab?.canGoForward == true,
+                            bookmarked = tab != null && bookmarks.any { it.url == tab.url },
+                            desktopMode = tab?.desktopMode == true,
+                            showZoom = settings.showZoomInMenu,
+                            zoom = vm.currentZoom(),
+                            siteExcepted = vm.currentHostExcepted(),
+                            a = MenuActions(
+                                reload = { tab?.session?.reload() },
+                                savePage = { vm.savePage() },
+                                toggleBookmark = { vm.toggleBookmark(); vm.countAction(QuickAction.BOOKMARK) },
+                                back = { tab?.session?.goBack() },
+                                forward = { tab?.session?.goForward() },
+                                newTab = { vm.newTab(); vm.countAction(QuickAction.NEW_TAB) },
+                                newPrivateTab = { vm.newTab(private = true) },
+                                addToNewGroup = vm::addCurrentToNewGroup,
+                                history = openHistory,
+                                clearData = { showClearData = true },
+                                downloads = vm::openDownloads,
+                                bookmarks = openBookmarks,
+                                recentTabs = { showRecent = true },
+                                translate = { showTranslate = true; vm.countAction(QuickAction.TRANSLATE) },
+                                toggleDesktop = vm::toggleDesktopMode,
+                                readAloud = { vm.readAloud(); vm.countAction(QuickAction.READ_ALOUD) },
+                                share = { vm.share(); vm.countAction(QuickAction.SHARE) },
+                                siteShield = vm::toggleSiteException,
+                                zoom = vm::setZoom,
+                                extensions = openExtensions,
+                                webStore = vm::openChromeWebStore,
+                                settings = openSettings,
+                                customizeNewTab = openNewTabSettings,
+                            ),
+                        )
                     },
                 )
             }
@@ -181,6 +251,7 @@ fun BrowserScreen(
     if (showTabs) {
         TabsSheet(
             tabs = vm.tabs.tabs,
+            groups = vm.tabs.groups,
             selectedId = vm.tabs.selectedId,
             onSelect = vm.tabs::select,
             onClose = vm::closeTab,
@@ -193,9 +264,8 @@ fun BrowserScreen(
     if (showTranslate) {
         TranslatePanel(vm = vm, onDismiss = { showTranslate = false })
     }
+    if (showRecent) RecentTabsSheet(vm.tabs.recentlyClosed, vm::reopenClosed) { showRecent = false }
+    if (showClearData) ClearDataDialog(onDismiss = { showClearData = false }, onConfirm = vm::clearBrowsingData)
+    if (showStore) WebStoreSheet(analyze = vm::analyzeStoreExtension, onInstall = vm::installExtension) { showStore = false }
 }
 
-@Composable
-private fun MenuItem(label: String, close: () -> Unit, action: () -> Unit) {
-    DropdownMenuItem(text = { Text(label) }, onClick = { close(); action() })
-}

@@ -23,7 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.safar.browser.BrowserViewModel
+import app.safar.browser.data.QuickAction
 import app.safar.browser.data.ToolbarItem
+import app.safar.browser.data.effectiveQuickAction
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.RadioButton
 
 private const val MAX_ITEMS = 7
 
@@ -43,6 +47,23 @@ fun ToolbarCustomizeScreen(vm: BrowserViewModel, onBack: () -> Unit) {
         })
     }) { pad ->
         LazyColumn(Modifier.padding(pad)) {
+            // اختصارات شريط الأدوات (الزر الذكي بجانب شريط العنوان) — مثل Chrome
+            item { Text("اختصارات شريط الأدوات", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(16.dp)) }
+            item {
+                SwitchRow("اختصارات شريط الأدوات", s.quickActionEnabled, "زر سريع بجانب شريط العنوان لأكثر مهمة تستخدمها") { v ->
+                    vm.updateSettings { it.copy(quickActionEnabled = v) }
+                }
+            }
+            if (s.quickActionEnabled) {
+                items(QuickAction.entries, key = { "qa-${it.name}" }) { qa ->
+                    ListItem(
+                        leadingContent = { RadioButton(selected = s.quickAction == qa, onClick = { vm.updateSettings { it.copy(quickAction = qa) } }) },
+                        headlineContent = { Text(qa.labelAr) },
+                        supportingContent = if (qa == QuickAction.AUTO) ({ Text("الاقتراح الحالي: ${s.effectiveQuickAction().labelAr}") }) else null,
+                        modifier = Modifier.clickable { vm.updateSettings { it.copy(quickAction = qa) } },
+                    )
+                }
+            }
             item {
                 Text("المفعّلة (${enabled.size}/$MAX_ITEMS) — بالترتيب من البداية", style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(16.dp))

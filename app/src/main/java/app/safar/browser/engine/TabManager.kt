@@ -21,6 +21,7 @@ import org.mozilla.geckoview.WebResponse
 interface TabEvents {
     fun onTabCreated(tab: BrowserTab) {}
     fun onLocationChanged(tab: BrowserTab) {}
+    fun onTitleChanged(tab: BrowserTab) {}
     fun onExternalResponse(tab: BrowserTab, response: WebResponse) {}
     fun onExternalUri(uri: String): Boolean = false
     fun onMediaActivated(tab: BrowserTab, media: MediaSession) {}
@@ -30,11 +31,19 @@ interface TabEvents {
     fun promptDelegate(): GeckoSession.PromptDelegate? = null
 }
 
+data class TabGroup(val id: Long, val name: String, val color: Long)
+
+/** تبويب مغلق مؤخراً (لـ "علامات التبويب الأخيرة"). */
+data class ClosedTab(val url: String, val title: String, val state: String?, val time: Long = System.currentTimeMillis())
+
 class TabManager(
     private val runtime: GeckoRuntime,
     private val events: TabEvents,
 ) {
     val tabs = mutableStateListOf<BrowserTab>()
+    val groups = mutableStateListOf<TabGroup>()
+    val recentlyClosed = mutableStateListOf<ClosedTab>()
+    private val groupColors = listOf(0xFF1E88E5, 0xFF43A047, 0xFFE53935, 0xFF8E24AA, 0xFFFB8C00, 0xFF00897B)
     var selectedId by mutableStateOf<Long?>(null)
         private set
 
@@ -48,13 +57,17 @@ class TabManager(
         select: Boolean = true,
         restoreState: String? = null,
         open: Boolean = true,
+        desktop: Boolean = false,
     ): BrowserTab {
         val settings = GeckoSessionSettings.Builder()
             .usePrivateMode(private)
             .useTrackingProtection(true)
+            .userAgentMode(if (desktop) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP else GeckoSessionSettings.USER_AGENT_MODE_MOBILE)
+            .viewportMode(if (desktop) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE)
             .build()
         val session = GeckoSession(settings)
         val tab = BrowserTab(nextId++, session, private)
+        tab.desktopMode = desktop
         attachDelegates(tab)
         if (open) session.open(runtime)
         tabs.add(tab)
@@ -80,11 +93,49 @@ class TabManager(
         val idx = tabs.indexOfFirst { it.id == id }
         if (idx < 0) return
         val tab = tabs.removeAt(idx)
+        if (!tab.isPrivate && tab.url.startsWith("http")) {
+            recentlyClosed.add(0, ClosedTab(tab.url, tab.title, tab.sessionState))
+            while (recentlyClosed.size > 25) recentlyClosed.removeAt(recentlyClosed.lastIndex)
+        }
         tab.session.close()
+        groups.removeAll { g -> tabs.none { it.groupId == g.id } }
         if (selectedId == id) {
             selectedId = null
             tabs.getOrNull(idx.coerceAtMost(tabs.lastIndex))?.let { select(it.id) }
         }
+    }
+
+    /** إعادة فتح تبويب مغلق مؤخراً مع سجل تنقله. */
+    fun reopen(closed: ClosedTab) {
+        recentlyClosed.remove(closed)
+        newTab(closed.url, restoreState = closed.state)
+    }
+
+    /**
+     * تبديل وضع الكمبيوتر/الهاتف مع الحفاظ على حالة التصفح: نغيّر User-Agent ونمط الـ viewport لنفس الجلسة
+     * (لا نفتح جلسة جديدة) ثم نعيد التحميل، فيبقى سجل الرجوع والتقدّم كما هو.
+     */
+    fun setDesktopMode(tab: BrowserTab, desktop: Boolean) {
+        if (tab.desktopMode == desktop) return
+        tab.desktopMode = desktop
+        tab.session.settings.userAgentMode =
+            if (desktop) GeckoSessionSettings.USER_AGENT_MODE_DESKTOP else GeckoSessionSettings.USER_AGENT_MODE_MOBILE
+        tab.session.settings.viewportMode =
+            if (desktop) GeckoSessionSettings.VIEWPORT_MODE_DESKTOP else GeckoSessionSettings.VIEWPORT_MODE_MOBILE
+        tab.session.reload()
+    }
+
+    /** "الإضافة إلى مجموعة جديدة": ينشئ مجموعة ويضيف إليها التبويب. */
+    fun addToNewGroup(tab: BrowserTab): TabGroup {
+        val g = TabGroup(System.currentTimeMillis(), "مجموعة ${groups.size + 1}", groupColors[groups.size % groupColors.size])
+        groups.add(g)
+        tab.groupId = g.id
+        return g
+    }
+
+    fun moveToGroup(tab: BrowserTab, groupId: Long?) {
+        tab.groupId = groupId
+        groups.removeAll { g -> tabs.none { it.groupId == g.id } }
     }
 
     fun closeAllPrivate() = tabs.filter { it.isPrivate }.forEach { close(it.id) }
@@ -154,7 +205,10 @@ class TabManager(
         }
 
         s.contentDelegate = object : ContentDelegate {
-            override fun onTitleChange(session: GeckoSession, title: String?) { tab.title = title.orEmpty() }
+            override fun onTitleChange(session: GeckoSession, title: String?) {
+                tab.title = title.orEmpty()
+                events.onTitleChanged(tab)
+            }
             override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
                 events.onExternalResponse(tab, response)
             }

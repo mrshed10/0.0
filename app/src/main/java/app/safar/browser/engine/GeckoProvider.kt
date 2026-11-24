@@ -3,6 +3,8 @@ package app.safar.browser.engine
 import android.content.Context
 import app.safar.browser.BuildConfig
 import app.safar.browser.data.BrowserSettings
+import app.safar.browser.data.SecureDnsMode
+import app.safar.browser.data.dohUri
 import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoRuntimeSettings
@@ -51,6 +53,27 @@ object GeckoProvider {
         cb.setStrictSocialTrackingProtection(s.adBlock)
         runtime.settings.setAllowInsecureConnections(insecure(s))
         runtime.settings.setFingerprintingProtection(s.blockCanvas) // GV-API
+        // فرض تفعيل التكبير: تجاوز user-scalable=no / maximum-scale في المواقع
+        runtime.settings.setForceUserScalableEnabled(s.forceEnableZoom)
+        applySecureDns(runtime, s)
+    }
+
+    /**
+     * DNS الآمن (DNS over HTTPS) عبر TRR في Gecko:
+     *  - تلقائي: DoH أولاً مع الرجوع لـ DNS الشبكة عند الفشل (TRR_MODE_FIRST)
+     *  - مقدم محدد: DoH فقط (TRR_MODE_ONLY) — لا تسرب لطلبات DNS عادية
+     */
+    private fun applySecureDns(runtime: GeckoRuntime, s: BrowserSettings) {
+        val uri = s.dohUri()
+        val rs = runtime.settings
+        if (uri == null) {
+            rs.setTrustedRecursiveResolverMode(GeckoRuntimeSettings.TRR_MODE_OFF) // GV-API
+            return
+        }
+        rs.setTrustedRecursiveResolverUri(uri)
+        rs.setTrustedRecursiveResolverMode(
+            if (s.secureDns == SecureDnsMode.PROVIDER) GeckoRuntimeSettings.TRR_MODE_ONLY else GeckoRuntimeSettings.TRR_MODE_FIRST
+        )
     }
 
     private fun antiTracking(s: BrowserSettings): Int =

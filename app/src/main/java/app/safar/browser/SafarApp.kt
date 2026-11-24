@@ -4,6 +4,7 @@ import android.app.Application
 import app.safar.browser.backup.BackupManager
 import app.safar.browser.data.BookmarkStore
 import app.safar.browser.data.BrowserSettings
+import app.safar.browser.data.HistoryStore
 import app.safar.browser.data.SecureKeyStore
 import app.safar.browser.data.SessionStore
 import app.safar.browser.data.SettingsRepository
@@ -31,8 +32,9 @@ class AppContainer(val app: Application) {
     val settingsRepo = SettingsRepository(app)
     val keys = SecureKeyStore(app)
     val bookmarks = BookmarkStore(app)
+    val history = HistoryStore(app)
     val sessionStore = SessionStore(app)
-    val backup = BackupManager(app, settingsRepo, bookmarks, sessionStore)
+    val backup = BackupManager(app, settingsRepo, bookmarks, sessionStore, history)
 
     // قراءة واحدة سريعة متزامنة عند الإقلاع ليُنشأ المحرك بالإعدادات الصحيحة من البداية
     private val initial: BrowserSettings = runBlocking { settingsRepo.current() }

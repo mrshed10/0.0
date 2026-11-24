@@ -43,12 +43,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.safar.browser.engine.BrowserTab
+import app.safar.browser.engine.TabGroup
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import app.safar.browser.engine.UrlUtils
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TabsSheet(
     tabs: List<BrowserTab>,
+    groups: List<TabGroup> = emptyList(),
     selectedId: Long?,
     onSelect: (Long) -> Unit,
     onClose: (Long) -> Unit,
@@ -56,7 +67,22 @@ fun TabsSheet(
     onCloseAllPrivate: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var groupFilter by remember { mutableStateOf<Long?>(null) }
+    val shown = if (groupFilter == null) tabs else tabs.filter { it.groupId == groupFilter }
     ModalBottomSheet(onDismissRequest = onDismiss) {
+        if (groups.isNotEmpty()) {
+            // مجموعات التبويبات
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = groupFilter == null, onClick = { groupFilter = null }, label = { Text("الكل (${tabs.size})") })
+                groups.forEach { g ->
+                    FilterChip(
+                        selected = groupFilter == g.id, onClick = { groupFilter = g.id },
+                        label = { Text("${g.name} (${tabs.count { it.groupId == g.id }})") },
+                        leadingIcon = { Box(Modifier.size(10.dp).background(Color(g.color), CircleShape)) },
+                    )
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             AssistChip(onClick = { onNew(false); onDismiss() }, label = { Text("تبويب جديد") }, leadingIcon = { Icon(Icons.Filled.Add, null) })
             AssistChip(onClick = { onNew(true); onDismiss() }, label = { Text("تبويب متخفٍ") }, leadingIcon = { Icon(Icons.Outlined.VisibilityOff, null) })
@@ -68,15 +94,15 @@ fun TabsSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(tabs, key = { it.id }) { tab ->
-                TabCard(tab, tab.id == selectedId, { onSelect(tab.id); onDismiss() }, { onClose(tab.id) })
+            items(shown, key = { it.id }) { tab ->
+                TabCard(tab, tab.id == selectedId, { onSelect(tab.id); onDismiss() }, { onClose(tab.id) }, groups.firstOrNull { it.id == tab.groupId })
             }
         }
     }
 }
 
 @Composable
-private fun TabCard(tab: BrowserTab, selected: Boolean, onClick: () -> Unit, onClose: () -> Unit) {
+private fun TabCard(tab: BrowserTab, selected: Boolean, onClick: () -> Unit, onClose: () -> Unit, group: TabGroup? = null) {
     Card(
         onClick = onClick,
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
@@ -96,6 +122,7 @@ private fun TabCard(tab: BrowserTab, selected: Boolean, onClick: () -> Unit, onC
                 IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "إغلاق") }
             }
             Spacer(Modifier.weight(1f))
+            if (group != null) Text("● ${group.name}", color = Color(group.color), style = MaterialTheme.typography.labelSmall, maxLines = 1)
             Text(UrlUtils.display(tab.url), maxLines = 1, style = MaterialTheme.typography.bodySmall,
                 color = if (tab.isPrivate) Color.White.copy(alpha = .7f) else MaterialTheme.colorScheme.onSurfaceVariant)
         }

@@ -30,6 +30,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.safar.browser.ui.browser.BookmarksScreen
 import app.safar.browser.ui.browser.BrowserScreen
+import app.safar.browser.ui.browser.ClearDataDialog
+import app.safar.browser.ui.browser.HistoryScreen
+import app.safar.browser.ui.settings.DnsSettingsScreen
+import app.safar.browser.ui.settings.NewTabSettingsScreen
 import app.safar.browser.ui.extensions.ExtensionsScreen
 import app.safar.browser.ui.onboarding.OnboardingScreen
 import app.safar.browser.ui.settings.SettingsScreen
@@ -38,7 +42,7 @@ import app.safar.browser.ui.theme.SafarTheme
 import org.mozilla.geckoview.GeckoView
 import java.lang.ref.WeakReference
 
-enum class Screen { BROWSER, SETTINGS, TOOLBAR, EXTENSIONS, BOOKMARKS }
+enum class Screen { BROWSER, SETTINGS, TOOLBAR, EXTENSIONS, BOOKMARKS, HISTORY, DNS, NEWTAB }
 
 class MainActivity : ComponentActivity() {
     private val vm: BrowserViewModel by viewModels()
@@ -72,7 +76,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler(enabled = screen != Screen.BROWSER) {
-                    screen = if (screen == Screen.TOOLBAR) Screen.SETTINGS else Screen.BROWSER
+                    screen = if (screen == Screen.TOOLBAR || screen == Screen.DNS) Screen.SETTINGS else Screen.BROWSER
                 }
 
                 when (screen) {
@@ -81,15 +85,28 @@ class MainActivity : ComponentActivity() {
                         openSettings = { screen = Screen.SETTINGS },
                         openExtensions = { screen = Screen.EXTENSIONS },
                         openBookmarks = { screen = Screen.BOOKMARKS },
+                        openHistory = { screen = Screen.HISTORY },
+                        openNewTabSettings = { screen = Screen.NEWTAB },
                     )
                     Screen.SETTINGS -> SettingsScreen(
                         vm = vm,
                         onBack = { screen = Screen.BROWSER },
                         openToolbar = { screen = Screen.TOOLBAR },
                         requestDefaultBrowser = ::requestDefaultBrowser,
+                        openDns = { screen = Screen.DNS },
+                        openNewTab = { screen = Screen.NEWTAB },
                     )
                     Screen.TOOLBAR -> ToolbarCustomizeScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
                     Screen.EXTENSIONS -> ExtensionsScreen(vm = vm, onBack = { screen = Screen.BROWSER })
+                    Screen.HISTORY -> {
+                        var clear by remember { mutableStateOf(false) }
+                        HistoryScreen(vm = vm, onBack = { screen = Screen.BROWSER }, onOpen = {
+                            vm.load(it); screen = Screen.BROWSER
+                        }, onClearData = { clear = true })
+                        if (clear) ClearDataDialog(onDismiss = { clear = false }, onConfirm = vm::clearBrowsingData)
+                    }
+                    Screen.DNS -> DnsSettingsScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
+                    Screen.NEWTAB -> NewTabSettingsScreen(vm = vm, onBack = { screen = Screen.BROWSER })
                     Screen.BOOKMARKS -> BookmarksScreen(vm = vm, onBack = { screen = Screen.BROWSER }, onOpen = {
                         vm.load(it); screen = Screen.BROWSER
                     })

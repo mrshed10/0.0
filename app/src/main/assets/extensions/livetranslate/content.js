@@ -50,7 +50,9 @@
       if (p) { clearTimeout(p.timer); pendingRpc.delete(msg.rpc); p.resolve(msg.data); }
       return;
     }
-    if (msg.cmd === "config") applyConfig(msg);
+    if (msg.cmd === "config") { applyConfig(msg); if (isTop && typeof msg.zoom === "number") applyZoom(msg.zoom); }
+    else if (msg.cmd === "zoom" && isTop) applyZoom(msg.value);
+    else if (msg.cmd === "pageText" && isTop) replyPageText(msg.id);
     else if (msg.cmd === "rectText" && isTop) replyRectText(msg);
     else if (msg.cmd === "overlays" && isTop) placeBoxes(msg.boxes || [], vvPageLeft(), vvPageTop(), msg.scope || "float");
     else if (msg.cmd === "clearOverlays" && isTop) clearOverlays(msg.scope);
@@ -563,5 +565,21 @@
     }
     send({ type: "rectTextResult", id: msg.id, text: parts.join(" ").slice(0, 4000) }).catch(() => {});
   }
+  /* ============================== أدوات الصفحة ============================== */
+  /** تكبير/تصغير محتوى الصفحة (مستوى محفوظ لكل موقع). يُطبق على body فلا تتأثر طبقة الترجمة. */
+  function applyZoom(pct) {
+    const v = Math.max(30, Math.min(300, pct || 100));
+    if (!document.body) { document.addEventListener("DOMContentLoaded", () => applyZoom(v), { once: true }); return; }
+    document.body.style.zoom = v === 100 ? "" : String(v / 100);
+  }
+
+  /** نص الصفحة للاستماع إليها (القراءة الصوتية). يفضّل المحتوى الرئيسي إن وُجد. */
+  function replyPageText(id) {
+    const main = document.querySelector("article, main, [role=main]") || document.body;
+    const text = (originals.size ? main.innerText : main.innerText || "").replace(/\n{3,}/g, "\n\n").slice(0, 40000);
+    const lang = document.documentElement.lang || "";
+    send({ type: "pageTextResult", id, text, lang }).catch(() => {});
+  }
+
   connect();
 })();

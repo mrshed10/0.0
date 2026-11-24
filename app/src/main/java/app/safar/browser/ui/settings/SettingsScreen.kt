@@ -30,7 +30,10 @@ import app.safar.browser.data.LANGUAGES
 import app.safar.browser.data.OcrEngineId
 import app.safar.browser.data.ProviderId
 import app.safar.browser.data.SearchEngines
+import app.safar.browser.data.SecureDnsMode
 import app.safar.browser.data.SecureKeyStore
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -48,6 +51,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     openToolbar: () -> Unit,
     requestDefaultBrowser: () -> Unit,
+    openDns: () -> Unit,
+    openNewTab: () -> Unit,
 ) {
     val s by vm.settings.collectAsStateWithLifecycle()
     var dialog by remember { mutableStateOf<Dialog?>(null) }
@@ -80,6 +85,7 @@ fun SettingsScreen(
             }
             item { SwitchRow("استعادة التبويبات عند الفتح", s.restoreTabs) { v -> vm.updateSettings { it.copy(restoreTabs = v) } } }
             item { ClickRow("تعيين كمتصفح افتراضي", "لفتح الروابط من التطبيقات الأخرى في سفر", requestDefaultBrowser) }
+            item { ClickRow("تخصيص علامة تبويب جديدة", "الاختصارات، الإشارات، آخر الزيارات، الخلفية", openNewTab) }
 
             // ------------------------------------------------ الواجهة والإيماءات
             item { SectionTitle("الواجهة والإيماءات") }
@@ -88,7 +94,14 @@ fun SettingsScreen(
                     vm.updateSettings { it.copy(addressBar = p) }
                 }
             }
-            item { ClickRow("تخصيص أزرار شريط الأدوات", s.toolbarItems.joinToString("، ") { it.labelAr }, openToolbar) }
+            item {
+                ClickRow(
+                    "تخصيص شريط الأدوات واختصاراته",
+                    s.toolbarItems.joinToString("، ") { it.labelAr } + " • الزر السريع: " +
+                        (if (s.quickActionEnabled) s.quickAction.labelAr else "متوقف"),
+                    openToolbar,
+                )
+            }
             item {
                 ChoiceRow("السحب الأفقي على الشريط", GestureAction.entries, s.barSwipe, { it.labelAr }) { g ->
                     vm.updateSettings { it.copy(barSwipe = g) }
@@ -103,6 +116,17 @@ fun SettingsScreen(
             item { SwitchRow("حظر الكوكيز الخارجية", s.blockThirdPartyCookies, "عند الإيقاف تبقى معزولة لكل موقع") { v -> vm.updateSettings { it.copy(blockThirdPartyCookies = v) } } }
             item { SwitchRow("إخفاء عنوان الشبكة المحلي (WebRTC)", s.hideLocalIp) { v -> vm.updateSettings { it.copy(hideLocalIp = v) } } }
             item { SwitchRow("منع قراءة Canvas (البصمة الرقمية)", s.blockCanvas) { v -> vm.updateSettings { it.copy(blockCanvas = v) } } }
+            item {
+                ClickRow(
+                    "استخدام نظام أسماء النطاقات (DNS) الآمن",
+                    when (s.secureDns) {
+                        SecureDnsMode.OFF -> "متوقف"
+                        SecureDnsMode.AUTOMATIC -> "تلقائي"
+                        SecureDnsMode.PROVIDER -> s.dnsProvider.labelAr
+                    },
+                    openDns,
+                )
+            }
             item {
                 ClickRow("إضافة موقع مستثنى", "${s.siteExceptions.size} موقع مستثنى") {
                     dialog = Dialog.Text("نطاق الموقع (مثال: example.com)", "") { v ->
@@ -165,6 +189,32 @@ fun SettingsScreen(
                 }
             }
 
+            // ------------------------------------------------ التكبير والتصغير
+            item { SectionTitle("التكبير والتصغير") }
+            item { SwitchRow("عرض خيار التكبير أو التصغير في القائمة الرئيسية", s.showZoomInMenu, "تخصيص حجم المحتوى لكل موقع بسهولة") { v -> vm.updateSettings { it.copy(showZoomInMenu = v) } } }
+            item { SwitchRow("فرض تفعيل التكبير أو التصغير", s.forceEnableZoom, "تجاوز طلب الموقع الإلكتروني لمنع التكبير") { v -> vm.updateSettings { it.copy(forceEnableZoom = v) } } }
+            item { Text("مستويات التكبير أو التصغير المحفوظة للمواقع الإلكترونية", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 16.dp, top = 8.dp)) }
+            if (s.siteZoom.isEmpty()) item { Text("لا توجد مستويات محفوظة", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)) }
+            s.siteZoom.toSortedMap().forEach { (host, pct) ->
+                item(key = "zoom-$host") {
+                    ListItem(headlineContent = { Text(host) }, supportingContent = { Text("$pct%") }, trailingContent = {
+                        TextButton(onClick = { vm.resetZoom(host) }) { Text("إعادة الضبط") }
+                    })
+                }
+            }
+
+            // ------------------------------------------------ وضع سطح المكتب
+            item { SectionTitle("الموقع المصمم للكمبيوتر") }
+            item { SwitchRow("وضع الكمبيوتر افتراضياً للتبويبات الجديدة", s.desktopByDefault) { v -> vm.updateSettings { it.copy(desktopByDefault = v) } } }
+            item { SwitchRow("وضع الكمبيوتر تلقائياً في متجر Chrome", s.autoDesktopForWebStore) { v -> vm.updateSettings { it.copy(autoDesktopForWebStore = v) } } }
+            s.desktopSites.sorted().forEach { host ->
+                item(key = "desk-$host") {
+                    ListItem(headlineContent = { Text(host) }, supportingContent = { Text("يفتح دائماً بنسخة الكمبيوتر") }, trailingContent = {
+                        IconButton(onClick = { vm.updateSettings { it.copy(desktopSites = it.desktopSites - host) } }) { Icon(Icons.Filled.Close, "إزالة") }
+                    })
+                }
+            }
+
             // ------------------------------------------------ التحميل والوسائط
             item { SectionTitle("التحميل والوسائط") }
             item { SwitchRow("تشغيل الصوت في الخلفية", s.backgroundAudio, "يستمر عند تبديل التطبيقات أو قفل الشاشة") { v -> vm.updateSettings { it.copy(backgroundAudio = v) } } }
@@ -182,7 +232,7 @@ fun SettingsScreen(
             // ------------------------------------------------ النسخ الاحتياطي
             item { SectionTitle("النسخ الاحتياطي") }
             item {
-                ClickRow("حفظ نسخة احتياطية مشفرة", "الإعدادات + الإشارات المرجعية + الجلسات + قائمة الإضافات (بدون مفاتيح API)") {
+                ClickRow("حفظ نسخة احتياطية مشفرة", "الإعدادات + الإشارات المرجعية + السجل + الجلسة الحالية بكل تبويباتها + الإضافات (بدون مفاتيح API)") {
                     val date = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
                     exportLauncher.launch("safar-backup-$date.sfbk")
                 }

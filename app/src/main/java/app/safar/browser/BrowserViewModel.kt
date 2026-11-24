@@ -4,11 +4,21 @@ import android.app.Activity
 import android.app.Application
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.os.Build
 import android.net.Uri
 import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.safar.browser.data.BrowserSettings
+import app.safar.browser.data.HistoryEntry
+import app.safar.browser.data.QuickAction
+import app.safar.browser.engine.ClosedTab
+import app.safar.browser.engine.PageSaver
+import app.safar.browser.extensions.ChromeStore
+import app.safar.browser.extensions.ChromeStoreBridge
+import app.safar.browser.extensions.StoreAnalysis
+import app.safar.browser.media.PageReader
+import org.mozilla.geckoview.StorageController
 import app.safar.browser.data.ContentKind
 import app.safar.browser.data.ProviderId
 import app.safar.browser.data.SearchEngines
@@ -21,6 +31,7 @@ import app.safar.browser.engine.GeckoProvider
 import app.safar.browser.engine.TabEvents
 import app.safar.browser.engine.TabManager
 import app.safar.browser.engine.UrlUtils
+import app.safar.browser.engine.await
 import app.safar.browser.extensions.ExtensionManager
 import app.safar.browser.media.MediaBridge
 import app.safar.browser.media.MediaPlaybackService
@@ -53,6 +64,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
     val settings: StateFlow<BrowserSettings> = c.settings
     val keys: SecureKeyStore = c.keys
     val bookmarks = c.bookmarks.items
+    val history = c.history.items
+    val pageReader = PageReader(app)
+    private val storeBridge = ChromeStoreBridge()
 
     var activity: WeakReference<Activity>? = null
     private val promptDelegate = BasicPromptDelegate { activity?.get() }
@@ -78,6 +92,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
     )
     val translate: LiveTranslateController = LiveTranslateController(
         c.runtime, viewModelScope, { settings.value }, router, OcrRouter(MlKitOcr(), TesseractOcr(app)),
+        zoomFor = { url -> UrlUtils.host(url)?.let { settings.value.siteZoom[it] } ?: 100 },
         onSuggestManga = {
             if (settings.value.translate.content == ContentKind.TEXT) {
                 updateTranslate { it.copy(content = ContentKind.MANGA) }
@@ -137,6 +152,15 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
         if (privacy.applyExceptionFor(tab, settings.value)) tab.session.reload()
         val host = UrlUtils.host(tab.url)
         if (tab.id == tabs.selectedId && host != lastHost) { lastHost = host; translate.onNavigated() }
+        if (!tab.isPrivate) viewModelScope.launch { c.history.record(tab.url, tab.title) }
+        // وضع سطح المكتب التلقائي: مواقع محفوظة + متجر Chrome (ليسهل التصفح والتحميل)
+        val s = settings.value
+        val wantDesktop = host != null && (host in s.desktopSites || (s.autoDesktopForWebStore && ChromeStore.isStoreUrl(tab.url)))
+        if (wantDesktop && !tab.desktopMode) tabs.setDesktopMode(tab, true)
+    }
+
+    override fun onTitleChanged(tab: BrowserTab) {
+        if (!tab.isPrivate) viewModelScope.launch { c.history.updateTitle(tab.url, tab.title) }
     }
 
     override fun onExternalResponse(tab: BrowserTab, response: WebResponse) =
@@ -209,7 +233,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
         tabs.newTab(UrlUtils.toUrlOrSearch(url, SearchEngines.byId(settings.value.searchEngineId).template), private)
     }
 
-    fun newTab(private: Boolean = false) = tabs.newTab(settings.value.homePage, private)
+    fun newTab(private: Boolean = false) = tabs.newTab(settings.value.homePage, private, desktop = settings.value.desktopByDefault)
 
     fun closeTab(id: Long) {
         tabs.tabs.firstOrNull { it.id == id }?.let { translate.detach(it.session) }
@@ -299,6 +323,105 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
         password.fill('\u0000')
     }
 
+    // ---------------------------------------------------------------- وضع سطح المكتب
+
+    /** تبديل الموقع الحالي بين الهاتف والكمبيوتر، مع تذكّر الاختيار لهذا الموقع. */
+    fun toggleDesktopMode() {
+        val tab = tabs.selected ?: return
+        val on = !tab.desktopMode
+        tabs.setDesktopMode(tab, on)
+        UrlUtils.host(tab.url)?.let { host ->
+            updateSettings { it.copy(desktopSites = if (on) it.desktopSites + host else it.desktopSites - host) }
+        }
+    }
+
+    fun openChromeWebStore() {
+        val tab = tabs.newTab(ChromeStore.HOME_URL, desktop = settings.value.autoDesktopForWebStore)
+        tab.url = ChromeStore.HOME_URL
+    }
+
+    suspend fun analyzeStoreExtension(): StoreAnalysis {
+        val t = tabs.selected ?: throw IllegalStateException("لا توجد صفحة")
+        return storeBridge.analyze(t.url, t.title)
+    }
+
+    // ---------------------------------------------------------------- التكبير والتصغير
+
+    fun currentZoom(): Int = UrlUtils.host(tabs.selected?.url)?.let { settings.value.siteZoom[it] } ?: 100
+
+    /** حفظ مستوى التكبير لهذا الموقع وتطبيقه فوراً. */
+    fun setZoom(pct: Int) {
+        val v = pct.coerceIn(50, 300)
+        val host = UrlUtils.host(tabs.selected?.url) ?: return
+        updateSettings { s -> s.copy(siteZoom = if (v == 100) s.siteZoom - host else s.siteZoom + (host to v)) }
+        translate.setZoom(tabs.selected?.session, v)
+    }
+
+    fun resetZoom(host: String) = updateSettings { it.copy(siteZoom = it.siteZoom - host) }
+
+    // ---------------------------------------------------------------- حفظ الصفحة
+
+    fun savePage(share: Boolean = false) = viewModelScope.launch {
+        val t = tabs.selected ?: return@launch
+        runCatching { PageSaver.saveAsPdf(getApplication(), t.session, t.title.ifBlank { UrlUtils.display(t.url) }) }
+            .onSuccess { uri ->
+                toast("تم حفظ الصفحة في التنزيلات/Safar")
+                if (share && Build.VERSION.SDK_INT >= 29) {
+                    val i = Intent(Intent.ACTION_SEND).setType("application/pdf").putExtra(Intent.EXTRA_STREAM, uri)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    activity?.get()?.startActivity(Intent.createChooser(i, t.title))
+                }
+            }
+            .onFailure { toast("تعذر حفظ الصفحة: ${it.message}") }
+    }
+
+    // ---------------------------------------------------------------- السجل وحذف البيانات
+
+    fun removeHistory(e: HistoryEntry) = viewModelScope.launch { c.history.remove(e) }
+
+    /**
+     * حذف بيانات التصفح. نطاق الوقت يُطبق على السجل؛ الكوكيز وذاكرة التخزين المؤقت في Gecko تُحذف بالكامل
+     * (لا يوفر GeckoView حذفاً حسب الوقت).
+     */
+    fun clearBrowsingData(sinceMillis: Long, history: Boolean, cookies: Boolean, cache: Boolean) = viewModelScope.launch {
+        if (history) c.history.clearSince(sinceMillis)
+        var flags = 0L
+        if (cookies) flags = flags or StorageController.ClearFlags.COOKIES or StorageController.ClearFlags.SITE_DATA or
+            StorageController.ClearFlags.DOM_STORAGES or StorageController.ClearFlags.AUTH_SESSIONS
+        if (cache) flags = flags or StorageController.ClearFlags.ALL_CACHES
+        if (flags != 0L) runCatching { c.runtime.storageController.clearData(flags).await() }
+        if (history || cache) translate.clearCache()
+        toast("تم حذف بيانات التصفح")
+    }
+
+    fun openDownloads() {
+        runCatching {
+            activity?.get()?.startActivity(Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS))
+        }.onFailure { toast("لا يوجد تطبيق لعرض التنزيلات") }
+    }
+
+    fun reopenClosed(t: ClosedTab) = tabs.reopen(t)
+
+    fun addCurrentToNewGroup() {
+        val t = tabs.selected ?: return
+        val g = tabs.addToNewGroup(t)
+        toast("أُضيف التبويب إلى ${g.name}")
+    }
+
+    // ---------------------------------------------------------------- زر الاختصار السريع
+
+    /** تسجيل استخدام إجراء (لوضع "حسب معدل استخدامك"). */
+    fun countAction(a: QuickAction) = updateSettings { s ->
+        s.copy(actionUsage = s.actionUsage + (a.name to ((s.actionUsage[a.name] ?: 0) + 1)))
+    }
+
+    fun readAloud() = viewModelScope.launch {
+        if (pageReader.speaking.value) { pageReader.stop(); return@launch }
+        val (text, lang) = translate.requestPageText(tabs.selected?.session) ?: run { toast("تعذر قراءة نص الصفحة"); return@launch }
+        if (text.isBlank()) { toast("لا يوجد نص للقراءة"); return@launch }
+        pageReader.speak(text, lang)
+    }
+
     // ---------------------------------------------------------------- Intents
 
     fun handleIntent(intent: Intent?) {
@@ -312,6 +435,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
     private fun toast(msg: String) = Toast.makeText(getApplication(), msg, Toast.LENGTH_SHORT).show()
 
     override fun onCleared() {
+        pageReader.shutdown()
         saveSession()
         super.onCleared()
     }

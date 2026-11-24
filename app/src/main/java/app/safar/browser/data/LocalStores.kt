@@ -42,4 +42,19 @@ class BookmarkStore(context: Context) : JsonListStore<Bookmark>(context, "bookma
     fun contains(url: String) = items.value.any { it.url == url }
 }
 
+/** سجل التصفح (محلي فقط، لا يُسجل التصفح المتخفي). */
+class HistoryStore(context: Context) : JsonListStore<HistoryEntry>(context, "history.json", HistoryEntry.serializer()) {
+    suspend fun record(url: String, title: String) {
+        if (!url.startsWith("http")) return
+        set(HistoryLogic.add(items.value, HistoryEntry(url, title)))
+    }
+    suspend fun updateTitle(url: String, title: String) {
+        val cur = items.value
+        val i = cur.indexOfFirst { it.url == url }
+        if (i >= 0 && cur[i].title != title && title.isNotBlank()) set(cur.toMutableList().also { it[i] = it[i].copy(title = title) })
+    }
+    suspend fun remove(entry: HistoryEntry) = set(items.value - entry)
+    suspend fun clearSince(sinceMillis: Long) = set(items.value.filter { it.time < sinceMillis })
+}
+
 class SessionStore(context: Context) : JsonListStore<TabSnapshot>(context, "session.json", TabSnapshot.serializer())
