@@ -54,7 +54,7 @@
     else if (msg.cmd === "zoom" && isTop) applyZoom(msg.value);
     else if (msg.cmd === "pageText" && isTop) replyPageText(msg.id);
     else if (msg.cmd === "rectText" && isTop) replyRectText(msg);
-    else if (msg.cmd === "overlays" && isTop) placeBoxes(msg.boxes || [], vvPageLeft(), vvPageTop(), msg.scope || "float");
+    else if (msg.cmd === "overlays" && isTop) placeBoxes(msg.boxes || [], msg.scope || "float");
     else if (msg.cmd === "clearOverlays" && isTop) clearOverlays(msg.scope);
     else if (msg.cmd === "hide" && isTop) hideForCapture(msg.id);
     else if (msg.cmd === "show" && isTop) showAfterCapture();
@@ -262,15 +262,19 @@
 
   /* ============================== مانغا / صور ============================== */
   /*
-   * دورة الترجمة المستمرة (مستقلة تماماً عن المربع العائم، على كامل الشاشة المرئية):
-   *   إخفاء طبقة الترجمة ← انتظار إعادة الرسم ← التقاط الصفحة الأصلية ← OCR وتجميع الفقاعات ← ترجمة
-   *   ← مسح الترجمات القديمة في الشاشة ← رسم الجديدة.
-   * المشغّلات: فتح الصفحة، توقف التمرير (500ms)، تحميل صور، تكبير/تصغير، تغيّر الصفحة.
-   * التكرار ممنوع: التطبيق يقارن بصمة اللقطة ويرد "unchanged" إن لم يتغير شيء.
+   * التثبيت بالمرساة (Anchoring):
+   *   كل ترجمة تُربط بالعنصر الذي تقع فوقه (صورة/Canvas غالباً) وتُخزَّن إحداثياتها كنِسَب من مستطيله.
+   *   في كل إطار تمرير يُعاد حساب موضعها من موقع ذلك العنصر الفعلي على الشاشة ⇒ تبقى ملتصقة بالفقاعة
+   *   مهما كان من يمرّر (النافذة، حاوية داخلية مثل Manga Plus، تحويلات CSS، تقليب الصفحات).
+   *   إن تغيّرت صورة المرساة (صفحة جديدة) أو أُزيلت ⇒ تُحذف ترجماتها فوراً (لا بقايا في غير موضعها).
+   *
+   * دورة الترجمة المستمرة: إخفاء الطبقة ← التقاط ← OCR وتجميع الفقاعات ← ترجمة ← مسح القديم داخل الشاشة ← رسم الجديد.
+   * المشغّلات: فتح الصفحة، توقف أي تمرير (حتى الحاويات الداخلية) 500ms، تحميل صور، تغيّر الصور الظاهرة، تكبير، تنقل.
    */
-  let layer = null, scrollTimer = null, tickTimer = null, mangaOn = false, capturing = false;
-  let lastHref = location.href, lastScale = VV ? VV.scale : 1, failStreak = 0, forceNext = true;
-  const items = []; // {data, ox, oy, rect:{x,y,w,h} بإحداثيات الصفحة, scope:"cont"|"float", nodes}
+  let layer = null, scrollTimer = null, tickTimer = null, watchTimer = null, mangaOn = false, capturing = false;
+  let lastHref = location.href, lastScale = VV ? VV.scale : 1, failStreak = 0, forceNext = true, syncQueued = false;
+  let lastMediaSig = "", pendingSig = "";
+  const items = []; // {data, scope, anchor, anchorSrc, frac, docRect, nodes, cleanNode, textNode, span, ...}
 
   function ensureLayer() {
     if (layer && layer.isConnected) return layer;
@@ -293,28 +297,35 @@
     await hideLayer();
     send({ type: "hiddenAck", id }).catch(() => {});
   }
-  function showAfterCapture() { if (layer) layer.style.visibility = "visible"; }
+  function showAfterCapture() { if (layer) { syncPositions(); layer.style.visibility = "visible"; } }
 
   function schedule(delay = 500) {
     clearTimeout(scrollTimer);
     scrollTimer = setTimeout(captureViewport, delay);
   }
 
-  function onScroll() {
-    if (location.href !== lastHref) { lastHref = location.href; clearOverlays("cont"); forceNext = true; } // صفحة جديدة (SPA)
-    schedule(500); // بعد توقف التمرير
+  /** أي تمرير في الصفحة (مرحلة الالتقاط ⇒ يشمل الحاويات الداخلية): مزامنة فورية للمواضع + التقاط بعد التوقف. */
+  function onAnyScroll() {
+    requestSync();
+    if (location.href !== lastHref) { lastHref = location.href; clearOverlays("cont"); forceNext = true; }
+    if (mangaOn) schedule(500);
   }
 
   function onZoom() {
-    if (!VV || Math.abs(VV.scale - lastScale) < 0.01) { onScroll(); return; }
-    lastScale = VV.scale; forceNext = true; schedule(500);
+    requestSync();
+    if (!VV || Math.abs(VV.scale - lastScale) < 0.01) { onAnyScroll(); return; }
+    lastScale = VV.scale; forceNext = true; if (mangaOn) schedule(500);
   }
 
   function onImageLoad(e) {
-    if (mangaOn && e.target && e.target.tagName === "IMG") { forceNext = true; schedule(500); }
+    if (e.target && (e.target.tagName === "IMG" || e.target.tagName === "VIDEO")) {
+      requestSync();
+      if (mangaOn) { forceNext = true; schedule(500); }
+    }
   }
 
-  function viewportRect() { return { x: vvPageLeft(), y: vvPageTop(), w: vvW(), h: vvH() }; }
+  // --- الهندسة: إحداثيات الالتقاط (visual viewport) ⇄ layout viewport ⇄ نِسَب من المرساة
+  const toLayout = (r) => ({ x: r.x + vvOffLeft(), y: r.y + vvOffTop(), w: r.w, h: r.h });
   const inside = (a, b) => a.x >= b.x - 1 && a.y >= b.y - 1 && a.x + a.w <= b.x + b.w + 1 && a.y + a.h <= b.y + b.h + 1;
   const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   function overlapRatio(a, b) {
@@ -322,52 +333,160 @@
     if (w <= 0 || h <= 0) return 0;
     return (w * h) / Math.min(a.w * a.h, b.w * b.h);
   }
+  function layoutViewport() { return { x: 0, y: 0, w: innerWidth, h: innerHeight }; }
+
+  const MEDIA = new Set(["IMG", "CANVAS", "VIDEO", "PICTURE", "SVG"]);
+  /** العنصر الذي يحمل الفقاعة عند نقطة (بإحداثيات layout): يفضّل الصورة/Canvas، ويتجاهل طبقتنا. */
+  function anchorAt(x, y) {
+    let list = [];
+    try { list = document.elementsFromPoint(x, y); } catch (e) { return null; }
+    list = list.filter((el) => !(layer && layer.contains(el)) && el !== document.documentElement && el !== document.body);
+    const media = list.find((el) => MEDIA.has(el.tagName.toUpperCase()) || (el.style && el.style.backgroundImage));
+    const el = media || list[0] || null;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return r.width > 20 && r.height > 20 ? el : null;
+  }
+  const srcOf = (el) => (el && (el.currentSrc || el.src || (el.style && el.style.backgroundImage))) || "";
+
+  function fracOf(r, A) { return { x: (r.x - A.left) / A.width, y: (r.y - A.top) / A.height, w: r.w / A.width, h: r.h / A.height }; }
+  function fromFrac(f, A) { return { x: A.left + f.x * A.width, y: A.top + f.y * A.height, w: f.w * A.width, h: f.h * A.height }; }
+
+  /** الهندسة الحالية لعنصر (بإحداثيات layout viewport)، أو null إن اختفت مرساته. */
+  function geom(item) {
+    const b = item.data;
+    if (item.anchor) {
+      if (!item.anchor.isConnected || srcOf(item.anchor) !== item.anchorSrc) return null; // صفحة جديدة/أزيلت
+      const A = item.anchor.getBoundingClientRect();
+      if (A.width < 2 || A.height < 2) return { hidden: true };
+      const k = A.width / item.anchorW0;
+      return {
+        box: fromFrac(item.frac.box, A), area: fromFrac(item.frac.area, A),
+        clean: item.frac.clean ? fromFrac(item.frac.clean, A) : null, k,
+      };
+    }
+    // بلا مرساة: إحداثيات المستند (تتبع تمرير النافذة فقط)
+    const dx = item.docX - scrollX, dy = item.docY - scrollY;
+    const sh = (r) => r && { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h };
+    return { box: sh(item.lay.box), area: sh(item.lay.area), clean: sh(item.lay.clean), k: 1 };
+  }
+
+  function requestSync() {
+    if (syncQueued || !items.length) return;
+    syncQueued = true;
+    requestAnimationFrame(() => { syncQueued = false; syncPositions(); });
+  }
+
+  /** تحريك كل الترجمات مع محتواها؛ حذف ما فقد مرساته؛ إعادة الملاءمة إن تغيّر الحجم. */
+  function syncPositions() {
+    for (let i = items.length - 1; i >= 0; i--) {
+      const it = items[i];
+      const g = geom(it);
+      if (!g) { it.nodes.forEach((n) => n.remove()); items.splice(i, 1); continue; }
+      if (g.hidden) { it.nodes.forEach((n) => (n.style.display = "none")); continue; }
+      it.nodes.forEach((n) => (n.style.display = ""));
+      if (Math.abs(g.k - it.lastK) > 0.03) {
+        // تغيّر حجم الصورة (تكبير/ملاءمة) ⇒ إعادة رسم بنفس النِّسَب
+        it.lastK = g.k; it.nodes.forEach((n) => n.remove()); it.nodes = []; renderBubble(layer, it, g);
+      } else {
+        applyGeom(it, g);
+      }
+      it.rect = g.box;
+    }
+  }
+
+  function applyGeom(it, g) {
+    if (it.cleanNode) {
+      const c = it.cleanKind === "soft" ? pad(g.box, 3) : pad(g.clean || g.box, 1);
+      setRect(it.cleanNode, c);
+    }
+    if (it.textNode) setRect(it.textNode, textArea(it, g));
+  }
+  const pad = (r, p) => ({ x: r.x - p, y: r.y - p, w: r.w + 2 * p, h: r.h + 2 * p });
+  function setRect(n, r) {
+    n.style.transform = `translate(${r.x}px, ${r.y}px)`;
+    n.style.width = r.w + "px"; n.style.height = r.h + "px";
+  }
+  function textArea(it, g) {
+    const base = it.useArea ? g.area : g.box;
+    const inset = Math.max(2, Math.min(10, Math.min(base.w, base.h) * 0.08));
+    return { x: base.x + inset, y: base.y + inset, w: Math.max(24, base.w - 2 * inset), h: Math.max(14, base.h - 2 * inset) };
+  }
+
+  /** بصمة الصور الظاهرة (مصدرها وموقعها): تكشف تقليب الصفحات والتحميل الكسول دون التقاط شاشة. */
+  function mediaSignature() {
+    const out = [];
+    const vh = innerHeight, vw = innerWidth;
+    for (const el of document.querySelectorAll("img, canvas, video")) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 80 || r.height < 80 || r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
+      out.push(srcOf(el).slice(-60) + "@" + Math.round(r.left / 16) + "," + Math.round(r.top / 16) + "," + Math.round(r.width / 16));
+      if (out.length > 24) break;
+    }
+    return out.join("|");
+  }
+
+  function watchTick() {
+    if (!mangaOn || capturing || document.visibilityState !== "visible") return;
+    syncPositions();
+    const sig = mediaSignature();
+    if (sig === lastMediaSig) { pendingSig = ""; return; }
+    // ننتظر ثبات التغيير دورة واحدة (انتهاء الحركة/التحميل) ثم نلتقط
+    if (sig === pendingSig) { pendingSig = ""; schedule(80); } else pendingSig = sig;
+  }
 
   async function captureViewport() {
     if (!mangaOn || document.visibilityState !== "visible") return;
     if (capturing) { schedule(400); return; }
     capturing = true;
     ensureLayer();
+    syncPositions();
     await hideLayer();
-    const vr = viewportRect();
-    const ox = vr.x, oy = vr.y;
+    const lv = layoutViewport();
     // ترجمات تتجاوز حافة الشاشة: نبقيها ونطلب عدم إعادة ترجمة ما تحتها (فقاعة مقصوصة بالحافة)
-    const covered = items.filter((it) => it.scope === "cont" && overlaps(it.rect, vr) && !inside(it.rect, vr))
-      .map((it) => ({ x: it.rect.x - ox, y: it.rect.y - oy, w: it.rect.w, h: it.rect.h }));
+    const covered = items.filter((it) => it.scope === "cont" && it.rect && overlaps(it.rect, lv) && !inside(it.rect, lv))
+      .map((it) => ({ x: it.rect.x - vvOffLeft(), y: it.rect.y - vvOffTop(), w: it.rect.w, h: it.rect.h }));
+    const sig = mediaSignature();
     let res = null;
-    try { res = await send({ type: "captureViewport", vw: vr.w, innerWidth, covered, force: forceNext }); } catch (e) { res = null; }
-    showAfterCapture();
+    try { res = await send({ type: "captureViewport", vw: vvW(), innerWidth, covered, force: forceNext }); } catch (e) { res = null; }
     capturing = false;
-    if (!mangaOn) return;
+    if (!mangaOn) { showAfterCapture(); return; }
     if (!res || res.error) {
+      showAfterCapture();
       // فشل مؤقت (شبكة، نموذج قيد التنزيل...) ⇒ إعادة محاولة بدل التعليق بلا نتيجة
       if (++failStreak <= 3) schedule(3000);
       return;
     }
-    failStreak = 0;
-    forceNext = false;
-    if (res.unchanged) return; // نفس المحتوى والموقع: لا إعادة ترجمة
+    failStreak = 0; forceNext = false; lastMediaSig = sig;
+    if (res.unchanged) { showAfterCapture(); return; } // نفس المحتوى والموقع: لا إعادة ترجمة
     // مسح القديم داخل الشاشة ثم رسم الجديد
     for (let i = items.length - 1; i >= 0; i--) {
       const it = items[i];
-      if (it.scope === "cont" && inside(it.rect, vr)) { it.nodes.forEach((n) => n.remove()); items.splice(i, 1); }
+      if (it.scope === "cont" && it.rect && inside(it.rect, lv)) { it.nodes.forEach((n) => n.remove()); items.splice(i, 1); }
     }
-    placeBoxes(res.boxes || [], ox, oy, "cont");
+    placeBoxes(res.boxes || [], "cont");
+    showAfterCapture();
   }
 
-  /** رسم فقاعات بإحداثيات نسبة للشاشة المرئية (CSS px) + إزاحة الصفحة. */
-  function placeBoxes(boxes, ox, oy, scope) {
+  /** رسم فقاعات بإحداثيات الشاشة المرئية لحظة الالتقاط، مع ربط كل منها بمرساتها. */
+  function placeBoxes(boxes, scope) {
     const l = ensureLayer();
     if (scope === "float") clearOverlays("float"); // ترجمات المربع السابقة تُمسح قبل الجديدة
     const batch = [];
     for (const b of boxes) {
-      const rect = { x: b.box.x + ox, y: b.box.y + oy, w: b.box.w, h: b.box.h };
+      const lay = { box: toLayout(b.box), area: toLayout(b.area || b.box), clean: b.clean ? toLayout(b.clean) : null };
       // لا تراكب: أي ترجمة قديمة تغطي نفس الفقاعة تُزال
       for (let i = items.length - 1; i >= 0; i--) {
-        if (overlapRatio(items[i].rect, rect) > 0.3) { items[i].nodes.forEach((n) => n.remove()); items.splice(i, 1); }
+        if (items[i].rect && overlapRatio(items[i].rect, lay.box) > 0.3) { items[i].nodes.forEach((n) => n.remove()); items.splice(i, 1); }
       }
-      const item = { data: b, ox, oy, rect, scope, nodes: [] };
-      renderBubble(l, item);
+      const item = { data: b, scope, nodes: [], lay, docX: scrollX, docY: scrollY, rect: lay.box, lastK: 1 };
+      const anchor = anchorAt(lay.box.x + lay.box.w / 2, lay.box.y + lay.box.h / 2);
+      if (anchor) {
+        const A = anchor.getBoundingClientRect();
+        item.anchor = anchor; item.anchorSrc = srcOf(anchor); item.anchorW0 = A.width;
+        item.frac = { box: fracOf(lay.box, A), area: fracOf(lay.area, A), clean: lay.clean ? fracOf(lay.clean, A) : null };
+      }
+      renderBubble(l, item, geom(item) || { box: lay.box, area: lay.area, clean: lay.clean, k: 1 });
       items.push(item);
       batch.push(item);
     }
@@ -377,7 +496,10 @@
   function restyleAll() {
     applyLayerVisibility();
     if (!layer) return;
-    for (const item of items) { item.nodes.forEach((n) => n.remove()); item.nodes = []; renderBubble(layer, item); }
+    for (const item of items) {
+      const g = geom(item); if (!g || g.hidden) continue;
+      item.nodes.forEach((n) => n.remove()); item.nodes = []; renderBubble(layer, item, g);
+    }
     harmonize(items);
   }
 
@@ -394,80 +516,64 @@
 
   /**
    * رسم فقاعة واحدة بأسلوب ترجمة Google: خط خفيف وصغير ومتناسق، داخل الفقاعة دائماً.
-   *  CLEAN       : الفقاعة الموحّدة تُطلى بلونها (أبيض غالباً) داخل حدودها، والترجمة داخلها بهامش داخلي آمن.
-   *               على الرسم/الخلفيات المنقطة: رقعة ناعمة الحواف بلون الخلفية تغطي النص الأصلي فقط.
+   *  CLEAN       : الفقاعة الموحّدة تُطلى بلونها داخل حدودها، والترجمة داخلها بهامش داخلي آمن.
+   *               خلفية فاتحة غير موحّدة (screentone): رقعة ناعمة الحواف فوق النص الأصلي فقط.
+   *               خلفية داكنة/رسم متوسط الإضاءة: نص فقط بتوهج خفيف (لا رقع رمادية فوق الرسم).
    *  TRANSLUCENT : خلفية بلون الفقاعة بعتامة 0..35% (بدون ضبابية).
    *  TEXT_ONLY   : نص فقط مع حافة/توهج خفيف.
    */
-  function renderBubble(l, item) {
-    const b = item.data, ox = item.ox, oy = item.oy;
-    const [r, g, bl] = hexToRgb(b.bg);
+  function renderBubble(l, item, g) {
+    const b = item.data;
+    const [r, gr, bl] = hexToRgb(b.bg);
+    const bgLum = (r * 299 + gr * 587 + bl * 114) / 1000;
     const style = cfg.style || "CLEAN";
     const opacity = Math.max(0, Math.min(35, cfg.opacity == null ? 20 : cfg.opacity)) / 100;
     const darkText = b.dark !== false;
-    const solidClean = style === "CLEAN" && b.uniform && b.clean;
-    const softClean = style === "CLEAN" && !solidClean;
+    const solidClean = style === "CLEAN" && b.uniform && !!b.clean;
+    const softClean = style === "CLEAN" && !solidClean && bgLum >= 170;
+    item.useArea = solidClean;
+    item.cleanNode = null; item.cleanKind = null;
 
-    if (solidClean) {
+    if (solidClean || softClean) {
       const c = document.createElement("div");
-      c.className = "safar-lt-clean";
-      c.style.cssText = `left:${b.clean.x + ox - 1}px;top:${b.clean.y + oy - 1}px;width:${b.clean.w + 2}px;height:${b.clean.h + 2}px;background:rgb(${r},${g},${bl});`;
+      c.className = "safar-lt-clean" + (softClean ? " safar-lt-soft" : "");
+      c.style.background = softClean ? `rgba(${r},${gr},${bl},0.93)` : `rgb(${r},${gr},${bl})`;
+      if (softClean) c.style.boxShadow = `0 0 6px 4px rgba(${r},${gr},${bl},0.93)`;
       l.appendChild(c); item.nodes.push(c);
-    } else if (softClean) {
-      // رقعة ناعمة (حواف متدرجة) فوق النص الأصلي فقط — تخفيه دون صندوق حاد يشوّه الرسم
-      const c = document.createElement("div");
-      c.className = "safar-lt-clean safar-lt-soft";
-      const p = 3;
-      c.style.cssText = `left:${b.box.x + ox - p}px;top:${b.box.y + oy - p}px;width:${b.box.w + 2 * p}px;height:${b.box.h + 2 * p}px;` +
-        `background:rgba(${r},${g},${bl},0.93);box-shadow:0 0 6px 4px rgba(${r},${g},${bl},0.93);`;
-      l.appendChild(c); item.nodes.push(c);
+      item.cleanNode = c; item.cleanKind = softClean ? "soft" : "solid";
     }
-
-    // مساحة الكتابة + هامش داخلي آمن حتى لا يلامس النص حواف الفقاعة
-    const base = solidClean ? b.area : b.box;
-    const inset = Math.max(2, Math.min(10, Math.min(base.w, base.h) * 0.08));
-    const area = { x: base.x + inset, y: base.y + inset, w: Math.max(24, base.w - 2 * inset), h: Math.max(14, base.h - 2 * inset) };
 
     const t = document.createElement("div");
     t.className = "safar-lt-text";
     t.dir = cfg.rtl ? "rtl" : "ltr";
-    t.style.left = (area.x + ox) + "px";
-    t.style.top = (area.y + oy) + "px";
-    t.style.width = area.w + "px";
-    t.style.height = area.h + "px";
     t.style.color = darkText ? "#1a1a1a" : "#fff";
     const span = document.createElement("span");
     span.textContent = b.text;
     t.appendChild(span);
-
     if (!solidClean && !softClean) {
       t.classList.add(darkText ? "safar-glow-light" : "safar-glow-dark");
-      if (style === "TRANSLUCENT" && opacity > 0) t.style.background = `rgba(${r},${g},${bl},${opacity})`;
+      if (style === "TRANSLUCENT" && opacity > 0) t.style.background = `rgba(${r},${gr},${bl},${opacity})`;
     }
-
     // لمسة: إظهار النص الأصلي / العودة للترجمة
     t.addEventListener("click", (e) => {
       e.stopPropagation(); e.preventDefault();
       const showOrig = !t.classList.contains("safar-show-orig");
       t.classList.toggle("safar-show-orig", showOrig);
       span.textContent = showOrig ? b.orig : b.text;
-      item.nodes.forEach((n) => { if (n !== t) n.style.visibility = showOrig ? "hidden" : ""; });
+      if (item.cleanNode) item.cleanNode.style.visibility = showOrig ? "hidden" : "";
       fitText(t, span, item.maxFont);
     });
     l.appendChild(t); item.nodes.push(t);
-    // الحد الأعلى للخط: قريب من حجم النص الأصلي (لا يكبر عنه) — مثل Google
-    item.maxFont = Math.max(9, Math.min(17, (b.lh || 16) * 0.82));
-    item.span = span; item.textBox = t;
+    item.textNode = t; item.span = span;
+    applyGeom(item, g);
+    // الحد الأعلى للخط: قريب من حجم النص الأصلي (لا يكبر عنه) ويتبع تكبير الصورة — مثل Google
+    item.maxFont = Math.max(9, Math.min(17 * (g.k || 1), (b.lh || 16) * 0.82 * (g.k || 1)));
     item.fitted = fitText(t, span, item.maxFont);
   }
 
   const MIN_FONT = 7;
 
-  /**
-   * أكبر حجم خط (بحث ثنائي) يجعل النص كله داخل المساحة، بين MIN_FONT والحد الأعلى.
-   * الأسطر متوازنة (text-wrap: balance) والكلمات الطويلة تلتف بدل أن تخرج عن الحدود.
-   * @return الحجم المختار.
-   */
+  /** أكبر حجم خط يجعل النص كله داخل المساحة (بحث ثنائي)، أسطر متوازنة، لا خروج عن الحدود. */
   function fitText(box, span, maxFont) {
     const maxW = box.clientWidth, maxH = box.clientHeight;
     const fits = () => span.offsetHeight <= maxH && span.scrollWidth <= maxW + 0.5;
@@ -489,32 +595,32 @@
     const sizes = batch.map((it) => it.fitted).filter(Boolean).sort((a, b) => a - b);
     if (sizes.length < 3) return;
     const cap = sizes[Math.floor(sizes.length / 2)] * 1.15;
-    for (const it of batch) {
-      if (it.fitted > cap) { it.span.style.fontSize = cap + "px"; it.fitted = cap; }
-    }
+    for (const it of batch) if (it.fitted > cap) { it.span.style.fontSize = cap + "px"; it.fitted = cap; }
+  }
+
+  // مستمعو المزامنة يعملون دائماً (للمربع العائم أيضاً)، أما الالتقاط التلقائي فللوضع المستمر فقط
+  if (isTop) {
+    document.addEventListener("scroll", onAnyScroll, { capture: true, passive: true });
+    window.addEventListener("resize", onZoom, { passive: true });
+    if (VV) { VV.addEventListener("resize", onZoom, { passive: true }); VV.addEventListener("scroll", requestSync, { passive: true }); }
+    document.addEventListener("load", onImageLoad, true);
+    window.addEventListener("popstate", onAnyScroll);
+    setInterval(() => { if (items.length && !mangaOn) syncPositions(); }, 700);
   }
 
   function startManga() {
-    mangaOn = true; forceNext = true; failStreak = 0;
+    mangaOn = true; forceNext = true; failStreak = 0; lastMediaSig = "";
     ensureLayer();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onZoom, { passive: true });
-    if (VV) { VV.addEventListener("resize", onZoom, { passive: true }); VV.addEventListener("scroll", onScroll, { passive: true }); }
-    document.addEventListener("load", onImageLoad, true); // صور كسولة التحميل
-    window.addEventListener("popstate", onScroll);
     schedule(300); // فور فتح الصفحة
-    // محاولات إضافية قليلة لصور تتأخر في التحميل (بدون فحص دوري دائم حتى لا تومض الترجمات)
+    // محاولات إضافية لصور تتأخر في التحميل + مراقبة تغيّر الصور الظاهرة (تقليب الصفحات)
     tickTimer = [1800, 4500].map((d) => setTimeout(() => { if (mangaOn && !capturing) captureViewport(); }, d));
+    watchTimer = setInterval(watchTick, 700);
   }
 
   function stopManga() {
     mangaOn = false;
     clearTimeout(scrollTimer); (tickTimer || []).forEach(clearTimeout); tickTimer = null;
-    window.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", onZoom);
-    if (VV) { VV.removeEventListener("resize", onZoom); VV.removeEventListener("scroll", onScroll); }
-    document.removeEventListener("load", onImageLoad, true);
-    window.removeEventListener("popstate", onScroll);
+    clearInterval(watchTimer); watchTimer = null;
     clearOverlays("cont");
   }
 

@@ -22,6 +22,8 @@ interface TabEvents {
     fun onTabCreated(tab: BrowserTab) {}
     fun onLocationChanged(tab: BrowserTab) {}
     fun onTitleChanged(tab: BrowserTab) {}
+    /** ضغط مطوّل على رابط/صورة في الصفحة. */
+    fun onContextMenu(tab: BrowserTab, element: ContentDelegate.ContextElement) {}
     fun onExternalResponse(tab: BrowserTab, response: WebResponse) {}
     fun onExternalUri(uri: String): Boolean = false
     fun onMediaActivated(tab: BrowserTab, media: MediaSession) {}
@@ -213,6 +215,9 @@ class TabManager(
                 events.onExternalResponse(tab, response)
             }
             override fun onCloseRequest(session: GeckoSession) { close(tab.id) }
+            override fun onContextMenu(session: GeckoSession, screenX: Int, screenY: Int, element: ContentDelegate.ContextElement) {
+                events.onContextMenu(tab, element)
+            }
             override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) { tab.fullscreen = fullScreen }
             override fun onCrash(session: GeckoSession) { session.open(runtime); session.reload() }
             override fun onKill(session: GeckoSession) { session.open(runtime); session.loadUri(tab.url) }

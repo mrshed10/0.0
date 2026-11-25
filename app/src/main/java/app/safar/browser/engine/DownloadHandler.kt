@@ -13,6 +13,21 @@ import org.mozilla.geckoview.WebResponse
 /** التنزيل عبر DownloadManager للنظام أو تسليم الرابط لمدير تحميل خارجي (ADM, 1DM, ...). */
 class DownloadHandler(private val context: Context) {
 
+    /** تنزيل رابط مباشرة (من قائمة الضغط المطوّل). */
+    fun downloadUrl(url: String, settings: BrowserSettings, privateTab: Boolean) {
+        val fileName = URLUtil.guessFileName(url, null, null)
+        val req = DownloadManager.Request(Uri.parse(url))
+            .setTitle(fileName)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            .setNotificationVisibility(
+                if (settings.downloadNotifications) DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                else DownloadManager.Request.VISIBILITY_HIDDEN
+            )
+        if (privateTab) req.setVisibleInDownloadsUi(false)
+        (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+        Toast.makeText(context, "بدأ التنزيل: $fileName", Toast.LENGTH_SHORT).show()
+    }
+
     fun handle(response: WebResponse, settings: BrowserSettings, privateTab: Boolean) {
         val url = response.uri
         val disposition = response.headers["Content-Disposition"] ?: response.headers["content-disposition"]

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddBox
 import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.ChromeReaderMode
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DesktopWindows
 import androidx.compose.material.icons.outlined.DownloadDone
@@ -59,6 +60,7 @@ class MenuActions(
     val clearData: () -> Unit,
     val downloads: () -> Unit,
     val bookmarks: () -> Unit,
+    val readingList: () -> Unit,
     val recentTabs: () -> Unit,
     val translate: () -> Unit,
     val toggleDesktop: () -> Unit,
@@ -107,6 +109,7 @@ fun MainMenu(
         HorizontalDivider()
         Item(Icons.Outlined.DownloadDone, "عمليات التنزيل", onDismiss, a.downloads)
         Item(Icons.Outlined.Bookmarks, "الإشارات المرجعية", onDismiss, a.bookmarks)
+        Item(Icons.Outlined.ChromeReaderMode, "قائمة القراءة", onDismiss, a.readingList)
         Item(Icons.Outlined.Devices, "علامات التبويب الأخيرة", onDismiss, a.recentTabs)
         HorizontalDivider()
         Item(Icons.Outlined.Share, "مشاركة", onDismiss, a.share)

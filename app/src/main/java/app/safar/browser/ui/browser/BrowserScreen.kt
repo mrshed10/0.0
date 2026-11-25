@@ -50,6 +50,7 @@ fun BrowserScreen(
     openBookmarks: () -> Unit,
     openHistory: () -> Unit,
     openNewTabSettings: () -> Unit,
+    openReadingList: () -> Unit,
 ) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val bookmarks by vm.bookmarks.collectAsStateWithLifecycle()
@@ -229,6 +230,7 @@ fun BrowserScreen(
                                 clearData = { showClearData = true },
                                 downloads = vm::openDownloads,
                                 bookmarks = openBookmarks,
+                                readingList = openReadingList,
                                 recentTabs = { showRecent = true },
                                 translate = { showTranslate = true; vm.countAction(QuickAction.TRANSLATE) },
                                 toggleDesktop = vm::toggleDesktopMode,
@@ -263,6 +265,31 @@ fun BrowserScreen(
 
     if (showTranslate) {
         TranslatePanel(vm = vm, onDismiss = { showTranslate = false })
+    }
+    val linkTarget by vm.linkTarget.collectAsStateWithLifecycle()
+    val previewUrl by vm.previewUrl.collectAsStateWithLifecycle()
+    linkTarget?.let { t ->
+        LinkContextSheet(
+            t,
+            LinkActions(
+                newTab = vm::openLinkInNewTab,
+                newTabInGroup = vm::openLinkInGroup,
+                incognito = vm::openLinkIncognito,
+                newWindow = vm::openLinkInNewWindow,
+                preview = { vm.previewUrl.value = it },
+                copyAddress = { vm.copyToClipboard("رابط", it) },
+                copyText = { vm.copyToClipboard("نص الرابط", it) },
+                download = { vm.downloadLink(it) },
+                readingList = { u, title -> vm.addToReadingList(u, title) },
+                share = vm::shareLink,
+            ),
+            onDismiss = { vm.linkTarget.value = null },
+        )
+    }
+    previewUrl?.let { u ->
+        PagePreviewSheet(u, newSession = { vm.newPreviewSession(it, tab?.isPrivate == true) }, onOpen = vm::openLinkInNewTab) {
+            vm.previewUrl.value = null
+        }
     }
     if (showRecent) RecentTabsSheet(vm.tabs.recentlyClosed, vm::reopenClosed) { showRecent = false }
     if (showClearData) ClearDataDialog(onDismiss = { showClearData = false }, onConfirm = vm::clearBrowsingData)

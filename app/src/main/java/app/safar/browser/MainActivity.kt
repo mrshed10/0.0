@@ -32,6 +32,7 @@ import app.safar.browser.ui.browser.BookmarksScreen
 import app.safar.browser.ui.browser.BrowserScreen
 import app.safar.browser.ui.browser.ClearDataDialog
 import app.safar.browser.ui.browser.HistoryScreen
+import app.safar.browser.ui.browser.ReadingListScreen
 import app.safar.browser.ui.settings.DnsSettingsScreen
 import app.safar.browser.ui.settings.NewTabSettingsScreen
 import app.safar.browser.ui.extensions.ExtensionsScreen
@@ -42,7 +43,7 @@ import app.safar.browser.ui.theme.SafarTheme
 import org.mozilla.geckoview.GeckoView
 import java.lang.ref.WeakReference
 
-enum class Screen { BROWSER, SETTINGS, TOOLBAR, EXTENSIONS, BOOKMARKS, HISTORY, DNS, NEWTAB }
+enum class Screen { BROWSER, SETTINGS, TOOLBAR, EXTENSIONS, BOOKMARKS, HISTORY, DNS, NEWTAB, READING }
 
 class MainActivity : ComponentActivity() {
     private val vm: BrowserViewModel by viewModels()
@@ -87,6 +88,7 @@ class MainActivity : ComponentActivity() {
                         openBookmarks = { screen = Screen.BOOKMARKS },
                         openHistory = { screen = Screen.HISTORY },
                         openNewTabSettings = { screen = Screen.NEWTAB },
+                        openReadingList = { screen = Screen.READING },
                     )
                     Screen.SETTINGS -> SettingsScreen(
                         vm = vm,
@@ -105,6 +107,9 @@ class MainActivity : ComponentActivity() {
                         }, onClearData = { clear = true })
                         if (clear) ClearDataDialog(onDismiss = { clear = false }, onConfirm = vm::clearBrowsingData)
                     }
+                    Screen.READING -> ReadingListScreen(vm = vm, onBack = { screen = Screen.BROWSER }, onOpen = {
+                        vm.load(it); screen = Screen.BROWSER
+                    })
                     Screen.DNS -> DnsSettingsScreen(vm = vm, onBack = { screen = Screen.SETTINGS })
                     Screen.NEWTAB -> NewTabSettingsScreen(vm = vm, onBack = { screen = Screen.BROWSER })
                     Screen.BOOKMARKS -> BookmarksScreen(vm = vm, onBack = { screen = Screen.BROWSER }, onOpen = {

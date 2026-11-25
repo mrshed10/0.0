@@ -8,6 +8,8 @@ import app.safar.browser.data.BookmarkStore
 import app.safar.browser.data.BrowserSettings
 import app.safar.browser.data.HistoryEntry
 import app.safar.browser.data.HistoryStore
+import app.safar.browser.data.ReadingItem
+import app.safar.browser.data.ReadingListStore
 import app.safar.browser.data.SessionStore
 import app.safar.browser.data.SettingsRepository
 import app.safar.browser.data.TabSnapshot
@@ -24,6 +26,7 @@ data class BackupPayload(
     val tabs: List<TabSnapshot>,
     /** السجل (أُضيف في الإصدار 2 من صيغة النسخة؛ النسخ القديمة تُقرأ بقائمة فارغة). */
     val history: List<HistoryEntry> = emptyList(),
+    val readingList: List<ReadingItem> = emptyList(),
 )
 
 /**
@@ -37,10 +40,12 @@ class BackupManager(
     private val bookmarks: BookmarkStore,
     private val sessions: SessionStore,
     private val history: HistoryStore,
+    private val readingList: ReadingListStore,
 ) {
     suspend fun export(uri: Uri, password: CharArray, currentTabs: List<TabSnapshot>) = withContext(Dispatchers.IO) {
         val payload = BackupPayload(
             settings = settings.current(), bookmarks = bookmarks.items.value, tabs = currentTabs, history = history.items.value,
+            readingList = readingList.items.value,
         )
         val json = AppJson.encodeToString(BackupPayload.serializer(), payload).toByteArray()
         val enc = BackupCrypto.encrypt(json, password)
@@ -56,6 +61,7 @@ class BackupManager(
         bookmarks.set(payload.bookmarks)
         sessions.set(payload.tabs)
         if (payload.history.isNotEmpty()) history.set(payload.history)
+        if (payload.readingList.isNotEmpty()) readingList.set(payload.readingList)
         payload
     }
 }

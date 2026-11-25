@@ -57,4 +57,17 @@ class HistoryStore(context: Context) : JsonListStore<HistoryEntry>(context, "his
     suspend fun clearSince(sinceMillis: Long) = set(items.value.filter { it.time < sinceMillis })
 }
 
+@Serializable
+data class ReadingItem(val url: String, val title: String, val time: Long = System.currentTimeMillis(), val read: Boolean = false)
+
+/** قائمة القراءة: صفحات محفوظة للرجوع إليها لاحقاً. */
+class ReadingListStore(context: Context) : JsonListStore<ReadingItem>(context, "reading_list.json", ReadingItem.serializer()) {
+    suspend fun add(url: String, title: String) {
+        if (items.value.any { it.url == url }) return
+        set(listOf(ReadingItem(url, title)) + items.value)
+    }
+    suspend fun markRead(url: String) = set(items.value.map { if (it.url == url) it.copy(read = true) else it })
+    suspend fun remove(url: String) = set(items.value.filterNot { it.url == url })
+}
+
 class SessionStore(context: Context) : JsonListStore<TabSnapshot>(context, "session.json", TabSnapshot.serializer())

@@ -57,6 +57,9 @@ import org.mozilla.geckoview.MediaSession
 import org.mozilla.geckoview.WebResponse
 import java.lang.ref.WeakReference
 
+/** هدف الضغط المطوّل: رابط و/أو صورة. */
+data class LinkTarget(val url: String?, val text: String, val title: String, val imageSrc: String?, val private: Boolean)
+
 data class InstallRequest(val name: String, val permissions: List<String>, val answer: CompletableDeferred<Boolean>)
 
 class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
@@ -65,6 +68,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
     val keys: SecureKeyStore = c.keys
     val bookmarks = c.bookmarks.items
     val history = c.history.items
+    val readingList = c.readingList.items
+    val linkTarget = MutableStateFlow<LinkTarget?>(null)
+    val previewUrl = MutableStateFlow<String?>(null)
     val pageReader = PageReader(app)
     private val storeBridge = ChromeStoreBridge()
 
@@ -157,6 +163,19 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
         val s = settings.value
         val wantDesktop = host != null && (host in s.desktopSites || (s.autoDesktopForWebStore && ChromeStore.isStoreUrl(tab.url)))
         if (wantDesktop && !tab.desktopMode) tabs.setDesktopMode(tab, true)
+    }
+
+    override fun onContextMenu(tab: BrowserTab, element: GeckoSession.ContentDelegate.ContextElement) {
+        val link = element.linkUri
+        val img = element.srcUri?.takeIf { element.type == GeckoSession.ContentDelegate.ContextElement.TYPE_IMAGE }
+        if (link == null && img == null) return
+        linkTarget.value = LinkTarget(
+            url = link,
+            text = element.textContent?.trim().orEmpty(),
+            title = element.title ?: element.altText ?: "",
+            imageSrc = img,
+            private = tab.isPrivate,
+        )
     }
 
     override fun onTitleChanged(tab: BrowserTab) {
@@ -420,6 +439,62 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app), TabEvents {
         val (text, lang) = translate.requestPageText(tabs.selected?.session) ?: run { toast("تعذر قراءة نص الصفحة"); return@launch }
         if (text.isBlank()) { toast("لا يوجد نص للقراءة"); return@launch }
         pageReader.speak(text, lang)
+    }
+
+    // ---------------------------------------------------------------- قائمة الضغط المطوّل على الروابط
+
+    /** يفتح الرابط في تبويب جديد في الخلفية (تبقى الصفحة الحالية ظاهرة كما في Chrome). */
+    fun openLinkInNewTab(url: String) {
+        val cur = tabs.selected
+        tabs.newTab(url, private = cur?.isPrivate == true, select = false, desktop = settings.value.desktopByDefault)
+        toast("فُتح الرابط في علامة تبويب جديدة")
+    }
+
+    /** تبويب جديد ضمن مجموعة التبويب الحالي (أو مجموعة جديدة تضم الاثنين). */
+    fun openLinkInGroup(url: String) {
+        val cur = tabs.selected ?: return openLinkInNewTab(url)
+        val gid = cur.groupId ?: tabs.addToNewGroup(cur).id
+        val t = tabs.newTab(url, private = cur.isPrivate, select = false)
+        tabs.moveToGroup(t, gid)
+        toast("أُضيف إلى ${tabs.groups.firstOrNull { it.id == gid }?.name ?: "المجموعة"}")
+    }
+
+    fun openLinkIncognito(url: String) { tabs.newTab(url, private = true) }
+
+    /** "نافذة جديدة": تبويب في مجموعة مستقلة باسم نافذة، ويُعرض فوراً (سفر يعمل بنافذة واحدة على أندرويد). */
+    fun openLinkInNewWindow(url: String) {
+        val t = tabs.newTab(url, private = tabs.selected?.isPrivate == true)
+        val g = tabs.addToNewGroup(t)
+        toast("فُتح في ${g.name}")
+    }
+
+    fun copyToClipboard(label: String, text: String) {
+        val cm = getApplication<Application>().getSystemService(android.content.ClipboardManager::class.java)
+        cm.setPrimaryClip(android.content.ClipData.newPlainText(label, text))
+        if (Build.VERSION.SDK_INT < 33) toast("تم النسخ")
+    }
+
+    fun downloadLink(url: String) = downloads.downloadUrl(url, settings.value, tabs.selected?.isPrivate == true)
+
+    fun addToReadingList(url: String, title: String) = viewModelScope.launch {
+        c.readingList.add(url, title.ifBlank { UrlUtils.display(url) })
+        toast("أُضيف إلى قائمة القراءة")
+    }
+
+    fun removeFromReadingList(url: String) = viewModelScope.launch { c.readingList.remove(url) }
+    fun markRead(url: String) = viewModelScope.launch { c.readingList.markRead(url) }
+
+    fun shareLink(url: String, title: String) {
+        val i = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
+        activity?.get()?.startActivity(Intent.createChooser(i, title.ifBlank { url }))
+    }
+
+    /** جلسة معاينة سريعة (لا تُضاف للتبويبات ولا للسجل). */
+    fun newPreviewSession(url: String, private: Boolean): GeckoSession {
+        val s = GeckoSession(org.mozilla.geckoview.GeckoSessionSettings.Builder().usePrivateMode(private).build())
+        s.open(c.runtime)
+        s.loadUri(url)
+        return s
     }
 
     // ---------------------------------------------------------------- Intents

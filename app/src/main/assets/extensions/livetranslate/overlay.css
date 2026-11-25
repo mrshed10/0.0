@@ -1,11 +1,12 @@
-.safar-lt-layer { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 2147483646; pointer-events: none; }
+/* طبقة ثابتة بإحداثيات الشاشة؛ كل ترجمة تُحرَّك بـ transform في كل إطار تبعاً لموقع صورتها الفعلي */
+.safar-lt-layer { position: fixed; top: 0; left: 0; width: 0; height: 0; z-index: 2147483646; pointer-events: none; contain: layout style; }
 
 /* طلاء مكان النص الأصلي بلون الفقاعة نفسه (مستطيل داخل حدود الفقاعة فقط ⇒ الخطوط السوداء تبقى سليمة) */
-.safar-lt-clean { position: absolute; box-sizing: border-box; pointer-events: none; border-radius: 6px; }
+.safar-lt-clean { position: absolute; left: 0; top: 0; box-sizing: border-box; pointer-events: none; border-radius: 6px; will-change: transform; }
 
 /* الترجمة داخل الفقاعة بأسلوب ترجمة Google: خط خفيف، أسطر متوازنة، لا خروج عن الحدود أبداً */
 .safar-lt-text {
-  position: absolute; box-sizing: border-box; pointer-events: auto;
+  position: absolute; left: 0; top: 0; will-change: transform; box-sizing: border-box; pointer-events: auto;
   display: flex; align-items: center; justify-content: center; text-align: center;
   padding: 0; overflow: hidden;
   font-family: "Noto Sans Arabic", "Noto Naskh Arabic", "Roboto", system-ui, sans-serif;
